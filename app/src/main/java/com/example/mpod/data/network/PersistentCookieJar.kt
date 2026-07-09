@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.concurrent.ConcurrentHashMap
 
 class PersistentCookieJar(context: Context) : CookieJar {
@@ -18,7 +19,7 @@ class PersistentCookieJar(context: Context) : CookieJar {
             val urlString = key
             val cookieStrings = (value as? String)?.split(";") ?: emptyList()
             
-            val url = HttpUrl.parse(urlString)
+            val url = urlString.toHttpUrlOrNull()
             if (url != null) {
                 val cookies = cookieStrings.mapNotNull { Cookie.parse(url, it) }
                 cookieStore[urlString] = cookies
@@ -27,7 +28,7 @@ class PersistentCookieJar(context: Context) : CookieJar {
     }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val urlString = url.host()
+        val urlString = url.host
         cookieStore[urlString] = cookies
 
         // Save to preferences
@@ -36,6 +37,6 @@ class PersistentCookieJar(context: Context) : CookieJar {
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        return cookieStore[url.host()] ?: emptyList()
+        return cookieStore[url.host] ?: emptyList()
     }
 }
