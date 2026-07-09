@@ -29,11 +29,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -84,7 +84,7 @@ fun PageHeader(
                     iconRes = R.drawable.ic_refresh_dot,
                     contentDescription = "Refresh",
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     elevation = 0.dp
                 )
                 SquareIconButton(
@@ -126,7 +126,7 @@ fun SquareIconButton(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(size)
-            .then(if (elevation > 0.dp) Modifier.shadow(elevation, RoundedCornerShape(radius), clip = false) else Modifier)
+            .then(if (elevation > 0.dp) Modifier.figmaDropShadow(radius = radius) else Modifier)
             .clip(RoundedCornerShape(radius))
             .background(containerColor)
             .then(if (border == null) Modifier else Modifier.border(border, RoundedCornerShape(radius)))
@@ -149,13 +149,18 @@ fun MpodButton(
     outlined: Boolean = false,
     height: Dp = 32.dp,
     radius: Dp = 8.dp,
+    iconRes: Int? = null,
+    containerColor: Color? = null,
+    contentColor: Color? = null,
+    elevation: Dp = 1.dp,
     onClick: () -> Unit = {}
 ) {
-    val background = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
-    val foreground = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+    val background = containerColor ?: if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+    val foreground = contentColor ?: if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
     Box(
         modifier = modifier
             .height(height)
+            .then(if (elevation > 0.dp) Modifier.figmaDropShadow(radius = radius) else Modifier)
             .clip(RoundedCornerShape(radius))
             .background(background)
             .then(if (outlined) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(radius)) else Modifier)
@@ -163,16 +168,29 @@ fun MpodButton(
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = foreground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (iconRes != null) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = foreground
+                )
+            }
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = foreground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -182,12 +200,16 @@ fun MpodInput(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "",
-    trailingIconRes: Int? = null
+    trailingIconRes: Int? = null,
+    trailingIconContentDescription: String? = null,
+    onTrailingIconClick: (() -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
+        visualTransformation = visualTransformation,
         textStyle = TextStyle(
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             fontSize = 16.sp,
@@ -197,6 +219,7 @@ fun MpodInput(
         ),
         modifier = modifier
             .height(36.dp)
+            .figmaDropShadow(radius = 8.dp, blur = 2.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.background)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
@@ -220,11 +243,22 @@ fun MpodInput(
                     innerTextField()
                 }
                 if (trailingIconRes != null) {
+                    val iconModifier = if (onTrailingIconClick == null) {
+                        Modifier.size(16.dp)
+                    } else {
+                        Modifier
+                            .size(16.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onTrailingIconClick
+                            )
+                    }
                     Spacer(modifier = Modifier.width(10.dp))
                     Icon(
                         painter = painterResource(id = trailingIconRes),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        contentDescription = trailingIconContentDescription,
+                        modifier = iconModifier,
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -240,7 +274,10 @@ fun LabeledInput(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
-    trailingIconRes: Int? = null
+    trailingIconRes: Int? = null,
+    trailingIconContentDescription: String? = null,
+    onTrailingIconClick: (() -> Unit)? = null,
+    visualTransformation: VisualTransformation = VisualTransformation.None
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -258,6 +295,9 @@ fun LabeledInput(
             onValueChange = onValueChange,
             placeholder = placeholder,
             trailingIconRes = trailingIconRes,
+            trailingIconContentDescription = trailingIconContentDescription,
+            onTrailingIconClick = onTrailingIconClick,
+            visualTransformation = visualTransformation,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -360,11 +400,13 @@ fun MpodOutlinedSurface(
     content: @Composable () -> Unit
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (elevation > 0.dp) Modifier.figmaDropShadow(radius = radius) else Modifier
+        ),
         shape = RoundedCornerShape(radius),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         content()
     }

@@ -15,13 +15,14 @@ import androidx.compose.ui.unit.sp
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PlayerView
+import com.example.mpod.ui.components.figmaDropShadow
 
 @Composable
 fun HomeScreen() {
     val episodes = listOf(
         Triple("Why store loyalty cards became a UX minefield", "54m", true),
-        Triple("How public transit maps teach invisible habits", "36m", true),
-        Triple("The app menu nobody understands but everyone...", "43m", true)
+        Triple("How public transit maps teach invisible habits", "36m", false),
+        Triple("The app menu nobody understands but everyone...", "43m", false)
     )
 
     Column(
@@ -48,10 +49,11 @@ fun HomeScreen() {
             Card(
                 shape = RoundedCornerShape(4.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
+                    .figmaDropShadow(radius = 4.dp)
             ) {
                 Box(
                     contentAlignment = Alignment.CenterStart,

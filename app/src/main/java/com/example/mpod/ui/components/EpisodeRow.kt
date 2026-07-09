@@ -42,6 +42,8 @@ fun EpisodeRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .height(76.dp)
+            .figmaDropShadow(radius = 4.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
             .padding(horizontal = if (showDragHandle) 8.dp else 12.dp, vertical = 8.dp),

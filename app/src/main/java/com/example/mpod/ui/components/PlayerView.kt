@@ -57,19 +57,23 @@ fun PlayerView(
         }
     }
 
-    // Figma: border 1dp, radius 16dp, shadow 0px 1px 1px rgba(0,0,0,0.1)
+    // Figma: 320x246, border 1dp, radius 16dp, shadow-xs.
     OutlinedCard(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = modifier.fillMaxWidth()
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(246.dp)
+            .figmaDropShadow(radius = 16.dp)
     ) {
         Column(
             modifier = Modifier
+                .fillMaxSize()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Title and Subtitle — gap 8dp
@@ -217,7 +221,7 @@ fun PlayerView(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_note),
                         contentDescription = "Notes",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(30.dp)
                     )
                 }

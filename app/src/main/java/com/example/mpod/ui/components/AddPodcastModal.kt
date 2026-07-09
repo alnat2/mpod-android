@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -25,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +53,11 @@ fun AddPodcastModal(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(8.dp, RoundedCornerShape(8.dp))
+                .figmaDropShadow(
+                    radius = 8.dp,
+                    offsetY = 8.dp,
+                    blur = 9.dp
+                )
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
@@ -137,11 +141,11 @@ fun AddPodcastModal(
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
-                    Text(
-                        text = "Import your podcast subscriptions from an OPML file.",
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    FileDropzone(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(232.dp),
+                        onBrowse = onImportOpml
                     )
                 }
             }
@@ -155,6 +159,7 @@ fun AddPodcastModal(
                 MpodButton(
                     text = "Cancel",
                     primary = false,
+                    elevation = 0.dp,
                     modifier = Modifier.weight(1f),
                     onClick = onDismiss
                 )
@@ -171,6 +176,61 @@ fun AddPodcastModal(
 }
 
 @Composable
+fun FileDropzone(
+    modifier: Modifier = Modifier,
+    onBrowse: () -> Unit = {}
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .figmaDashedBorder(
+                color = MaterialTheme.colorScheme.primary,
+                radius = 8.dp
+            )
+            .clickable(onClick = onBrowse)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Drag and drop your file",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Icon(
+                painter = painterResource(id = R.drawable.ic_file_upload),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(80.dp)
+            )
+            Text(
+                text = "or click to browse from your computer",
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        MpodButton(
+            text = "Browse files",
+            primary = false,
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.primary,
+            elevation = 0.dp,
+            height = 36.dp,
+            modifier = Modifier.width(140.dp),
+            onClick = onBrowse
+        )
+    }
+}
+
+@Composable
 private fun ModalTab(
     text: String,
     selected: Boolean,
@@ -183,7 +243,7 @@ private fun ModalTab(
             .then(
                 if (selected) {
                     Modifier
-                        .shadow(1.dp, RoundedCornerShape(8.dp))
+                        .figmaDropShadow(radius = 8.dp)
                         .background(MaterialTheme.colorScheme.background)
                         .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                 } else {

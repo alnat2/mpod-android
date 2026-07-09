@@ -31,6 +31,7 @@ fun PodcastCard(
         modifier = modifier
             .fillMaxWidth()
             .height(160.dp)
+            .figmaDropShadow(radius = 16.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(background)
             .then(
@@ -100,12 +101,16 @@ fun PodcastCard(
                 text = "Refresh",
                 primary = false,
                 outlined = true,
+                iconRes = R.drawable.ic_refresh_dot,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.onBackground,
                 height = 32.dp,
                 modifier = Modifier.weight(1f)
             )
             MpodButton(
                 text = "Unsubscribe",
                 primary = false,
+                elevation = 0.dp,
                 height = 32.dp,
                 modifier = Modifier.weight(1f),
                 onClick = onUnsubscribe
@@ -122,6 +127,7 @@ fun MarkAllListenedHeader(
         modifier = modifier
             .fillMaxWidth()
             .height(50.dp)
+            .figmaDropShadow(radius = 4.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 12.dp)

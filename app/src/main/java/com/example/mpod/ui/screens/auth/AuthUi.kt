@@ -16,10 +16,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
@@ -37,6 +43,8 @@ fun AuthScreen(
     password: String,
     onPasswordChange: (String) -> Unit
 ) {
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -62,7 +70,8 @@ fun AuthScreen(
 
         MpodOutlinedSurface(
             modifier = Modifier.fillMaxWidth(),
-            radius = 10.dp
+            radius = 10.dp,
+            elevation = 1.dp
         ) {
             Column(
                 modifier = Modifier
@@ -88,7 +97,14 @@ fun AuthScreen(
                     value = password,
                     onValueChange = onPasswordChange,
                     placeholder = "Create a password",
-                    trailingIconRes = R.drawable.ic_view
+                    trailingIconRes = if (passwordVisible) R.drawable.ic_view else R.drawable.ic_view_off,
+                    trailingIconContentDescription = if (passwordVisible) "Hide password" else "Show password",
+                    onTrailingIconClick = { passwordVisible = !passwordVisible },
+                    visualTransformation = if (passwordVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    }
                 )
                 MpodButton(
                     text = submitLabel,
