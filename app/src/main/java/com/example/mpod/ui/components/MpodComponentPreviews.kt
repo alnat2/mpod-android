@@ -79,6 +79,19 @@ private fun MpodMobileComponentsPreview() {
                 modifier = Modifier.fillMaxWidth()
             )
 
+            PreviewLabel("Show Notes Mobile")
+            ShowNotesMobile()
+
+            PreviewLabel("AuthCard Mobile")
+            AuthCardMobile(
+                title = "Create your account",
+                submitLabel = "Create account",
+                username = "",
+                onUsernameChange = {},
+                password = "",
+                onPasswordChange = {}
+            )
+
             PreviewLabel("Auth Inputs")
             LabeledInput(
                 label = "Username",
@@ -101,6 +114,19 @@ private fun MpodMobileComponentsPreview() {
                 onNavigate = {}
             )
         }
+    }
+}
+
+@Preview(
+    name = "Modal screen mobile / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun ModalScreenMobilePreview() {
+    MpodTheme {
+        ModalScreenMobile()
     }
 }
 

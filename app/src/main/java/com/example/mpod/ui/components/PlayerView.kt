@@ -26,7 +26,8 @@ import com.example.mpod.ui.theme.InterFontFamily
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerView(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
     var currentSpeed by remember { mutableStateOf("1.5") }
@@ -216,7 +217,9 @@ fun PlayerView(
                 // Notes Button — Figma: container 36dp, icon fills container (30dp effective)
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable(onClick = onNotesClick)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_note),
