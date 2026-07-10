@@ -39,7 +39,6 @@ fun SettingItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .figmaDropShadow(radius = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
