@@ -1,6 +1,8 @@
 package com.example.mpod.ui.screens.auth
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.mpod.ui.theme.MpodTheme
 
 @Composable
 fun SetupScreen() {
@@ -16,4 +18,17 @@ fun SetupScreen() {
         password = password,
         onPasswordChange = { password = it }
     )
+}
+
+@Preview(
+    name = "Setup screen / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SetupScreenPreview() {
+    MpodTheme {
+        SetupScreen()
+    }
 }

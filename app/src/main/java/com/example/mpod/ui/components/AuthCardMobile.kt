@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +36,9 @@ fun AuthCardMobile(
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
     MpodOutlinedSurface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .widthIn(max = 320.dp)
+            .fillMaxWidth(),
         radius = 10.dp,
         elevation = 1.dp
     ) {

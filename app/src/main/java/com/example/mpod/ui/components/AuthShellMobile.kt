@@ -62,7 +62,6 @@ fun AuthShellMobile(
             onUsernameChange = onUsernameChange,
             password = password,
             onPasswordChange = onPasswordChange,
-            modifier = Modifier.fillMaxWidth(),
             onSubmit = onSubmit
         )
     }
