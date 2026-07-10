@@ -8,11 +8,14 @@ import com.example.mpod.data.network.model.PlaybackSyncRequest
 import com.example.mpod.data.network.model.PlaylistResponse
 import com.example.mpod.data.network.model.PodcastsResponse
 import com.example.mpod.data.network.model.SessionDto
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.Path
 import retrofit2.http.POST
+import retrofit2.http.Part
 
 interface MpodApi {
 
@@ -33,6 +36,10 @@ interface MpodApi {
 
     @POST("api/podcasts")
     suspend fun createPodcast(@Body request: CreatePodcastRequest): Response<Unit>
+
+    @Multipart
+    @POST("api/podcasts/import-opml")
+    suspend fun importOpml(@Part file: MultipartBody.Part): Response<Unit>
 
     @GET("api/podcasts/{podcastId}/episodes")
     suspend fun getPodcastEpisodes(@Path("podcastId") podcastId: Int): Response<EpisodesResponse>

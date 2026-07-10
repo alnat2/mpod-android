@@ -1,5 +1,7 @@
 package com.example.mpod.ui.navigation
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -85,6 +87,14 @@ fun AppNavigation(
                 ) {
                     val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
                     val addPodcastState by addPodcastViewModel.state.collectAsState()
+                    val opmlPicker = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.OpenDocument()
+                    ) { uri ->
+                        addPodcastViewModel.importOpml(uri) {
+                            libraryRefreshKey += 1
+                            navController.popBackStack()
+                        }
+                    }
                     AddPodcastModal(
                         onDismiss = { navController.popBackStack() },
                         onAddUrl = { url ->
@@ -93,7 +103,9 @@ fun AppNavigation(
                                 navController.popBackStack()
                             }
                         },
-                        onImportOpml = { /* TODO */ },
+                        onImportOpml = {
+                            opmlPicker.launch(arrayOf("text/xml", "application/xml", "text/x-opml", "*/*"))
+                        },
                         isSubmitting = addPodcastState.isSubmitting,
                         errorMessage = addPodcastState.errorMessage
                     )
