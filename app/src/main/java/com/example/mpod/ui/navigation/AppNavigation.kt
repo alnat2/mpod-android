@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,51 +43,61 @@ fun AppNavigation(
         return
     }
 
-    val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
+    key(startDestination) {
+        val navController = rememberNavController()
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
+        val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        NavHost(
-            navController = navController,
-            startDestination = startDestination,
-            modifier = Modifier.weight(1f)
-        ) {
-            composable(Screen.Setup.route) { com.example.mpod.ui.screens.auth.SetupScreen() }
-            composable(Screen.Login.route) { com.example.mpod.ui.screens.auth.LoginScreen() }
-            composable(Screen.Home.route) { HomeScreen() }
-            composable(Screen.Subscriptions.route) { SubscriptionsScreen() }
-            composable(Screen.Settings.route) { SettingsScreen() }
-            dialog(
-                route = Screen.AddPodcast.route,
-                dialogProperties = DialogProperties(usePlatformDefaultWidth = false)
+        Column(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = startDestination,
+                modifier = Modifier.weight(1f)
             ) {
-                com.example.mpod.ui.components.AddPodcastModal(
-                    onDismiss = { navController.popBackStack() },
-                    onAddUrl = { /* TODO */ navController.popBackStack() },
-                    onImportOpml = { /* TODO */ navController.popBackStack() }
+                composable(Screen.Setup.route) {
+                    com.example.mpod.ui.screens.auth.SetupScreen(
+                        onSubmit = launchViewModel::register
+                    )
+                }
+                composable(Screen.Login.route) {
+                    com.example.mpod.ui.screens.auth.LoginScreen(
+                        onSubmit = launchViewModel::login
+                    )
+                }
+                composable(Screen.Home.route) { HomeScreen() }
+                composable(Screen.Subscriptions.route) { SubscriptionsScreen() }
+                composable(Screen.Settings.route) { SettingsScreen() }
+                dialog(
+                    route = Screen.AddPodcast.route,
+                    dialogProperties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    com.example.mpod.ui.components.AddPodcastModal(
+                        onDismiss = { navController.popBackStack() },
+                        onAddUrl = { /* TODO */ navController.popBackStack() },
+                        onImportOpml = { /* TODO */ navController.popBackStack() }
+                    )
+                }
+            }
+            if (showBottomNav) {
+                MpodBottomNav(
+                    currentRoute = currentRoute,
+                    onNavigate = { screen ->
+                        if (screen == Screen.AddPodcast) {
+                            navController.navigate(screen.route)
+                        } else {
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp)
                 )
             }
-        }
-        if (showBottomNav) {
-            MpodBottomNav(
-                currentRoute = currentRoute,
-                onNavigate = { screen ->
-                    if (screen == Screen.AddPodcast) {
-                        navController.navigate(screen.route)
-                    } else {
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp)
-            )
         }
     }
 }

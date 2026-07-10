@@ -5,7 +5,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.mpod.ui.theme.MpodTheme
 
 @Composable
-fun SetupScreen() {
+fun SetupScreen(
+    onSubmit: (username: String, password: String) -> Unit = { _, _ -> }
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -16,7 +18,8 @@ fun SetupScreen() {
         username = username,
         onUsernameChange = { username = it },
         password = password,
-        onPasswordChange = { password = it }
+        onPasswordChange = { password = it },
+        onSubmit = { onSubmit(username, password) }
     )
 }
 

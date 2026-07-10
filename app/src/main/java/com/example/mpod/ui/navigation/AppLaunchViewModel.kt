@@ -3,6 +3,7 @@ package com.example.mpod.ui.navigation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
+import com.example.mpod.data.network.model.LoginRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,34 @@ class AppLaunchViewModel @Inject constructor(
                 AppLaunchState.Unauthenticated
             }
             _state.value = nextState
+        }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            _state.value = AppLaunchState.Loading
+            val response = runCatching {
+                api.login(LoginRequest(username = username, password = password))
+            }.getOrNull()
+            if (response?.isSuccessful == true) {
+                refreshSession()
+            } else {
+                _state.value = AppLaunchState.Unauthenticated
+            }
+        }
+    }
+
+    fun register(username: String, password: String) {
+        viewModelScope.launch {
+            _state.value = AppLaunchState.Loading
+            val response = runCatching {
+                api.register(LoginRequest(username = username, password = password))
+            }.getOrNull()
+            if (response?.isSuccessful == true) {
+                refreshSession()
+            } else {
+                _state.value = AppLaunchState.SetupRequired
+            }
         }
     }
 }

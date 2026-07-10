@@ -16,6 +16,9 @@ interface MpodApi {
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<Unit>
 
+    @POST("api/auth/register")
+    suspend fun register(@Body request: LoginRequest): Response<Unit>
+
     @POST("api/auth/logout")
     suspend fun logout(): Response<Unit>
 
