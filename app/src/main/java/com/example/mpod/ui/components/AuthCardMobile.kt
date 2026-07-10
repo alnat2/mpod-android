@@ -31,6 +31,8 @@ fun AuthCardMobile(
     modifier: Modifier = Modifier,
     usernamePlaceholder: String = "Choose a username",
     passwordPlaceholder: String = "Create a password",
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onSubmit: () -> Unit = {}
 ) {
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -75,10 +77,20 @@ fun AuthCardMobile(
                     PasswordVisualTransformation()
                 }
             )
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
             MpodButton(
-                text = submitLabel,
+                text = if (isSubmitting) "Please wait..." else submitLabel,
                 height = 40.dp,
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isSubmitting,
                 onClick = onSubmit
             )
         }

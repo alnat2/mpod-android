@@ -27,6 +27,7 @@ fun AppNavigation(
     launchViewModel: AppLaunchViewModel = hiltViewModel()
 ) {
     val launchState by launchViewModel.state.collectAsState()
+    val authUiState by launchViewModel.authUiState.collectAsState()
     val startDestination = when (launchState) {
         AppLaunchState.Loading -> null
         AppLaunchState.SetupRequired -> Screen.Setup.route
@@ -57,11 +58,15 @@ fun AppNavigation(
             ) {
                 composable(Screen.Setup.route) {
                     com.example.mpod.ui.screens.auth.SetupScreen(
+                        isSubmitting = authUiState.isSubmitting,
+                        errorMessage = authUiState.errorMessage,
                         onSubmit = launchViewModel::register
                     )
                 }
                 composable(Screen.Login.route) {
                     com.example.mpod.ui.screens.auth.LoginScreen(
+                        isSubmitting = authUiState.isSubmitting,
+                        errorMessage = authUiState.errorMessage,
                         onSubmit = launchViewModel::login
                     )
                 }

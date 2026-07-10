@@ -12,6 +12,8 @@ fun AuthScreen(
     onUsernameChange: (String) -> Unit,
     password: String,
     onPasswordChange: (String) -> Unit,
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onSubmit: () -> Unit = {}
 ) {
     AuthShellMobile(
@@ -22,6 +24,8 @@ fun AuthScreen(
         onUsernameChange = onUsernameChange,
         password = password,
         onPasswordChange = onPasswordChange,
+        isSubmitting = isSubmitting,
+        errorMessage = errorMessage,
         onSubmit = onSubmit
     )
 }

@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -153,6 +154,7 @@ fun MpodButton(
     containerColor: Color? = null,
     contentColor: Color? = null,
     elevation: Dp = 1.dp,
+    enabled: Boolean = true,
     onClick: () -> Unit = {}
 ) {
     val background = containerColor ?: if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
@@ -164,7 +166,8 @@ fun MpodButton(
             .clip(RoundedCornerShape(radius))
             .background(background)
             .then(if (outlined) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(radius)) else Modifier)
-            .clickable(onClick = onClick)
+            .alpha(if (enabled) 1f else 0.65f)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {

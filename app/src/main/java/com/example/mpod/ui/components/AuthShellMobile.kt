@@ -30,6 +30,8 @@ fun AuthShellMobile(
     password: String,
     onPasswordChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onSubmit: () -> Unit = {}
 ) {
     Column(
@@ -62,6 +64,8 @@ fun AuthShellMobile(
             onUsernameChange = onUsernameChange,
             password = password,
             onPasswordChange = onPasswordChange,
+            isSubmitting = isSubmitting,
+            errorMessage = errorMessage,
             onSubmit = onSubmit
         )
     }

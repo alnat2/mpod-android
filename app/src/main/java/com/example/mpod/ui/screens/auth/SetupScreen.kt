@@ -6,6 +6,8 @@ import com.example.mpod.ui.theme.MpodTheme
 
 @Composable
 fun SetupScreen(
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onSubmit: (username: String, password: String) -> Unit = { _, _ -> }
 ) {
     var username by remember { mutableStateOf("") }
@@ -19,6 +21,8 @@ fun SetupScreen(
         onUsernameChange = { username = it },
         password = password,
         onPasswordChange = { password = it },
+        isSubmitting = isSubmitting,
+        errorMessage = errorMessage,
         onSubmit = { onSubmit(username, password) }
     )
 }
