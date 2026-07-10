@@ -18,9 +18,9 @@ import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.window.DialogProperties
 import com.example.mpod.ui.components.MpodBottomNav
-import com.example.mpod.ui.screens.home.HomeScreen
+import com.example.mpod.ui.screens.home.HomeRoute
 import com.example.mpod.ui.screens.settings.SettingsScreen
-import com.example.mpod.ui.screens.subscriptions.SubscriptionsScreen
+import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 
 @Composable
 fun AppNavigation(
@@ -70,8 +70,8 @@ fun AppNavigation(
                         onSubmit = launchViewModel::login
                     )
                 }
-                composable(Screen.Home.route) { HomeScreen() }
-                composable(Screen.Subscriptions.route) { SubscriptionsScreen() }
+                composable(Screen.Home.route) { HomeRoute() }
+                composable(Screen.Subscriptions.route) { SubscriptionsRoute() }
                 composable(Screen.Settings.route) { SettingsScreen() }
                 dialog(
                     route = Screen.AddPodcast.route,

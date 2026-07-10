@@ -27,6 +27,11 @@ import com.example.mpod.ui.theme.InterFontFamily
 @Composable
 fun PlayerView(
     modifier: Modifier = Modifier,
+    title: String = "Why store loyalty cards became a UX minefield",
+    podcastTitle: String = "Decoder Ring",
+    elapsedLabel: String = "23:14",
+    durationLabel: String = "14:03",
+    progress: Float = 0.6f,
     onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
@@ -85,7 +90,7 @@ fun PlayerView(
             ) {
                 // Figma: Inter Bold, 18sp, lineHeight 28sp, center
                 Text(
-                    text = "Why store loyalty cards became a UX minefield",
+                    text = title,
                     fontFamily = InterFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
@@ -98,7 +103,7 @@ fun PlayerView(
                 )
                 // Figma: Inter Regular, 14sp, lineHeight 20sp, muted-foreground, center
                 Text(
-                    text = "Decoder Ring",
+                    text = podcastTitle,
                     fontFamily = InterFontFamily,
                     fontWeight = FontWeight.Normal,
                     fontSize = 14.sp,
@@ -127,7 +132,7 @@ fun PlayerView(
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
-                            .fillMaxWidth(0.6f)
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
                             .background(MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 }
@@ -136,8 +141,8 @@ fun PlayerView(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("23:14", fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("14:03", fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(elapsedLabel, fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(durationLabel, fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 

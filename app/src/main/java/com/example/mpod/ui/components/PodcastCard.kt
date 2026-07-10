@@ -121,6 +121,7 @@ fun PodcastCard(
 
 @Composable
 fun MarkAllListenedHeader(
+    summary: String = "21 / 15 episodes",
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -138,7 +139,7 @@ fun MarkAllListenedHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "21 / 15 episodes",
+                text = summary,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
