@@ -1,5 +1,6 @@
 package com.example.mpod.data.network
 
+import com.example.mpod.data.network.model.CreatePodcastRequest
 import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
@@ -29,6 +30,9 @@ interface MpodApi {
 
     @GET("api/podcasts")
     suspend fun getPodcasts(): Response<PodcastsResponse>
+
+    @POST("api/podcasts")
+    suspend fun createPodcast(@Body request: CreatePodcastRequest): Response<Unit>
 
     @GET("api/podcasts/{podcastId}/episodes")
     suspend fun getPodcastEpisodes(@Path("podcastId") podcastId: Int): Response<EpisodesResponse>

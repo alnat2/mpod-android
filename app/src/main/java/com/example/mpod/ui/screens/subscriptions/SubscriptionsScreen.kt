@@ -24,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -50,9 +51,13 @@ import com.example.mpod.ui.util.formatPublishedDate
 
 @Composable
 fun SubscriptionsRoute(
+    refreshKey: Int = 0,
     viewModel: SubscriptionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    LaunchedEffect(refreshKey) {
+        if (refreshKey > 0) viewModel.refresh()
+    }
     SubscriptionsScreen(state = state)
 }
 

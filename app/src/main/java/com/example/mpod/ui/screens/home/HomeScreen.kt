@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,9 +40,13 @@ import com.example.mpod.ui.util.formatTotalDuration
 
 @Composable
 fun HomeRoute(
+    refreshKey: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    LaunchedEffect(refreshKey) {
+        if (refreshKey > 0) viewModel.refresh()
+    }
     HomeScreen(state = state)
 }
 

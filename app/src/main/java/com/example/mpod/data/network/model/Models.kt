@@ -7,6 +7,10 @@ data class LoginRequest(
     @SerializedName("password") val password: String
 )
 
+data class CreatePodcastRequest(
+    @SerializedName("rssUrl") val rssUrl: String
+)
+
 data class SessionDto(
     @SerializedName("authenticated") val authenticated: Boolean,
     @SerializedName("setupRequired") val setupRequired: Boolean,

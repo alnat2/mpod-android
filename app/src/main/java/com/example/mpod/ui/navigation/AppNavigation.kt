@@ -7,6 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -17,6 +20,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.window.DialogProperties
+import com.example.mpod.ui.components.AddPodcastModal
+import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.screens.home.HomeRoute
 import com.example.mpod.ui.screens.settings.SettingsScreen
@@ -46,6 +51,7 @@ fun AppNavigation(
 
     key(startDestination) {
         val navController = rememberNavController()
+        var libraryRefreshKey by remember { mutableIntStateOf(0) }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
         val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
@@ -70,17 +76,26 @@ fun AppNavigation(
                         onSubmit = launchViewModel::login
                     )
                 }
-                composable(Screen.Home.route) { HomeRoute() }
-                composable(Screen.Subscriptions.route) { SubscriptionsRoute() }
+                composable(Screen.Home.route) { HomeRoute(refreshKey = libraryRefreshKey) }
+                composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
                 composable(Screen.Settings.route) { SettingsScreen() }
                 dialog(
                     route = Screen.AddPodcast.route,
                     dialogProperties = DialogProperties(usePlatformDefaultWidth = false)
                 ) {
-                    com.example.mpod.ui.components.AddPodcastModal(
+                    val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
+                    val addPodcastState by addPodcastViewModel.state.collectAsState()
+                    AddPodcastModal(
                         onDismiss = { navController.popBackStack() },
-                        onAddUrl = { /* TODO */ navController.popBackStack() },
-                        onImportOpml = { /* TODO */ navController.popBackStack() }
+                        onAddUrl = { url ->
+                            addPodcastViewModel.addRssFeed(url) {
+                                libraryRefreshKey += 1
+                                navController.popBackStack()
+                            }
+                        },
+                        onImportOpml = { /* TODO */ },
+                        isSubmitting = addPodcastState.isSubmitting,
+                        errorMessage = addPodcastState.errorMessage
                     )
                 }
             }

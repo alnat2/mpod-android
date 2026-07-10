@@ -45,7 +45,9 @@ enum class AddPodcastMode {
 fun AddPodcastModal(
     onDismiss: () -> Unit,
     onAddUrl: (String) -> Unit,
-    onImportOpml: () -> Unit
+    onImportOpml: () -> Unit,
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null
 ) {
     var mode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
     var url by remember { mutableStateOf("") }
@@ -56,6 +58,8 @@ fun AddPodcastModal(
             onModeChange = { mode = it },
             url = url,
             onUrlChange = { url = it },
+            isSubmitting = isSubmitting,
+            errorMessage = errorMessage,
             onDismiss = onDismiss,
             onAddUrl = { onAddUrl(url) },
             onImportOpml = onImportOpml
@@ -70,6 +74,8 @@ fun AddPodcastMobile(
     url: String,
     onUrlChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isSubmitting: Boolean = false,
+    errorMessage: String? = null,
     onDismiss: () -> Unit = {},
     onAddUrl: () -> Unit = {},
     onImportOpml: () -> Unit = {}
@@ -173,6 +179,15 @@ fun AddPodcastMobile(
                     onBrowse = onImportOpml
                 )
             }
+            if (!errorMessage.isNullOrBlank()) {
+                Text(
+                    text = errorMessage,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
 
         Row(
@@ -189,8 +204,13 @@ fun AddPodcastMobile(
                 onClick = onDismiss
             )
             MpodButton(
-                text = if (mode == AddPodcastMode.RssFeedUrl) "Add Feed" else "Import OPML",
+                text = when {
+                    isSubmitting -> "Please wait..."
+                    mode == AddPodcastMode.RssFeedUrl -> "Add Feed"
+                    else -> "Import OPML"
+                },
                 modifier = Modifier.weight(1f),
+                enabled = !isSubmitting,
                 onClick = if (mode == AddPodcastMode.RssFeedUrl) onAddUrl else onImportOpml
             )
         }
