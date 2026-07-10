@@ -48,6 +48,7 @@ fun PageHeader(
     title: String,
     subtitle: String? = null,
     showActions: Boolean = false,
+    onRefreshClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -86,7 +87,8 @@ fun PageHeader(
                     contentDescription = "Refresh",
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    elevation = 0.dp
+                    elevation = 0.dp,
+                    onClick = onRefreshClick
                 )
                 SquareIconButton(
                     iconRes = R.drawable.ic_view,

@@ -41,6 +41,12 @@ interface MpodApi {
     @POST("api/podcasts/import-opml")
     suspend fun importOpml(@Part file: MultipartBody.Part): Response<Unit>
 
+    @POST("api/podcasts/refresh-all")
+    suspend fun refreshAllPodcasts(): Response<Unit>
+
+    @POST("api/podcasts/{podcastId}/refresh")
+    suspend fun refreshPodcast(@Path("podcastId") podcastId: Int): Response<Unit>
+
     @GET("api/podcasts/{podcastId}/episodes")
     suspend fun getPodcastEpisodes(@Path("podcastId") podcastId: Int): Response<EpisodesResponse>
 

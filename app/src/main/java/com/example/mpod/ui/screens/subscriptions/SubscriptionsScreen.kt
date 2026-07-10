@@ -58,15 +58,22 @@ fun SubscriptionsRoute(
     LaunchedEffect(refreshKey) {
         if (refreshKey > 0) viewModel.refresh()
     }
-    SubscriptionsScreen(state = state)
+    SubscriptionsScreen(
+        state = state,
+        onRefreshAll = viewModel::refreshAll,
+        onRefreshPodcast = viewModel::refreshPodcast
+    )
 }
 
 @Composable
 fun SubscriptionsScreen(
     hasRefreshError: Boolean = false,
-    state: SubscriptionsUiState = remember(hasRefreshError) { previewSubscriptionsState() }
+    state: SubscriptionsUiState = remember(hasRefreshError) { previewSubscriptionsState() },
+    onRefreshAll: () -> Unit = {},
+    onRefreshPodcast: (Int) -> Unit = {}
 ) {
     val podcasts = state.podcasts
+    val refreshErrorMessage = state.actionErrorMessage
 
     Box(
         modifier = Modifier
@@ -105,7 +112,8 @@ fun SubscriptionsScreen(
                     PageHeader(
                         title = "Subscriptions",
                         subtitle = if (hasRefreshError) "Last refresh · today 3:04" else podcastCountLabel(podcasts.size),
-                        showActions = true
+                        showActions = true,
+                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll
                     )
 
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -123,7 +131,9 @@ fun SubscriptionsScreen(
                                         title = podcast.title,
                                         description = podcast.description,
                                         selected = index == 0,
-                                        onUnsubscribe = { /* TODO */ }
+                                        onUnsubscribe = { /* TODO */ },
+                                        isRefreshing = podcast.id in state.refreshingPodcastIds,
+                                        onRefresh = { onRefreshPodcast(podcast.id) }
                                     )
                                     Column(
                                         modifier = Modifier
@@ -152,8 +162,9 @@ fun SubscriptionsScreen(
             }
         }
 
-        if (hasRefreshError) {
+        if (hasRefreshError || refreshErrorMessage != null) {
             RefreshErrorBanner(
+                message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp)
@@ -189,6 +200,7 @@ private fun SubscriptionsStatusCard(
 
 @Composable
 private fun RefreshErrorBanner(
+    message: String,
     modifier: Modifier = Modifier
 ) {
     val destructive = Color(0xFFE7000B)
@@ -204,7 +216,7 @@ private fun RefreshErrorBanner(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Refresh failed for \"The Watch\" podcast",
+            text = message,
             fontSize = MaterialTheme.typography.bodySmall.fontSize,
             lineHeight = MaterialTheme.typography.bodySmall.lineHeight,
             fontWeight = FontWeight.Medium,

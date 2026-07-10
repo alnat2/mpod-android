@@ -24,7 +24,9 @@ fun PodcastCard(
     description: String,
     selected: Boolean,
     onUnsubscribe: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {}
 ) {
     val background = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
     Column(
@@ -98,14 +100,16 @@ fun PodcastCard(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MpodButton(
-                text = "Refresh",
+                text = if (isRefreshing) "Refreshing" else "Refresh",
                 primary = false,
                 outlined = true,
                 iconRes = R.drawable.ic_refresh_dot,
                 containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
                 height = 32.dp,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                enabled = !isRefreshing,
+                onClick = onRefresh
             )
             MpodButton(
                 text = "Unsubscribe",

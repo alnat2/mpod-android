@@ -35,6 +35,51 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    fun refreshAll() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isRefreshingAll = true, actionErrorMessage = null)
+            val response = runCatching { api.refreshAllPodcasts() }.getOrNull()
+            if (response?.isSuccessful == true) {
+                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                    _state.value.copy(
+                        isRefreshingAll = false,
+                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                    )
+                }
+                _state.value = nextState
+            } else {
+                _state.value = _state.value.copy(
+                    isRefreshingAll = false,
+                    actionErrorMessage = response.errorMessage("Could not refresh subscriptions.")
+                )
+            }
+        }
+    }
+
+    fun refreshPodcast(podcastId: Int) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
+                actionErrorMessage = null
+            )
+            val response = runCatching { api.refreshPodcast(podcastId) }.getOrNull()
+            if (response?.isSuccessful == true) {
+                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                    _state.value.copy(
+                        refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
+                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                    )
+                }
+                _state.value = nextState
+            } else {
+                _state.value = _state.value.copy(
+                    refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
+                    actionErrorMessage = response.errorMessage("Could not refresh this podcast.")
+                )
+            }
+        }
+    }
+
     private suspend fun loadSubscriptionsState(): SubscriptionsUiState {
         val podcasts = api.getPodcasts().requireBody("Could not load podcasts.").podcasts
         val playlistEpisodeIds = api.getPlaylist()
@@ -82,11 +127,18 @@ class SubscriptionsViewModel @Inject constructor(
         }
         throw IllegalStateException(errorBody()?.string().orEmpty().ifBlank { defaultMessage })
     }
+
+    private fun Response<*>?.errorMessage(defaultMessage: String): String {
+        return this?.errorBody()?.string().orEmpty().ifBlank { defaultMessage }
+    }
 }
 
 data class SubscriptionsUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val actionErrorMessage: String? = null,
+    val isRefreshingAll: Boolean = false,
+    val refreshingPodcastIds: Set<Int> = emptySet(),
     val podcasts: List<SubscriptionPodcastUi> = emptyList()
 )
 
