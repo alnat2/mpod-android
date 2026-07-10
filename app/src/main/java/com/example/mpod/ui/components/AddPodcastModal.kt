@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,9 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
+import com.example.mpod.ui.theme.MpodTheme
 
 enum class AddPodcastMode {
     RssFeedUrl,
@@ -48,13 +50,7 @@ fun AddPodcastModal(
     var mode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
     var url by remember { mutableStateOf("") }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.30f))
-            .padding(horizontal = 20.dp),
-        contentAlignment = Alignment.Center
-    ) {
+    ModalScreenMobile {
         AddPodcastMobile(
             mode = mode,
             onModeChange = { mode = it },
@@ -80,6 +76,7 @@ fun AddPodcastMobile(
 ) {
     Column(
         modifier = modifier
+            .widthIn(max = 320.dp)
             .fillMaxWidth()
             .figmaDropShadow(
                 radius = 8.dp,
@@ -89,13 +86,13 @@ fun AddPodcastMobile(
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.Start
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -122,7 +119,7 @@ fun AddPodcastMobile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp)
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.Start
         ) {
@@ -151,7 +148,7 @@ fun AddPodcastMobile(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (mode == AddPodcastMode.RssFeedUrl) {
@@ -181,7 +178,7 @@ fun AddPodcastMobile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             MpodButton(
@@ -252,6 +249,26 @@ fun FileDropzone(
             modifier = Modifier.width(140.dp),
             onClick = onBrowse
         )
+    }
+}
+
+@Preview(
+    name = "Add RSS feed modal / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun AddRssFeedModalPreview() {
+    MpodTheme {
+        ModalScreenMobile {
+            AddPodcastMobile(
+                mode = AddPodcastMode.RssFeedUrl,
+                onModeChange = {},
+                url = "",
+                onUrlChange = {}
+            )
+        }
     }
 }
 
