@@ -52,7 +52,8 @@ fun SubscriptionsScreen() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(210.dp),
+                                .height(210.dp)
+                                .padding(horizontal = 2.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             MarkAllListenedHeader()
@@ -69,7 +70,6 @@ fun SubscriptionsScreen() {
                                 podcastName = "Decoder Ring",
                                 duration = "54m",
                                 date = "31.03.26",
-                                isPlaying = true,
                                 showDragHandle = index != 0
                             )
                         }
