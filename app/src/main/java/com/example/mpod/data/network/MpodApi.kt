@@ -5,6 +5,7 @@ import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.PlaybackSyncRequest
 import com.example.mpod.data.network.model.PlaylistItemDto
 import com.example.mpod.data.network.model.PodcastDto
+import com.example.mpod.data.network.model.SessionDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -17,6 +18,9 @@ interface MpodApi {
 
     @POST("api/auth/logout")
     suspend fun logout(): Response<Unit>
+
+    @GET("api/auth/session")
+    suspend fun getSession(): Response<SessionDto>
 
     @GET("api/podcasts")
     suspend fun getPodcasts(): Response<List<PodcastDto>>

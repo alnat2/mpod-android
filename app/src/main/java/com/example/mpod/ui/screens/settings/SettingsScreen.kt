@@ -37,7 +37,7 @@ import com.example.mpod.ui.components.PageHeader
 
 @Composable
 fun SettingsScreen() {
-    var backendAddress by remember { mutableStateOf("192.168.0.222:5050") }
+    var backendAddress by remember { mutableStateOf("192.168.0.222:5051") }
     var feedRefreshTime by remember { mutableStateOf("03:00") }
     var useSocks5 by remember { mutableStateOf(true) }
     var useDarkTheme by remember { mutableStateOf(false) }

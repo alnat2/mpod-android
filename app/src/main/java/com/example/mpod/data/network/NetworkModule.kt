@@ -38,7 +38,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:5050/") // Default Android emulator localhost alias to host port 5050
+            .baseUrl("http://192.168.0.222:5051/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

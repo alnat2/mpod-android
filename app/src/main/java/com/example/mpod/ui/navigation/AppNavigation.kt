@@ -1,10 +1,14 @@
 package com.example.mpod.ui.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,7 +22,26 @@ import com.example.mpod.ui.screens.settings.SettingsScreen
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsScreen
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    launchViewModel: AppLaunchViewModel = hiltViewModel()
+) {
+    val launchState by launchViewModel.state.collectAsState()
+    val startDestination = when (launchState) {
+        AppLaunchState.Loading -> null
+        AppLaunchState.SetupRequired -> Screen.Setup.route
+        AppLaunchState.Unauthenticated -> Screen.Login.route
+        AppLaunchState.Authenticated -> Screen.Home.route
+    }
+
+    if (startDestination == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -27,7 +50,7 @@ fun AppNavigation() {
     Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = startDestination,
             modifier = Modifier.weight(1f)
         ) {
             composable(Screen.Setup.route) { com.example.mpod.ui.screens.auth.SetupScreen() }
