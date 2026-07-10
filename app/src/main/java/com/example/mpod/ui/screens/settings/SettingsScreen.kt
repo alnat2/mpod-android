@@ -36,7 +36,9 @@ import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    onLogout: () -> Unit = {}
+) {
     var backendAddress by remember { mutableStateOf("192.168.0.222:5051") }
     var feedRefreshTime by remember { mutableStateOf("03:00") }
     var useSocks5 by remember { mutableStateOf(true) }
@@ -166,7 +168,8 @@ fun SettingsScreen() {
                     primary = false,
                     height = 32.dp,
                     radius = 6.dp,
-                    modifier = Modifier.width(113.dp)
+                    modifier = Modifier.width(113.dp),
+                    onClick = onLogout
                 )
             }
         )

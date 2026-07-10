@@ -80,7 +80,7 @@ fun AppNavigation(
                 }
                 composable(Screen.Home.route) { HomeRoute(refreshKey = libraryRefreshKey) }
                 composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
-                composable(Screen.Settings.route) { SettingsScreen() }
+                composable(Screen.Settings.route) { SettingsScreen(onLogout = launchViewModel::logout) }
                 dialog(
                     route = Screen.AddPodcast.route,
                     dialogProperties = DialogProperties(usePlatformDefaultWidth = false)

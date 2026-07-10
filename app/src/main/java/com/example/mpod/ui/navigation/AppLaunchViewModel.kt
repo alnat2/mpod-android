@@ -82,6 +82,15 @@ class AppLaunchViewModel @Inject constructor(
         }
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            _state.value = AppLaunchState.Loading
+            _authUiState.value = AuthUiState()
+            runCatching { api.logout() }
+            refreshSession()
+        }
+    }
+
     private fun validateAuthInput(username: String, password: String): Boolean {
         return if (username.isBlank() || password.isBlank()) {
             _authUiState.value = AuthUiState(errorMessage = "Enter username and password.")
