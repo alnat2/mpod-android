@@ -34,13 +34,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 
+enum class AddPodcastMode {
+    RssFeedUrl,
+    ImportOpmlFile
+}
+
 @Composable
 fun AddPodcastModal(
     onDismiss: () -> Unit,
     onAddUrl: (String) -> Unit,
     onImportOpml: () -> Unit
 ) {
-    var isRssTab by remember { mutableStateOf(true) }
+    var mode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
     var url by remember { mutableStateOf("") }
 
     Box(
@@ -50,127 +55,147 @@ fun AddPodcastModal(
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
+        AddPodcastMobile(
+            mode = mode,
+            onModeChange = { mode = it },
+            url = url,
+            onUrlChange = { url = it },
+            onDismiss = onDismiss,
+            onAddUrl = { onAddUrl(url) },
+            onImportOpml = onImportOpml
+        )
+    }
+}
+
+@Composable
+fun AddPodcastMobile(
+    mode: AddPodcastMode,
+    onModeChange: (AddPodcastMode) -> Unit,
+    url: String,
+    onUrlChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
+    onAddUrl: () -> Unit = {},
+    onImportOpml: () -> Unit = {}
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .figmaDropShadow(
+                radius = 8.dp,
+                offsetY = 8.dp,
+                blur = 9.dp
+            )
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .figmaDropShadow(
-                    radius = 8.dp,
-                    offsetY = 8.dp,
-                    blur = 9.dp
-                )
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                .padding(vertical = 12.dp),
-            horizontalAlignment = Alignment.Start
+                .padding(horizontal = 32.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Add Podcast",
+                fontSize = 20.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Icon(
+                painter = painterResource(id = R.drawable.ic_multiplication_sign),
+                contentDescription = "Close",
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clickable(onClick = onDismiss)
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp)
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.Start
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                ModalTab(
+                    text = "RSS Feed URL",
+                    selected = mode == AddPodcastMode.RssFeedUrl,
+                    onClick = { onModeChange(AddPodcastMode.RssFeedUrl) }
+                )
+                ModalTab(
+                    text = "Import OPML File",
+                    selected = mode == AddPodcastMode.ImportOpmlFile,
+                    onClick = { onModeChange(AddPodcastMode.ImportOpmlFile) }
+                )
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (mode == AddPodcastMode.RssFeedUrl) {
                 Text(
-                    text = "Add Podcast",
-                    fontSize = 20.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = "Paste RSS feed URL",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_multiplication_sign),
-                    contentDescription = "Close",
-                    tint = MaterialTheme.colorScheme.onBackground,
+                MpodInput(
+                    value = url,
+                    onValueChange = onUrlChange,
+                    placeholder = "https://feeds.example.com/podcast.xml",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                FileDropzone(
                     modifier = Modifier
-                        .size(24.dp)
-                        .clickable(onClick = onDismiss)
+                        .fillMaxWidth()
+                        .height(232.dp),
+                    onBrowse = onImportOpml
                 )
             }
+        }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.Start
-            ) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ModalTab(
-                        text = "RSS Feed URL",
-                        selected = isRssTab,
-                        onClick = { isRssTab = true }
-                    )
-                    ModalTab(
-                        text = "Import OPML File",
-                        selected = !isRssTab,
-                        onClick = { isRssTab = false }
-                    )
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (isRssTab) {
-                    Text(
-                        text = "Paste RSS feed URL",
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    MpodInput(
-                        value = url,
-                        onValueChange = { url = it },
-                        placeholder = "https://feeds.example.com/podcast.xml",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    FileDropzone(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(232.dp),
-                        onBrowse = onImportOpml
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MpodButton(
-                    text = "Cancel",
-                    primary = false,
-                    elevation = 0.dp,
-                    modifier = Modifier.weight(1f),
-                    onClick = onDismiss
-                )
-                MpodButton(
-                    text = if (isRssTab) "Add Feed" else "Import OPML",
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (isRssTab) onAddUrl(url) else onImportOpml()
-                    }
-                )
-            }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MpodButton(
+                text = "Cancel",
+                primary = false,
+                elevation = 0.dp,
+                modifier = Modifier.weight(1f),
+                onClick = onDismiss
+            )
+            MpodButton(
+                text = if (mode == AddPodcastMode.RssFeedUrl) "Add Feed" else "Import OPML",
+                modifier = Modifier.weight(1f),
+                onClick = if (mode == AddPodcastMode.RssFeedUrl) onAddUrl else onImportOpml
+            )
         }
     }
 }
