@@ -80,6 +80,31 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    fun unsubscribePodcast(podcastId: Int) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
+                actionErrorMessage = null
+            )
+            val response = runCatching { api.removePodcast(podcastId) }.getOrNull()
+            if (response?.isSuccessful == true) {
+                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                    _state.value.copy(
+                        unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
+                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                    )
+                }
+                _state.value = nextState
+            } else {
+                _state.value = _state.value.copy(
+                    unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
+                    actionErrorMessage = response.errorMessage("Could not unsubscribe from this podcast.")
+                )
+            }
+        }
+    }
+
+
     private suspend fun loadSubscriptionsState(): SubscriptionsUiState {
         val podcasts = api.getPodcasts().requireBody("Could not load podcasts.").podcasts
         val playlistEpisodeIds = api.getPlaylist()
@@ -139,6 +164,7 @@ data class SubscriptionsUiState(
     val actionErrorMessage: String? = null,
     val isRefreshingAll: Boolean = false,
     val refreshingPodcastIds: Set<Int> = emptySet(),
+    val unsubscribingPodcastIds: Set<Int> = emptySet(),
     val podcasts: List<SubscriptionPodcastUi> = emptyList()
 )
 

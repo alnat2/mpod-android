@@ -19,15 +19,19 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,7 +65,8 @@ fun SubscriptionsRoute(
     SubscriptionsScreen(
         state = state,
         onRefreshAll = viewModel::refreshAll,
-        onRefreshPodcast = viewModel::refreshPodcast
+        onRefreshPodcast = viewModel::refreshPodcast,
+        onUnsubscribePodcast = viewModel::unsubscribePodcast
     )
 }
 
@@ -70,10 +75,12 @@ fun SubscriptionsScreen(
     hasRefreshError: Boolean = false,
     state: SubscriptionsUiState = remember(hasRefreshError) { previewSubscriptionsState() },
     onRefreshAll: () -> Unit = {},
-    onRefreshPodcast: (Int) -> Unit = {}
+    onRefreshPodcast: (Int) -> Unit = {},
+    onUnsubscribePodcast: (Int) -> Unit = {}
 ) {
     val podcasts = state.podcasts
     val refreshErrorMessage = state.actionErrorMessage
+    var pendingUnsubscribe by remember { mutableStateOf<SubscriptionPodcastUi?>(null) }
 
     Box(
         modifier = Modifier
@@ -131,8 +138,9 @@ fun SubscriptionsScreen(
                                         title = podcast.title,
                                         description = podcast.description,
                                         selected = index == 0,
-                                        onUnsubscribe = { /* TODO */ },
+                                        onUnsubscribe = { pendingUnsubscribe = podcast },
                                         isRefreshing = podcast.id in state.refreshingPodcastIds,
+                                        isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
                                         onRefresh = { onRefreshPodcast(podcast.id) }
                                     )
                                     Column(
@@ -170,6 +178,29 @@ fun SubscriptionsScreen(
                     .padding(horizontal = 20.dp)
                     .padding(top = 10.dp)
                     .align(Alignment.TopCenter)
+            )
+        }
+
+        pendingUnsubscribe?.let { podcast ->
+            AlertDialog(
+                onDismissRequest = { pendingUnsubscribe = null },
+                title = { Text("Unsubscribe from ${podcast.title}?") },
+                text = { Text("Episodes, playlist entries, playback state, and downloads for this podcast will be removed.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            pendingUnsubscribe = null
+                            onUnsubscribePodcast(podcast.id)
+                        }
+                    ) {
+                        Text("Unsubscribe")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingUnsubscribe = null }) {
+                        Text("Cancel")
+                    }
+                }
             )
         }
     }

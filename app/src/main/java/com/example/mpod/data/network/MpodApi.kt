@@ -11,6 +11,7 @@ import com.example.mpod.data.network.model.SessionDto
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.Path
@@ -46,6 +47,9 @@ interface MpodApi {
 
     @POST("api/podcasts/{podcastId}/refresh")
     suspend fun refreshPodcast(@Path("podcastId") podcastId: Int): Response<Unit>
+
+    @DELETE("api/podcasts/{podcastId}")
+    suspend fun removePodcast(@Path("podcastId") podcastId: Int): Response<Unit>
 
     @GET("api/podcasts/{podcastId}/episodes")
     suspend fun getPodcastEpisodes(@Path("podcastId") podcastId: Int): Response<EpisodesResponse>

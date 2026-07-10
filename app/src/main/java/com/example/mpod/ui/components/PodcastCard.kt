@@ -26,6 +26,7 @@ fun PodcastCard(
     onUnsubscribe: () -> Unit,
     modifier: Modifier = Modifier,
     isRefreshing: Boolean = false,
+    isUnsubscribing: Boolean = false,
     onRefresh: () -> Unit = {}
 ) {
     val background = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
@@ -112,11 +113,12 @@ fun PodcastCard(
                 onClick = onRefresh
             )
             MpodButton(
-                text = "Unsubscribe",
+                text = if (isUnsubscribing) "Removing" else "Unsubscribe",
                 primary = false,
                 elevation = 0.dp,
                 height = 32.dp,
                 modifier = Modifier.weight(1f),
+                enabled = !isUnsubscribing,
                 onClick = onUnsubscribe
             )
         }
