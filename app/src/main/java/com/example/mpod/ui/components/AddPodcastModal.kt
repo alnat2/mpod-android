@@ -272,6 +272,26 @@ private fun AddRssFeedModalPreview() {
     }
 }
 
+@Preview(
+    name = "Import OPML modal / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun ImportOpmlModalPreview() {
+    MpodTheme {
+        ModalScreenMobile {
+            AddPodcastMobile(
+                mode = AddPodcastMode.ImportOpmlFile,
+                onModeChange = {},
+                url = "",
+                onUrlChange = {}
+            )
+        }
+    }
+}
+
 @Composable
 private fun ModalTab(
     text: String,
