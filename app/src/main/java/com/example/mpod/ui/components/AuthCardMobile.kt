@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -36,6 +41,7 @@ fun AuthCardMobile(
     onSubmit: () -> Unit = {}
 ) {
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     MpodOutlinedSurface(
         modifier = modifier
@@ -61,7 +67,11 @@ fun AuthCardMobile(
                 label = "Username",
                 value = username,
                 onValueChange = onUsernameChange,
-                placeholder = usernamePlaceholder
+                placeholder = usernamePlaceholder,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                )
             )
             LabeledInput(
                 label = "Password",
@@ -71,6 +81,13 @@ fun AuthCardMobile(
                 trailingIconRes = if (passwordVisible) R.drawable.ic_view else R.drawable.ic_view_off,
                 trailingIconContentDescription = if (passwordVisible) "Hide password" else "Show password",
                 onTrailingIconClick = { passwordVisible = !passwordVisible },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        if (!isSubmitting) onSubmit()
+                    }
+                ),
                 visualTransformation = if (passwordVisible) {
                     VisualTransformation.None
                 } else {
