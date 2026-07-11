@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,9 +23,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.Alignment
 import com.example.mpod.ui.components.AddPodcastModal
 import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
+import com.example.mpod.ui.components.MpodLogo
 import com.example.mpod.ui.screens.home.HomeRoute
 import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
@@ -47,7 +50,22 @@ fun AppNavigation(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-        )
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                MpodLogo()
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+            }
+        }
         return
     }
 
