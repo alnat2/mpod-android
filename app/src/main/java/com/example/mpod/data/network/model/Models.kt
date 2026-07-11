@@ -11,6 +11,14 @@ data class CreatePodcastRequest(
     @SerializedName("rssUrl") val rssUrl: String
 )
 
+data class PlaylistAddRequest(
+    @SerializedName("episodeId") val episodeId: Int
+)
+
+data class EpisodeListenedRequest(
+    @SerializedName("isListened") val isListened: Boolean
+)
+
 data class SessionDto(
     @SerializedName("authenticated") val authenticated: Boolean,
     @SerializedName("setupRequired") val setupRequired: Boolean,

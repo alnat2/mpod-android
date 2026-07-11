@@ -41,12 +41,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.MarkAllListenedHeader
+import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PodcastCard
+import com.example.mpod.ui.components.ShowNotesMobile
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
@@ -66,7 +69,11 @@ fun SubscriptionsRoute(
         state = state,
         onRefreshAll = viewModel::refreshAll,
         onRefreshPodcast = viewModel::refreshPodcast,
-        onUnsubscribePodcast = viewModel::unsubscribePodcast
+        onUnsubscribePodcast = viewModel::unsubscribePodcast,
+        onAddEpisodeToPlaylist = viewModel::addEpisodeToPlaylist,
+        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
+        onSetEpisodeListened = viewModel::setEpisodeListened,
+        onDownloadEpisode = viewModel::downloadEpisode
     )
 }
 
@@ -76,11 +83,16 @@ fun SubscriptionsScreen(
     state: SubscriptionsUiState = remember(hasRefreshError) { previewSubscriptionsState() },
     onRefreshAll: () -> Unit = {},
     onRefreshPodcast: (Int) -> Unit = {},
-    onUnsubscribePodcast: (Int) -> Unit = {}
+    onUnsubscribePodcast: (Int) -> Unit = {},
+    onAddEpisodeToPlaylist: (Int) -> Unit = {},
+    onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
+    onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
+    onDownloadEpisode: (Int) -> Unit = {}
 ) {
     val podcasts = state.podcasts
     val refreshErrorMessage = state.actionErrorMessage
     var pendingUnsubscribe by remember { mutableStateOf<SubscriptionPodcastUi?>(null) }
+    var showNotesEpisode by remember { mutableStateOf<Pair<SubscriptionPodcastUi, SubscriptionEpisodeUi>?>(null) }
 
     Box(
         modifier = Modifier
@@ -158,7 +170,20 @@ fun SubscriptionsScreen(
                                                 duration = formatEpisodeDuration(episode.durationSeconds),
                                                 date = formatPublishedDate(episode.publishedAt),
                                                 inPlaylist = episode.inPlaylist,
-                                                showDragHandle = index != 0
+                                                isListened = episode.isListened,
+                                                downloaded = episode.downloaded,
+                                                actionsEnabled = episode.id !in state.busyEpisodeIds,
+                                                showDragHandle = index != 0,
+                                                onAction = { action ->
+                                                    when (action) {
+                                                        EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
+                                                        EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
+                                                        EpisodeRowAction.ShowNotes -> showNotesEpisode = podcast to episode
+                                                        EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
+                                                        EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
+                                                        EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                                    }
+                                                }
                                             )
                                         }
                                     }
@@ -202,6 +227,16 @@ fun SubscriptionsScreen(
                     }
                 }
             )
+        }
+
+        showNotesEpisode?.let { (podcast, episode) ->
+            ModalScreenMobile {
+                ShowNotesMobile(
+                    podcastTitle = "${podcast.title} - ${episode.title}",
+                    notes = episode.summary?.takeIf { it.isNotBlank() } ?: "No show notes for this episode.",
+                    onClose = { showNotesEpisode = null }
+                )
+            }
         }
     }
 }
@@ -285,6 +320,7 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
             publishedAt = "2026-03-31T00:00:00Z",
             isListened = false,
             downloaded = false,
+            summary = "A story about loyalty cards, UX traps, and the tiny design decisions that become habits.",
             inPlaylist = true
         ),
         SubscriptionEpisodeUi(
@@ -294,6 +330,7 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
             publishedAt = "2026-03-31T00:00:00Z",
             isListened = false,
             downloaded = false,
+            summary = "Transit maps look simple, but the choices behind them shape how people move through cities.",
             inPlaylist = false
         )
     )

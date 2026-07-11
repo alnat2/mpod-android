@@ -2,12 +2,19 @@ package com.example.mpod.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,6 +25,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 
+enum class EpisodeRowAction {
+    AddToPlaylist,
+    RemoveFromPlaylist,
+    ShowNotes,
+    Download,
+    MarkListened,
+    MarkUnlistened
+}
+
 @Composable
 fun EpisodeRow(
     title: String,
@@ -26,9 +42,14 @@ fun EpisodeRow(
     date: String? = null,
     isPlaying: Boolean = false,
     inPlaylist: Boolean = false,
+    isListened: Boolean = false,
+    downloaded: Boolean = false,
+    actionsEnabled: Boolean = true,
     showDragHandle: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAction: ((EpisodeRowAction) -> Unit)? = null
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     val backgroundColor = if (isPlaying)
         MaterialTheme.colorScheme.surfaceVariant
     else
@@ -120,7 +141,14 @@ fun EpisodeRow(
                 .size(36.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.background)
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)),
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
+                .then(
+                    if (onAction == null || !actionsEnabled) {
+                        Modifier
+                    } else {
+                        Modifier.clickable { menuExpanded = true }
+                    }
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -129,6 +157,61 @@ fun EpisodeRow(
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
+            if (onAction != null) {
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    EpisodeActionItem(
+                        text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
+                        onClick = {
+                            menuExpanded = false
+                            onAction(if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist else EpisodeRowAction.AddToPlaylist)
+                        }
+                    )
+                    EpisodeActionItem(
+                        text = "Show notes",
+                        onClick = {
+                            menuExpanded = false
+                            onAction(EpisodeRowAction.ShowNotes)
+                        }
+                    )
+                    EpisodeActionItem(
+                        text = if (downloaded) "Downloaded" else "Download",
+                        enabled = !downloaded,
+                        onClick = {
+                            menuExpanded = false
+                            onAction(EpisodeRowAction.Download)
+                        }
+                    )
+                    EpisodeActionItem(
+                        text = if (isListened) "Mark as unlistened" else "Mark as listened",
+                        onClick = {
+                            menuExpanded = false
+                            onAction(if (isListened) EpisodeRowAction.MarkUnlistened else EpisodeRowAction.MarkListened)
+                        }
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun EpisodeActionItem(
+    text: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                lineHeight = 20.sp
+            )
+        },
+        enabled = enabled,
+        onClick = onClick
+    )
 }

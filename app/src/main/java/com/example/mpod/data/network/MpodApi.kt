@@ -1,10 +1,12 @@
 package com.example.mpod.data.network
 
 import com.example.mpod.data.network.model.CreatePodcastRequest
+import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.PlaybackSyncRequest
+import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PlaylistResponse
 import com.example.mpod.data.network.model.PodcastsResponse
 import com.example.mpod.data.network.model.SessionDto
@@ -15,6 +17,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.Path
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
 
@@ -57,8 +60,23 @@ interface MpodApi {
     @GET("api/episodes/{episodeId}")
     suspend fun getEpisode(@Path("episodeId") episodeId: Int): Response<EpisodeResponse>
 
+    @PATCH("api/episodes/{episodeId}")
+    suspend fun setEpisodeListened(
+        @Path("episodeId") episodeId: Int,
+        @Body request: EpisodeListenedRequest
+    ): Response<Unit>
+
+    @POST("api/episodes/{episodeId}/download")
+    suspend fun downloadEpisode(@Path("episodeId") episodeId: Int): Response<Unit>
+
     @GET("api/playlist")
     suspend fun getPlaylist(): Response<PlaylistResponse>
+
+    @POST("api/playlist")
+    suspend fun addToPlaylist(@Body request: PlaylistAddRequest): Response<Unit>
+
+    @DELETE("api/playlist/{episodeId}")
+    suspend fun removeFromPlaylist(@Path("episodeId") episodeId: Int): Response<Unit>
 
     @POST("api/playback/sync")
     suspend fun syncPlayback(@Body request: PlaybackSyncRequest): Response<Unit>
