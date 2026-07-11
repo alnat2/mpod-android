@@ -51,10 +51,11 @@ fun AddPodcastModal(
     onDismiss: () -> Unit,
     onAddUrl: (String) -> Unit,
     onImportOpml: () -> Unit,
+    initialMode: AddPodcastMode = AddPodcastMode.RssFeedUrl,
     isSubmitting: Boolean = false,
     errorMessage: String? = null
 ) {
-    var mode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
+    var mode by remember(initialMode) { mutableStateOf(initialMode) }
     var url by remember { mutableStateOf("") }
 
     ModalScreenMobile {

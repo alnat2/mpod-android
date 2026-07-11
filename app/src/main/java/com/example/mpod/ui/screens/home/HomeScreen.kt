@@ -55,7 +55,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun HomeRoute(
     refreshKey: Int = 0,
-    onAddPodcast: () -> Unit = {},
+    onAddRssFeed: () -> Unit = {},
+    onImportOpml: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -161,7 +162,8 @@ fun HomeRoute(
                 playbackState = playbackState.copy(speedLabel = speed)
             }
         },
-        onAddPodcast = onAddPodcast,
+        onAddRssFeed = onAddRssFeed,
+        onImportOpml = onImportOpml,
         onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
@@ -181,7 +183,8 @@ fun HomeScreen(
     onPlayToggle: () -> Unit = {},
     onSeekBy: (Int) -> Unit = {},
     onSpeedChange: (String) -> Unit = {},
-    onAddPodcast: () -> Unit = {},
+    onAddRssFeed: () -> Unit = {},
+    onImportOpml: () -> Unit = {},
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
@@ -222,7 +225,8 @@ fun HomeScreen(
                     )
 
                     NoPodcastsEmptyState(
-                        onAddPodcast = onAddPodcast,
+                        onAddRssFeed = onAddRssFeed,
+                        onImportOpml = onImportOpml,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -422,7 +426,8 @@ private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
 
 @Composable
 private fun NoPodcastsEmptyState(
-    onAddPodcast: () -> Unit = {},
+    onAddRssFeed: () -> Unit = {},
+    onImportOpml: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -482,7 +487,7 @@ private fun NoPodcastsEmptyState(
                     height = 32.dp,
                     radius = 6.dp,
                     modifier = Modifier.weight(1f),
-                    onClick = onAddPodcast
+                    onClick = onAddRssFeed
                 )
                 MpodButton(
                     text = "Import OPML",
@@ -493,7 +498,7 @@ private fun NoPodcastsEmptyState(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
-                    onClick = onAddPodcast
+                    onClick = onImportOpml
                 )
             }
         }

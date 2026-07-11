@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Alignment
 import com.example.mpod.ui.components.AddPodcastModal
+import com.example.mpod.ui.components.AddPodcastMode
 import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.MpodLogo
@@ -72,6 +74,7 @@ fun AppNavigation(
     key(startDestination) {
         val navController = rememberNavController()
         var libraryRefreshKey by remember { mutableIntStateOf(0) }
+        var addPodcastInitialMode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
         val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
@@ -99,7 +102,14 @@ fun AppNavigation(
                 composable(Screen.Home.route) {
                     HomeRoute(
                         refreshKey = libraryRefreshKey,
-                        onAddPodcast = { navController.navigate(Screen.AddPodcast.route) }
+                        onAddRssFeed = {
+                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
+                            navController.navigate(Screen.AddPodcast.route)
+                        },
+                        onImportOpml = {
+                            addPodcastInitialMode = AddPodcastMode.ImportOpmlFile
+                            navController.navigate(Screen.AddPodcast.route)
+                        }
                     )
                 }
                 composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
@@ -129,6 +139,7 @@ fun AppNavigation(
                         onImportOpml = {
                             opmlPicker.launch(arrayOf("text/xml", "application/xml", "text/x-opml", "*/*"))
                         },
+                        initialMode = addPodcastInitialMode,
                         isSubmitting = addPodcastState.isSubmitting,
                         errorMessage = addPodcastState.errorMessage
                     )
@@ -139,6 +150,7 @@ fun AppNavigation(
                     currentRoute = currentRoute,
                     onNavigate = { screen ->
                         if (screen == Screen.AddPodcast) {
+                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
                             navController.navigate(screen.route)
                         } else {
                             navController.navigate(screen.route) {
