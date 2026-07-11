@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRow
+import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodBottomNav
@@ -47,15 +48,23 @@ fun HomeRoute(
     LaunchedEffect(refreshKey) {
         if (refreshKey > 0) viewModel.refresh()
     }
-    HomeScreen(state = state)
+    HomeScreen(
+        state = state,
+        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
+        onSetEpisodeListened = viewModel::setEpisodeListened,
+        onDownloadEpisode = viewModel::downloadEpisode
+    )
 }
 
 @Composable
 fun HomeScreen(
     hasPodcasts: Boolean = true,
-    state: HomeUiState = remember(hasPodcasts) { previewHomeState(hasPodcasts) }
+    state: HomeUiState = remember(hasPodcasts) { previewHomeState(hasPodcasts) },
+    onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
+    onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
+    onDownloadEpisode: (Int) -> Unit = {}
 ) {
-    var showNotes by remember { mutableStateOf(false) }
+    var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
     val currentEpisode = state.queue.firstOrNull()
 
     Box(
@@ -108,6 +117,10 @@ fun HomeScreen(
                     showActions = true
                 )
 
+                state.actionErrorMessage?.let { message ->
+                    StatusCard(message = message)
+                }
+
                 PlayerView(
                     modifier = Modifier.fillMaxWidth(),
                     title = currentEpisode.title,
@@ -115,7 +128,7 @@ fun HomeScreen(
                     elapsedLabel = "0:00",
                     durationLabel = formatProgressTime(currentEpisode.durationSeconds ?: 0),
                     progress = 0f,
-                    onNotesClick = { showNotes = true }
+                    onNotesClick = { showNotesEpisode = currentEpisode }
                 )
 
                 Column(
@@ -153,7 +166,21 @@ fun HomeScreen(
                             podcastName = episode.podcastTitle,
                             duration = formatEpisodeDuration(episode.durationSeconds),
                             isPlaying = index == 0,
-                            showDragHandle = true
+                            inPlaylist = true,
+                            isListened = episode.isListened,
+                            downloaded = episode.downloaded,
+                            actionsEnabled = episode.id !in state.busyEpisodeIds,
+                            showDragHandle = true,
+                            onAction = { action ->
+                                when (action) {
+                                    EpisodeRowAction.AddToPlaylist -> Unit
+                                    EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
+                                    EpisodeRowAction.ShowNotes -> showNotesEpisode = episode
+                                    EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
+                                    EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
+                                    EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                }
+                            }
                         )
                     }
                 }
@@ -161,10 +188,12 @@ fun HomeScreen(
             }
         }
 
-        if (showNotes) {
+        showNotesEpisode?.let { episode ->
             ModalScreenMobile {
                 ShowNotesMobile(
-                    onClose = { showNotes = false }
+                    podcastTitle = "${episode.podcastTitle} - ${episode.title}",
+                    notes = episode.summary?.takeIf { it.isNotBlank() } ?: "No show notes for this episode.",
+                    onClose = { showNotesEpisode = null }
                 )
             }
         }
@@ -210,19 +239,28 @@ private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
                 id = 1,
                 title = "Why store loyalty cards became a UX minefield",
                 podcastTitle = "Decoder Ring",
-                durationSeconds = 54 * 60
+                durationSeconds = 54 * 60,
+                isListened = false,
+                downloaded = false,
+                summary = "A story about loyalty cards, UX traps, and the tiny design decisions that become habits."
             ),
             HomeEpisodeUi(
                 id = 2,
                 title = "How public transit maps teach invisible habits",
                 podcastTitle = "Decoder Ring",
-                durationSeconds = 36 * 60
+                durationSeconds = 36 * 60,
+                isListened = false,
+                downloaded = false,
+                summary = "Transit maps look simple, but the choices behind them shape how people move through cities."
             ),
             HomeEpisodeUi(
                 id = 3,
                 title = "The app menu nobody understands but everyone...",
                 podcastTitle = "Decoder Ring",
-                durationSeconds = 43 * 60
+                durationSeconds = 43 * 60,
+                isListened = false,
+                downloaded = false,
+                summary = "A short note about menu design and why obvious labels are sometimes the hardest thing to ship."
             )
         )
     )
