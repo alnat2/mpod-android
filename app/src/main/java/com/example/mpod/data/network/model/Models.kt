@@ -74,6 +74,15 @@ data class PlaybackSyncRequest(
     @SerializedName("position_seconds") val positionSeconds: Int
 )
 
+data class PlaybackUpdateRequest(
+    @SerializedName("episodeId") val episodeId: Int,
+    @SerializedName("positionSeconds") val positionSeconds: Int,
+    @SerializedName("durationSeconds") val durationSeconds: Int,
+    @SerializedName("completed") val completed: Boolean = false,
+    @SerializedName("didSeek") val didSeek: Boolean = false,
+    @SerializedName("clientUpdatedAt") val clientUpdatedAt: String
+)
+
 data class SettingsResponse(
     @SerializedName("settings") val settings: SettingsDto
 )

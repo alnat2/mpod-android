@@ -32,10 +32,15 @@ fun PlayerView(
     elapsedLabel: String = "23:14",
     durationLabel: String = "14:03",
     progress: Float = 0.6f,
+    isPlaying: Boolean = false,
+    speedLabel: String = "1.5",
+    onSpeedChange: (String) -> Unit = {},
+    onPlayClick: () -> Unit = {},
+    onSeekBackward: () -> Unit = {},
+    onSeekForward: () -> Unit = {},
     onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
-    var currentSpeed by remember { mutableStateOf("1.5") }
     val speeds = listOf("0.5", "0.75", "1.0", "1.3", "1.5", "2.0")
 
     if (showSpeedSheet) {
@@ -48,13 +53,16 @@ fun PlayerView(
                 Spacer(modifier = Modifier.height(16.dp))
                 speeds.forEach { speed ->
                     TextButton(
-                        onClick = { currentSpeed = speed; showSpeedSheet = false },
+                        onClick = {
+                            onSpeedChange(speed)
+                            showSpeedSheet = false
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
                             text = "${speed}x",
-                            fontWeight = if (speed == currentSpeed) FontWeight.Bold else FontWeight.Normal,
-                            color = if (speed == currentSpeed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            fontWeight = if (speed == speedLabel) FontWeight.Bold else FontWeight.Normal,
+                            color = if (speed == speedLabel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -162,7 +170,7 @@ fun PlayerView(
                         .clickable { showSpeedSheet = true }
                 ) {
                     Text(
-                        text = currentSpeed,
+                        text = speedLabel,
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -173,7 +181,9 @@ fun PlayerView(
                 // Rewind 10 — Figma: container 40dp, icon fills container
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(onClick = onSeekBackward)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_go_backward_10_sec),
@@ -197,10 +207,11 @@ fun PlayerView(
                             spotColor = Color(0x1A000000)
                         )
                         .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        .clickable(onClick = onPlayClick)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_play),
-                        contentDescription = "Play",
+                        contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -209,7 +220,9 @@ fun PlayerView(
                 // Forward 15 — Figma: container 40dp, icon fills container
                 Box(
                     contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(onClick = onSeekForward)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_go_forward_15_sec),

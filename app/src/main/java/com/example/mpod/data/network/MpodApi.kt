@@ -6,6 +6,7 @@ import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.PlaybackSyncRequest
+import com.example.mpod.data.network.model.PlaybackUpdateRequest
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PlaylistResponse
 import com.example.mpod.data.network.model.PodcastsResponse
@@ -88,6 +89,9 @@ interface MpodApi {
 
     @POST("api/playback/sync")
     suspend fun syncPlayback(@Body request: PlaybackSyncRequest): Response<Unit>
+
+    @POST("api/playback")
+    suspend fun updatePlayback(@Body request: PlaybackUpdateRequest): Response<Unit>
 
     @GET("api/settings")
     suspend fun getSettings(): Response<SettingsResponse>
