@@ -96,7 +96,12 @@ fun AppNavigation(
                         onSubmit = launchViewModel::login
                     )
                 }
-                composable(Screen.Home.route) { HomeRoute(refreshKey = libraryRefreshKey) }
+                composable(Screen.Home.route) {
+                    HomeRoute(
+                        refreshKey = libraryRefreshKey,
+                        onAddPodcast = { navController.navigate(Screen.AddPodcast.route) }
+                    )
+                }
                 composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
                 composable(Screen.Settings.route) { SettingsRoute(onLogout = launchViewModel::logout) }
                 dialog(

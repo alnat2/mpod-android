@@ -87,7 +87,8 @@ fun SubscriptionsScreen(
     onAddEpisodeToPlaylist: (Int) -> Unit = {},
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
-    onDownloadEpisode: (Int) -> Unit = {}
+    onDownloadEpisode: (Int) -> Unit = {},
+    onRetryRefresh: () -> Unit = onRefreshAll
 ) {
     val podcasts = state.podcasts
     val refreshErrorMessage = state.actionErrorMessage
@@ -200,6 +201,7 @@ fun SubscriptionsScreen(
         if (hasRefreshError || refreshErrorMessage != null) {
             RefreshErrorBanner(
                 message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
+                onRetry = onRetryRefresh,
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp)
@@ -269,6 +271,7 @@ private fun SubscriptionsStatusCard(
 @Composable
 private fun RefreshErrorBanner(
     message: String,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val destructive = Color(0xFFE7000B)
@@ -299,7 +302,8 @@ private fun RefreshErrorBanner(
             radius = 6.dp,
             containerColor = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.width(86.dp)
+            modifier = Modifier.width(86.dp),
+            onClick = onRetry
         )
     }
 }
