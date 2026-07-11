@@ -1,0 +1,142 @@
+package com.example.mpod.ui.screens.settings
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.mpod.data.network.MpodApi
+import com.example.mpod.data.network.model.ProxyStatusDto
+import com.example.mpod.data.network.model.SchedulerStatusDto
+import com.example.mpod.data.network.model.SettingsDto
+import com.example.mpod.data.network.model.SettingsUpdateRequest
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import retrofit2.Response
+import javax.inject.Inject
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val api: MpodApi
+) : ViewModel() {
+    private val _state = MutableStateFlow(SettingsUiState(isLoading = true))
+    val state: StateFlow<SettingsUiState> = _state.asStateFlow()
+
+    init {
+        refresh()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            _state.value = runCatching { loadSettingsState() }.getOrElse { error ->
+                _state.value.copy(
+                    isLoading = false,
+                    errorMessage = error.message ?: "Could not load settings."
+                )
+            }
+        }
+    }
+
+    fun saveDailyRefreshTime(value: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSavingRefreshTime = true, errorMessage = null)
+            val response = runCatching {
+                api.updateSettings(SettingsUpdateRequest(dailyRefreshTime = value))
+            }.getOrNull()
+            if (response?.isSuccessful == true) {
+                _state.value = runCatching { loadSettingsState() }.getOrElse {
+                    _state.value.copy(isSavingRefreshTime = false)
+                }
+            } else {
+                _state.value = _state.value.copy(
+                    isSavingRefreshTime = false,
+                    errorMessage = response.errorMessage("Could not save refresh time.")
+                )
+            }
+        }
+    }
+
+    fun setProxyEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isSavingProxy = true, errorMessage = null)
+            val response = runCatching {
+                api.updateSettings(SettingsUpdateRequest(proxyEnabled = enabled))
+            }.getOrNull()
+            if (response?.isSuccessful == true) {
+                _state.value = runCatching { loadSettingsState() }.getOrElse {
+                    _state.value.copy(isSavingProxy = false)
+                }
+            } else {
+                _state.value = _state.value.copy(
+                    isSavingProxy = false,
+                    errorMessage = response.errorMessage("Could not update proxy setting.")
+                )
+            }
+        }
+    }
+
+    private suspend fun loadSettingsState(): SettingsUiState {
+        val settings = api.getSettings().requireBody("Could not load settings.").settings
+        val scheduler = api.getJobsStatus().body()?.scheduler
+        val proxy = api.getProxyStatus().body()?.proxy
+
+        return SettingsUiState(
+            dailyRefreshTime = settings.dailyRefreshTime ?: "03:00",
+            proxyEnabled = settings.proxyEnabled == true,
+            proxyConfigured = settings.proxyConfigured == true || proxy?.proxyConfigured == true,
+            proxyStatusText = proxyStatusText(settings, proxy),
+            schedulerStatusText = schedulerStatusText(scheduler),
+            appBuild = settings.appBuild,
+            isLoading = false
+        )
+    }
+
+    private fun proxyStatusText(settings: SettingsDto, proxy: ProxyStatusDto?): String {
+        val configured = settings.proxyConfigured == true || proxy?.proxyConfigured == true
+        if (!configured) return "Proxy runtime configuration is not available."
+        if (settings.proxyEnabled != true || proxy?.status == "off") return "Proxy is off"
+        if (proxy?.status == "ok") {
+            return listOfNotNull(
+                proxy.externalIp?.let { "Current IP: $it" },
+                proxy.country?.let { "Geo: $it" }
+            ).joinToString(" · ").ifBlank { "Proxy is on" }
+        }
+        return proxy?.error ?: "Checking proxy status..."
+    }
+
+    private fun schedulerStatusText(scheduler: SchedulerStatusDto?): String {
+        val state = scheduler?.state ?: "idle"
+        val lastRefresh = scheduler?.lastRunAt ?: scheduler?.lastSuccessAt ?: scheduler?.lastFailureAt
+        return if (lastRefresh == null) {
+            "Status: $state · last refresh never"
+        } else {
+            val compact = lastRefresh.replace('T', ' ').take(16)
+            "Status: $state · last refresh $compact"
+        }
+    }
+
+    private fun <T> Response<T>.requireBody(defaultMessage: String): T {
+        if (isSuccessful) {
+            body()?.let { return it }
+        }
+        throw IllegalStateException(errorBody()?.string().orEmpty().ifBlank { defaultMessage })
+    }
+
+    private fun Response<*>?.errorMessage(defaultMessage: String): String {
+        return this?.errorBody()?.string().orEmpty().ifBlank { defaultMessage }
+    }
+}
+
+data class SettingsUiState(
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    val dailyRefreshTime: String = "03:00",
+    val isSavingRefreshTime: Boolean = false,
+    val proxyEnabled: Boolean = false,
+    val proxyConfigured: Boolean = false,
+    val isSavingProxy: Boolean = false,
+    val proxyStatusText: String = "Checking proxy status...",
+    val schedulerStatusText: String = "Status: idle · last refresh never",
+    val appBuild: String? = null
+)

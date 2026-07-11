@@ -9,7 +9,11 @@ import com.example.mpod.data.network.model.PlaybackSyncRequest
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PlaylistResponse
 import com.example.mpod.data.network.model.PodcastsResponse
+import com.example.mpod.data.network.model.ProxyStatusResponse
+import com.example.mpod.data.network.model.SchedulerStatusResponse
 import com.example.mpod.data.network.model.SessionDto
+import com.example.mpod.data.network.model.SettingsResponse
+import com.example.mpod.data.network.model.SettingsUpdateRequest
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -80,5 +84,17 @@ interface MpodApi {
 
     @POST("api/playback/sync")
     suspend fun syncPlayback(@Body request: PlaybackSyncRequest): Response<Unit>
+
+    @GET("api/settings")
+    suspend fun getSettings(): Response<SettingsResponse>
+
+    @PATCH("api/settings")
+    suspend fun updateSettings(@Body request: SettingsUpdateRequest): Response<SettingsResponse>
+
+    @GET("api/proxy/status")
+    suspend fun getProxyStatus(): Response<ProxyStatusResponse>
+
+    @GET("api/jobs/status")
+    suspend fun getJobsStatus(): Response<SchedulerStatusResponse>
 
 }

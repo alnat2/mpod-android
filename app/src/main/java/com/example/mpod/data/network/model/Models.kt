@@ -73,3 +73,42 @@ data class PlaybackSyncRequest(
     @SerializedName("episode_id") val episodeId: Int,
     @SerializedName("position_seconds") val positionSeconds: Int
 )
+
+data class SettingsResponse(
+    @SerializedName("settings") val settings: SettingsDto
+)
+
+data class SettingsDto(
+    @SerializedName("dailyRefreshTime") val dailyRefreshTime: String?,
+    @SerializedName("proxyEnabled") val proxyEnabled: Boolean?,
+    @SerializedName("proxyConfigured") val proxyConfigured: Boolean?,
+    @SerializedName("appBuild") val appBuild: String?
+)
+
+data class SettingsUpdateRequest(
+    @SerializedName("dailyRefreshTime") val dailyRefreshTime: String? = null,
+    @SerializedName("proxyEnabled") val proxyEnabled: Boolean? = null
+)
+
+data class SchedulerStatusResponse(
+    @SerializedName("scheduler") val scheduler: SchedulerStatusDto?
+)
+
+data class SchedulerStatusDto(
+    @SerializedName("state") val state: String?,
+    @SerializedName("lastRunAt") val lastRunAt: String?,
+    @SerializedName("lastSuccessAt") val lastSuccessAt: String?,
+    @SerializedName("lastFailureAt") val lastFailureAt: String?
+)
+
+data class ProxyStatusResponse(
+    @SerializedName("proxy") val proxy: ProxyStatusDto?
+)
+
+data class ProxyStatusDto(
+    @SerializedName("status") val status: String?,
+    @SerializedName("externalIp") val externalIp: String?,
+    @SerializedName("country") val country: String?,
+    @SerializedName("error") val error: String?,
+    @SerializedName("proxyConfigured") val proxyConfigured: Boolean?
+)

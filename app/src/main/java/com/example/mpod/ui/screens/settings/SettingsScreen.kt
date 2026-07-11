@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodInput
 import com.example.mpod.ui.components.MpodOutlinedSurface
@@ -36,13 +39,33 @@ import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 
 @Composable
+fun SettingsRoute(
+    onLogout: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsState()
+    SettingsScreen(
+        state = state,
+        onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
+        onProxyEnabledChange = viewModel::setProxyEnabled,
+        onLogout = onLogout
+    )
+}
+
+@Composable
 fun SettingsScreen(
+    state: SettingsUiState = SettingsUiState(),
+    onSaveDailyRefreshTime: (String) -> Unit = {},
+    onProxyEnabledChange: (Boolean) -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     var backendAddress by remember { mutableStateOf("192.168.0.222:5051") }
-    var feedRefreshTime by remember { mutableStateOf("03:00") }
-    var useSocks5 by remember { mutableStateOf(true) }
+    var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
     var useDarkTheme by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.dailyRefreshTime) {
+        feedRefreshTime = state.dailyRefreshTime
+    }
 
     Column(
         modifier = Modifier
@@ -55,6 +78,17 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         PageHeader(title = "Settings")
+
+        if (state.errorMessage != null) {
+            Text(
+                text = state.errorMessage,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         SettingCard(
             title = "Backend address",
@@ -97,15 +131,17 @@ fun SettingsScreen(
                         onValueChange = { feedRefreshTime = it },
                         modifier = Modifier.weight(1f)
                     )
-                    MpodButton(
-                        text = "Save time",
-                        height = 36.dp,
-                        radius = 10.dp,
-                        modifier = Modifier.width(100.dp)
-                    )
+                MpodButton(
+                    text = "Save time",
+                    height = 36.dp,
+                    radius = 10.dp,
+                    modifier = Modifier.width(100.dp),
+                    enabled = !state.isSavingRefreshTime && !state.isLoading,
+                    onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                )
                 }
                 Text(
-                    text = "Status: idle · last refresh today at 03:04",
+                    text = state.schedulerStatusText,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.Medium,
@@ -116,25 +152,13 @@ fun SettingsScreen(
 
         SettingCard(
             title = "Use SOCKS5 proxy",
-            descriptionContent = {
-                Text(
-                    text = buildAnnotatedString {
-                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                            append("Current IP:")
-                        }
-                        append(" 43.32.112.45 · ")
-                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                            append("Geo:")
-                        }
-                        append(" UK")
-                    },
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            },
+            description = state.proxyStatusText,
             action = {
-                MpodSwitch(checked = useSocks5, onCheckedChange = { useSocks5 = it })
+                MpodSwitch(
+                    checked = state.proxyEnabled,
+                    onCheckedChange = onProxyEnabledChange,
+                    enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading
+                )
             }
         )
 
@@ -175,7 +199,7 @@ fun SettingsScreen(
         )
 
         Text(
-            text = "Current app build: 868f248",
+            text = "Current app build: ${state.appBuild ?: "unknown"}",
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,

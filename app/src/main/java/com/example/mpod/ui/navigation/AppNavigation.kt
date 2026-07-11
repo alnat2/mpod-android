@@ -26,7 +26,7 @@ import com.example.mpod.ui.components.AddPodcastModal
 import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.screens.home.HomeRoute
-import com.example.mpod.ui.screens.settings.SettingsScreen
+import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 
 @Composable
@@ -80,7 +80,7 @@ fun AppNavigation(
                 }
                 composable(Screen.Home.route) { HomeRoute(refreshKey = libraryRefreshKey) }
                 composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
-                composable(Screen.Settings.route) { SettingsScreen(onLogout = launchViewModel::logout) }
+                composable(Screen.Settings.route) { SettingsRoute(onLogout = launchViewModel::logout) }
                 dialog(
                     route = Screen.AddPodcast.route,
                     dialogProperties = DialogProperties(usePlatformDefaultWidth = false)

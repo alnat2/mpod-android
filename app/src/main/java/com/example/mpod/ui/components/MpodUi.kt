@@ -312,7 +312,8 @@ fun LabeledInput(
 fun MpodSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val track = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     val thumb = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.background
@@ -321,7 +322,8 @@ fun MpodSwitch(
             .size(width = 44.dp, height = 24.dp)
             .clip(CircleShape)
             .background(track)
-            .clickable { onCheckedChange(!checked) }
+            .alpha(if (enabled) 1f else 0.65f)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(2.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
