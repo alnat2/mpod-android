@@ -16,27 +16,42 @@ class PersistentCookieJar(context: Context) : CookieJar {
         // Load cookies from preferences
         val allEntries = preferences.all
         for ((key, value) in allEntries) {
-            val urlString = key
-            val cookieStrings = (value as? String)?.split(";") ?: emptyList()
-            
-            val url = urlString.toHttpUrlOrNull()
+            val cookieStrings = (value as? String)?.lineSequence()?.filter { it.isNotBlank() }?.toList() ?: emptyList()
+            val url = key.toCookieUrlOrNull()
             if (url != null) {
                 val cookies = cookieStrings.mapNotNull { Cookie.parse(url, it) }
-                cookieStore[urlString] = cookies
+                    .filter { it.expiresAt > System.currentTimeMillis() }
+                if (cookies.isNotEmpty()) {
+                    cookieStore[key] = cookies
+                }
             }
         }
     }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val urlString = url.host
-        cookieStore[urlString] = cookies
+        val key = url.storageKey()
+        val freshCookies = cookies.filter { it.expiresAt > System.currentTimeMillis() }
+        cookieStore[key] = freshCookies
 
-        // Save to preferences
-        val cookieString = cookies.joinToString(";") { it.toString() }
-        preferences.edit().putString(urlString, cookieString).apply()
+        val cookieString = freshCookies.joinToString("\n") { it.toString() }
+        preferences.edit().putString(key, cookieString).apply()
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        return cookieStore[url.host] ?: emptyList()
+        return cookieStore.values
+            .flatten()
+            .filter { it.matches(url) && it.expiresAt > System.currentTimeMillis() }
+    }
+
+    private fun HttpUrl.storageKey(): String {
+        return "$scheme://$host:$port/"
+    }
+
+    private fun String.toCookieUrlOrNull(): HttpUrl? {
+        val candidate = when {
+            startsWith("http://") || startsWith("https://") -> this
+            else -> "http://$this/"
+        }
+        return candidate.toHttpUrlOrNull()
     }
 }
