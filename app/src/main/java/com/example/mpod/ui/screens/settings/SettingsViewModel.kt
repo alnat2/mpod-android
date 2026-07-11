@@ -1,5 +1,7 @@
 package com.example.mpod.ui.screens.settings
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
@@ -8,15 +10,19 @@ import com.example.mpod.data.network.model.SchedulerStatusDto
 import com.example.mpod.data.network.model.SettingsDto
 import com.example.mpod.data.network.model.SettingsUpdateRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val api: MpodApi
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState(isLoading = true))
@@ -76,6 +82,36 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun exportOpml(uri: Uri?) {
+        if (uri == null) return
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                isExportingOpml = true,
+                exportMessage = null,
+                errorMessage = null
+            )
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val response = api.exportOpml()
+                    if (!response.isSuccessful) {
+                        error(response.errorBody()?.string().orEmpty().ifBlank { "Could not export OPML." })
+                    }
+                    val bytes = response.body()?.bytes() ?: error("Backend returned an empty OPML file.")
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(bytes)
+                    } ?: error("Could not write to selected file.")
+                }
+            }
+
+            _state.value = _state.value.copy(
+                isExportingOpml = false,
+                exportMessage = if (result.isSuccess) "OPML export saved." else null,
+                errorMessage = result.exceptionOrNull()?.message ?: _state.value.errorMessage
+            )
+        }
+    }
+
     private suspend fun loadSettingsState(): SettingsUiState {
         val settings = api.getSettings().requireBody("Could not load settings.").settings
         val scheduler = api.getJobsStatus().body()?.scheduler
@@ -88,6 +124,7 @@ class SettingsViewModel @Inject constructor(
             proxyStatusText = proxyStatusText(settings, proxy),
             schedulerStatusText = schedulerStatusText(scheduler),
             appBuild = settings.appBuild,
+            exportMessage = _state.value.exportMessage,
             isLoading = false
         )
     }
@@ -136,6 +173,8 @@ data class SettingsUiState(
     val proxyEnabled: Boolean = false,
     val proxyConfigured: Boolean = false,
     val isSavingProxy: Boolean = false,
+    val isExportingOpml: Boolean = false,
+    val exportMessage: String? = null,
     val proxyStatusText: String = "Checking proxy status...",
     val schedulerStatusText: String = "Status: idle · last refresh never",
     val appBuild: String? = null

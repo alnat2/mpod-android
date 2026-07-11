@@ -15,6 +15,7 @@ import com.example.mpod.data.network.model.SessionDto
 import com.example.mpod.data.network.model.SettingsResponse
 import com.example.mpod.data.network.model.SettingsUpdateRequest
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -41,6 +42,9 @@ interface MpodApi {
 
     @GET("api/podcasts")
     suspend fun getPodcasts(): Response<PodcastsResponse>
+
+    @GET("api/podcasts/export-opml")
+    suspend fun exportOpml(): Response<ResponseBody>
 
     @POST("api/podcasts")
     suspend fun createPodcast(@Body request: CreatePodcastRequest): Response<Unit>

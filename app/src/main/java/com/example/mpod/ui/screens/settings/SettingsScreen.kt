@@ -1,5 +1,7 @@
 package com.example.mpod.ui.screens.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,10 +46,16 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val opmlExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/xml")
+    ) { uri ->
+        viewModel.exportOpml(uri)
+    }
     SettingsScreen(
         state = state,
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyEnabledChange = viewModel::setProxyEnabled,
+        onExportOpml = { opmlExportLauncher.launch("mpod-subscriptions.opml") },
         onLogout = onLogout
     )
 }
@@ -57,6 +65,7 @@ fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyEnabledChange: (Boolean) -> Unit = {},
+    onExportOpml: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     var backendAddress by remember { mutableStateOf("192.168.0.222:5051") }
@@ -86,6 +95,17 @@ fun SettingsScreen(
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (state.exportMessage != null) {
+            Text(
+                text = state.exportMessage,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -175,10 +195,12 @@ fun SettingsScreen(
             description = "Download the current subscription list as an OPML file.",
             action = {
                 MpodButton(
-                    text = "Export OPML",
+                    text = if (state.isExportingOpml) "Exporting" else "Export OPML",
                     height = 32.dp,
                     radius = 6.dp,
-                    modifier = Modifier.width(113.dp)
+                    modifier = Modifier.width(113.dp),
+                    enabled = !state.isExportingOpml && !state.isLoading,
+                    onClick = onExportOpml
                 )
             }
         )
