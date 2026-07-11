@@ -15,6 +15,10 @@ data class PlaylistAddRequest(
     @SerializedName("episodeId") val episodeId: Int
 )
 
+data class PlaylistReorderRequest(
+    @SerializedName("episodeIds") val episodeIds: List<Int>
+)
+
 data class EpisodeListenedRequest(
     @SerializedName("isListened") val isListened: Boolean
 )

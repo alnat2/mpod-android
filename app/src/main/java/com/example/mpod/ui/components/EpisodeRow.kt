@@ -31,7 +31,9 @@ enum class EpisodeRowAction {
     ShowNotes,
     Download,
     MarkListened,
-    MarkUnlistened
+    MarkUnlistened,
+    MoveUp,
+    MoveDown
 }
 
 @Composable
@@ -45,6 +47,8 @@ fun EpisodeRow(
     isListened: Boolean = false,
     downloaded: Boolean = false,
     actionsEnabled: Boolean = true,
+    canMoveUp: Boolean = false,
+    canMoveDown: Boolean = false,
     showDragHandle: Boolean = true,
     modifier: Modifier = Modifier,
     onAction: ((EpisodeRowAction) -> Unit)? = null
@@ -162,6 +166,24 @@ fun EpisodeRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (canMoveUp) {
+                        EpisodeActionItem(
+                            text = "Move up",
+                            onClick = {
+                                menuExpanded = false
+                                onAction(EpisodeRowAction.MoveUp)
+                            }
+                        )
+                    }
+                    if (canMoveDown) {
+                        EpisodeActionItem(
+                            text = "Move down",
+                            onClick = {
+                                menuExpanded = false
+                                onAction(EpisodeRowAction.MoveDown)
+                            }
+                        )
+                    }
                     EpisodeActionItem(
                         text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
                         onClick = {

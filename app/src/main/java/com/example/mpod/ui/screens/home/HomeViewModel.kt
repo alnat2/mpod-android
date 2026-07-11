@@ -7,6 +7,7 @@ import com.example.mpod.data.network.PersistentCookieJar
 import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
+import com.example.mpod.data.network.model.PlaylistReorderRequest
 import com.example.mpod.data.network.model.PodcastDto
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -125,6 +126,44 @@ class HomeViewModel @Inject constructor(
     fun downloadEpisode(episodeId: Int) {
         performEpisodeAction(episodeId, "Could not start episode download.") {
             api.downloadEpisode(episodeId)
+        }
+    }
+
+    fun moveEpisode(episodeId: Int, offset: Int) {
+        val currentQueue = _state.value.queue
+        val currentIndex = currentQueue.indexOfFirst { it.id == episodeId }
+        val targetIndex = (currentIndex + offset).coerceIn(0, currentQueue.lastIndex)
+        if (currentIndex < 0 || currentIndex == targetIndex) return
+
+        val nextQueue = currentQueue.toMutableList()
+        val movedEpisode = nextQueue.removeAt(currentIndex)
+        nextQueue.add(targetIndex, movedEpisode)
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                queue = nextQueue,
+                busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
+                actionErrorMessage = null
+            )
+            val response = runCatching {
+                api.reorderPlaylist(PlaylistReorderRequest(nextQueue.map { it.id }))
+            }.getOrNull()
+
+            if (response?.isSuccessful == true) {
+                val nextState = runCatching { loadHomeState() }.getOrElse { error ->
+                    _state.value.copy(
+                        busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
+                        actionErrorMessage = error.message ?: "Could not reload playlist."
+                    )
+                }
+                _state.value = nextState
+            } else {
+                _state.value = _state.value.copy(
+                    queue = currentQueue,
+                    busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
+                    actionErrorMessage = response.errorMessage("Could not reorder playlist.")
+                )
+            }
         }
     }
 

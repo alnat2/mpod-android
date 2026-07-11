@@ -8,6 +8,7 @@ import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.PlaybackSyncRequest
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
 import com.example.mpod.data.network.model.PlaylistAddRequest
+import com.example.mpod.data.network.model.PlaylistReorderRequest
 import com.example.mpod.data.network.model.PlaylistResponse
 import com.example.mpod.data.network.model.PodcastsResponse
 import com.example.mpod.data.network.model.ProxyStatusResponse
@@ -86,6 +87,9 @@ interface MpodApi {
 
     @DELETE("api/playlist/{episodeId}")
     suspend fun removeFromPlaylist(@Path("episodeId") episodeId: Int): Response<Unit>
+
+    @PATCH("api/playlist/reorder")
+    suspend fun reorderPlaylist(@Body request: PlaylistReorderRequest): Response<Unit>
 
     @POST("api/playback/sync")
     suspend fun syncPlayback(@Body request: PlaybackSyncRequest): Response<Unit>

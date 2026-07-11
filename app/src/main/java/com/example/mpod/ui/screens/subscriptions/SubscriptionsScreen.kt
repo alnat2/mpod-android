@@ -182,6 +182,8 @@ fun SubscriptionsScreen(
                                                         EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
                                                         EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
                                                         EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                                        EpisodeRowAction.MoveUp -> Unit
+                                                        EpisodeRowAction.MoveDown -> Unit
                                                     }
                                                 }
                                             )

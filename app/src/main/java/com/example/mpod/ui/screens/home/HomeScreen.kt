@@ -160,6 +160,7 @@ fun HomeRoute(
                 playbackState = playbackState.copy(speedLabel = speed)
             }
         },
+        onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onDownloadEpisode = viewModel::downloadEpisode
@@ -178,6 +179,7 @@ fun HomeScreen(
     onPlayToggle: () -> Unit = {},
     onSeekBy: (Int) -> Unit = {},
     onSpeedChange: (String) -> Unit = {},
+    onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
     onDownloadEpisode: (Int) -> Unit = {}
@@ -294,6 +296,8 @@ fun HomeScreen(
                             isListened = episode.isListened,
                             downloaded = episode.downloaded,
                             actionsEnabled = episode.id !in state.busyEpisodeIds,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < state.queue.lastIndex,
                             showDragHandle = true,
                             onAction = { action ->
                                 when (action) {
@@ -303,6 +307,8 @@ fun HomeScreen(
                                     EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
                                     EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
                                     EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                    EpisodeRowAction.MoveUp -> onMoveEpisode(episode.id, -1)
+                                    EpisodeRowAction.MoveDown -> onMoveEpisode(episode.id, 1)
                                 }
                             }
                         )
