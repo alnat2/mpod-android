@@ -53,6 +53,7 @@ fun SettingsRoute(
     }
     SettingsScreen(
         state = state,
+        onSaveBackendAddress = viewModel::saveBackendAddress,
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyEnabledChange = viewModel::setProxyEnabled,
         onExportOpml = { opmlExportLauncher.launch("mpod-subscriptions.opml") },
@@ -63,14 +64,19 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
+    onSaveBackendAddress: (String) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyEnabledChange: (Boolean) -> Unit = {},
     onExportOpml: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
-    var backendAddress by remember { mutableStateOf("192.168.0.222:5051") }
+    var backendAddress by remember { mutableStateOf(state.backendAddress) }
     var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
     var useDarkTheme by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.backendAddress) {
+        backendAddress = state.backendAddress
+    }
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
@@ -110,6 +116,17 @@ fun SettingsScreen(
             )
         }
 
+        if (state.backendMessage != null) {
+            Text(
+                text = state.backendMessage,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         SettingCard(
             title = "Backend address",
             description = "Enter the backend's IP address and port, separated by a colon."
@@ -128,7 +145,9 @@ fun SettingsScreen(
                     text = "Save conf",
                     height = 36.dp,
                     radius = 10.dp,
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier.width(100.dp),
+                    enabled = backendAddress != state.backendAddress,
+                    onClick = { onSaveBackendAddress(backendAddress) }
                 )
             }
         }
