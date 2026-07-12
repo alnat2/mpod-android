@@ -2,9 +2,9 @@ package com.example.mpod.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -198,103 +198,112 @@ fun HomeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             when {
                 state.isLoading -> {
-                    PageHeader(title = "Now playing")
-                    StatusCard(message = "Loading playlist")
+                    item {
+                        PageHeader(
+                            title = "Now playing",
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    item { StatusCard(message = "Loading playlist") }
                 }
 
                 state.errorMessage != null -> {
-                    PageHeader(title = "Now playing")
-                    StatusCard(message = state.errorMessage)
+                    item {
+                        PageHeader(
+                            title = "Now playing",
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    item { StatusCard(message = state.errorMessage) }
                 }
 
                 !state.hasPodcasts -> {
-                    PageHeader(
-                        title = "No podcasts",
-                        subtitle = "Start with one RSS feed or import subscriptions from another app."
-                    )
-
-                    NoPodcastsEmptyState(
-                        onAddRssFeed = onAddRssFeed,
-                        onImportOpml = onImportOpml,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    item {
+                        PageHeader(
+                            title = "No podcasts",
+                            subtitle = "Start with one RSS feed or import subscriptions from another app.",
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    item {
+                        NoPodcastsEmptyState(
+                            onAddRssFeed = onAddRssFeed,
+                            onImportOpml = onImportOpml,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 currentEpisode == null -> {
-                    PageHeader(
-                        title = "Now playing",
-                        showActions = true
-                    )
-                    StatusCard(message = "Playlist is empty")
+                    item {
+                        PageHeader(
+                            title = "Now playing",
+                            showActions = true,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    item { StatusCard(message = "Playlist is empty") }
                 }
 
                 else -> {
-                PageHeader(
-                    title = "Now playing",
-                    showActions = true
-                )
+                    item {
+                        PageHeader(
+                            title = "Now playing",
+                            showActions = true,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
 
-                state.actionErrorMessage?.let { message ->
-                    StatusCard(message = message)
-                }
-
-                PlayerView(
-                    modifier = Modifier.fillMaxWidth(),
-                    title = currentEpisode.title,
-                    podcastTitle = currentEpisode.podcastTitle,
-                    elapsedLabel = formatProgressTime(playbackState.positionSeconds),
-                    durationLabel = formatProgressTime(playbackState.remainingSeconds),
-                    progress = playbackState.progress,
-                    isPlaying = playbackState.isPlaying,
-                    speedLabel = playbackState.speedLabel,
-                    onSpeedChange = onSpeedChange,
-                    onPlayClick = onPlayToggle,
-                    onSeekBackward = { onSeekBy(-10) },
-                    onSeekForward = { onSeekBy(15) },
-                    onNotesClick = { showNotesEpisode = currentEpisode }
-                )
-
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(4.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .figmaDropShadow(radius = 4.dp)
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.CenterStart,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 12.dp)
-                        ) {
-                            Text(
-                                text = queueSummary(state.queue),
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    state.actionErrorMessage?.let { message ->
+                        item {
+                            StatusCard(
+                                message = message,
+                                modifier = Modifier.padding(bottom = 16.dp)
                             )
                         }
                     }
 
-                    state.queue.forEachIndexed { index, episode ->
+                    item {
+                        PlayerView(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            title = currentEpisode.title,
+                            podcastTitle = currentEpisode.podcastTitle,
+                            elapsedLabel = formatProgressTime(playbackState.positionSeconds),
+                            durationLabel = formatProgressTime(playbackState.remainingSeconds),
+                            progress = playbackState.progress,
+                            isPlaying = playbackState.isPlaying,
+                            speedLabel = playbackState.speedLabel,
+                            onSpeedChange = onSpeedChange,
+                            onPlayClick = onPlayToggle,
+                            onSeekBackward = { onSeekBy(-10) },
+                            onSeekForward = { onSeekBy(15) },
+                            onNotesClick = { showNotesEpisode = currentEpisode }
+                        )
+                    }
+
+                    item {
+                        QueueSummaryCard(
+                            text = queueSummary(state.queue),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+
+                    itemsIndexed(
+                        items = state.queue,
+                        key = { _, episode -> episode.id }
+                    ) { index, episode ->
                         EpisodeRow(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
@@ -312,6 +321,7 @@ fun HomeScreen(
                             } else {
                                 episode.podcastTitle
                             },
+                            modifier = Modifier.padding(bottom = 4.dp),
                             onAction = { action ->
                                 when (action) {
                                     EpisodeRowAction.AddToPlaylist -> Unit
@@ -327,7 +337,6 @@ fun HomeScreen(
                         )
                     }
                 }
-                }
             }
         }
 
@@ -339,6 +348,37 @@ fun HomeScreen(
                     onClose = { showNotesEpisode = null }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun QueueSummaryCard(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .figmaDropShadow(radius = 4.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp)
+        ) {
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
