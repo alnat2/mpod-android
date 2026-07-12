@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -40,6 +41,7 @@ fun ModalScreenMobile(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.30f))
+            .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = 20.dp),
@@ -57,6 +59,7 @@ fun ShowNotesMobile(
     modifier: Modifier = Modifier
 ) {
     val notesText = notes ?: rememberDefaultShowNotes()
+    val hasLongNotes = notesText.length > 280 || notesText.count { it == '\n' } > 6
 
     Column(
         modifier = modifier
@@ -112,7 +115,7 @@ fun ShowNotesMobile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(360.dp),
+                .then(if (hasLongNotes) Modifier.height(360.dp) else Modifier),
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.Top
         ) {
@@ -127,7 +130,9 @@ fun ShowNotesMobile(
                     .weight(1f)
                     .verticalScroll(scrollState)
             )
-            StaticScrollbar()
+            if (hasLongNotes) {
+                StaticScrollbar()
+            }
         }
     }
 }
