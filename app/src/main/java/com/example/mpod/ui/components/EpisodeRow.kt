@@ -50,6 +50,7 @@ fun EpisodeRow(
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
     showDragHandle: Boolean = true,
+    statusTextOverride: String? = null,
     modifier: Modifier = Modifier,
     onAction: ((EpisodeRowAction) -> Unit)? = null
 ) {
@@ -58,7 +59,7 @@ fun EpisodeRow(
         MaterialTheme.colorScheme.surfaceVariant
     else
         MaterialTheme.colorScheme.surface
-    val statusText = when {
+    val statusText = statusTextOverride ?: when {
         inPlaylist -> "In playlist"
         isPlaying -> "$podcastName · now playing"
         else -> podcastName

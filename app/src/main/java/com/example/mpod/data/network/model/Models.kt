@@ -26,7 +26,12 @@ data class EpisodeListenedRequest(
 data class SessionDto(
     @SerializedName("authenticated") val authenticated: Boolean,
     @SerializedName("setupRequired") val setupRequired: Boolean,
-    @SerializedName("user") val user: String?
+    @SerializedName("user") val user: SessionUserDto?
+)
+
+data class SessionUserDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("username") val username: String?
 )
 
 data class PodcastsResponse(

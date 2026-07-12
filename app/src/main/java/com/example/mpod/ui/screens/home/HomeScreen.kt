@@ -307,6 +307,11 @@ fun HomeScreen(
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
                             showDragHandle = true,
+                            statusTextOverride = if (index == 0) {
+                                "${episode.podcastTitle} · now playing"
+                            } else {
+                                episode.podcastTitle
+                            },
                             onAction = { action ->
                                 when (action) {
                                     EpisodeRowAction.AddToPlaylist -> Unit

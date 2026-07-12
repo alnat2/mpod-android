@@ -29,12 +29,14 @@ class PersistentCookieJar(context: Context) : CookieJar {
     }
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val key = url.storageKey()
         val freshCookies = cookies.filter { it.expiresAt > System.currentTimeMillis() }
+        if (freshCookies.isEmpty()) return
+
+        val key = url.storageKey()
         cookieStore[key] = freshCookies
 
         val cookieString = freshCookies.joinToString("\n") { it.toString() }
-        preferences.edit().putString(key, cookieString).apply()
+        preferences.edit().putString(key, cookieString).commit()
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
