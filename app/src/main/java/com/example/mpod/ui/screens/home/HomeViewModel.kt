@@ -9,6 +9,7 @@ import com.example.mpod.data.network.model.EpisodeDto
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
 import com.example.mpod.data.network.model.PlaylistReorderRequest
 import com.example.mpod.data.network.model.PodcastDto
+import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,13 +72,13 @@ class HomeViewModel @Inject constructor(
         val podcast = podcastsById[podcastId]
         return HomeEpisodeUi(
             id = id,
-            title = title.orEmpty().ifBlank { "Untitled episode" },
-            podcastTitle = podcast?.title.orEmpty().ifBlank { "Podcast" },
+            title = cleanFeedText(title).ifBlank { "Untitled episode" },
+            podcastTitle = cleanFeedText(podcast?.title).ifBlank { "Podcast" },
             audioUrl = "${MPOD_BASE_URL}api/episodes/$id/audio",
             durationSeconds = duration.toDurationSeconds(),
             isListened = isListened,
             downloaded = downloaded == true,
-            summary = summary
+            summary = cleanFeedText(summary).ifBlank { null }
         )
     }
 

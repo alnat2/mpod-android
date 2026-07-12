@@ -1,5 +1,7 @@
 package com.example.mpod.ui.util
 
+import android.os.Build
+import android.text.Html
 import kotlin.math.roundToInt
 
 fun formatEpisodeDuration(seconds: Int?): String {
@@ -38,6 +40,20 @@ fun formatPublishedDate(value: String?): String? {
     val month = date.substring(5, 7)
     val day = date.substring(8, 10)
     return "$day.$month.$year"
+}
+
+fun cleanFeedText(value: String?): String {
+    if (value.isNullOrBlank()) return ""
+    val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        Html.fromHtml(value, Html.FROM_HTML_MODE_LEGACY)
+    } else {
+        @Suppress("DEPRECATION")
+        Html.fromHtml(value)
+    }
+    return decoded.toString()
+        .replace('\u00A0', ' ')
+        .replace(Regex("\\s+"), " ")
+        .trim()
 }
 
 fun Double?.toDurationSeconds(): Int? = this?.roundToInt()?.takeIf { it > 0 }

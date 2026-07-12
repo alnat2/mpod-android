@@ -7,6 +7,7 @@ import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PodcastDto
+import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -189,8 +190,8 @@ class SubscriptionsViewModel @Inject constructor(
     private fun PodcastDto.toSubscriptionPodcast(episodes: List<SubscriptionEpisodeUi>): SubscriptionPodcastUi {
         return SubscriptionPodcastUi(
             id = id,
-            title = title.orEmpty().ifBlank { "Untitled podcast" },
-            description = description ?: rssUrl.orEmpty(),
+            title = cleanFeedText(title).ifBlank { "Untitled podcast" },
+            description = cleanFeedText(description).ifBlank { rssUrl.orEmpty() },
             episodes = episodes
         )
     }
@@ -198,12 +199,12 @@ class SubscriptionsViewModel @Inject constructor(
     private fun EpisodeDto.toSubscriptionEpisode(playlistEpisodeIds: Set<Int>): SubscriptionEpisodeUi {
         return SubscriptionEpisodeUi(
             id = id,
-            title = title.orEmpty().ifBlank { "Untitled episode" },
+            title = cleanFeedText(title).ifBlank { "Untitled episode" },
             durationSeconds = duration.toDurationSeconds(),
             publishedAt = publishedAt,
             isListened = isListened,
             downloaded = downloaded == true,
-            summary = summary,
+            summary = cleanFeedText(summary).ifBlank { null },
             inPlaylist = id in playlistEpisodeIds
         )
     }
