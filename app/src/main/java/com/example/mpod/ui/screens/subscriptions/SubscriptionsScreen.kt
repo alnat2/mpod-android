@@ -164,7 +164,7 @@ fun SubscriptionsScreen(
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         MarkAllListenedHeader(summary = podcastEpisodeSummary(podcast))
-                                        podcast.episodes.take(20).forEach { episode ->
+                                        podcast.episodes.forEach { episode ->
                                             EpisodeRow(
                                                 title = episode.title,
                                                 podcastName = podcast.title,
@@ -313,8 +313,7 @@ private fun podcastCountLabel(count: Int): String {
 }
 
 private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {
-    val unlistened = podcast.episodes.count { !it.isListened }
-    return "${podcast.episodes.size} / $unlistened episodes"
+    return "${podcast.totalEpisodeCount} / ${podcast.unlistenedEpisodeCount} episodes"
 }
 
 private fun previewSubscriptionsState(): SubscriptionsUiState {
@@ -347,12 +346,16 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
                 id = 1,
                 title = "Decoder Ring",
                 description = "Culture stories behind everyday design",
+                totalEpisodeCount = episodes.size,
+                unlistenedEpisodeCount = episodes.count { !it.isListened },
                 episodes = episodes
             ),
             SubscriptionPodcastUi(
                 id = 2,
                 title = "Rude Emails",
                 description = "Workplace stories and tiny disasters",
+                totalEpisodeCount = episodes.size,
+                unlistenedEpisodeCount = episodes.count { !it.isListened },
                 episodes = episodes
             )
         )

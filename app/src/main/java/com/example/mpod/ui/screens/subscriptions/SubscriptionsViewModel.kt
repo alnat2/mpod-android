@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 import retrofit2.Response
 import javax.inject.Inject
 
+private const val VISIBLE_EPISODE_LIMIT = 20
+
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val api: MpodApi
@@ -176,22 +178,33 @@ class SubscriptionsViewModel @Inject constructor(
             .toSet()
 
         val podcastItems = podcasts.map { podcast ->
-            val episodes = api.getPodcastEpisodes(podcast.id)
+            val allEpisodes = api.getPodcastEpisodes(podcast.id)
                 .requireBody("Could not load episodes.")
                 .episodes
-                .map { it.toSubscriptionEpisode(playlistEpisodeIds) }
 
-            podcast.toSubscriptionPodcast(episodes)
+            podcast.toSubscriptionPodcast(
+                episodes = allEpisodes
+                    .take(VISIBLE_EPISODE_LIMIT)
+                    .map { it.toSubscriptionEpisode(playlistEpisodeIds) },
+                totalEpisodeCount = allEpisodes.size,
+                unlistenedEpisodeCount = allEpisodes.count { !it.isListened }
+            )
         }
 
         return SubscriptionsUiState(podcasts = podcastItems)
     }
 
-    private fun PodcastDto.toSubscriptionPodcast(episodes: List<SubscriptionEpisodeUi>): SubscriptionPodcastUi {
+    private fun PodcastDto.toSubscriptionPodcast(
+        episodes: List<SubscriptionEpisodeUi>,
+        totalEpisodeCount: Int,
+        unlistenedEpisodeCount: Int
+    ): SubscriptionPodcastUi {
         return SubscriptionPodcastUi(
             id = id,
             title = cleanFeedText(title).ifBlank { "Untitled podcast" },
             description = cleanFeedText(description).ifBlank { rssUrl.orEmpty() },
+            totalEpisodeCount = totalEpisodeCount,
+            unlistenedEpisodeCount = unlistenedEpisodeCount,
             episodes = episodes
         )
     }
@@ -236,6 +249,8 @@ data class SubscriptionPodcastUi(
     val id: Int,
     val title: String,
     val description: String,
+    val totalEpisodeCount: Int,
+    val unlistenedEpisodeCount: Int,
     val episodes: List<SubscriptionEpisodeUi>
 )
 
