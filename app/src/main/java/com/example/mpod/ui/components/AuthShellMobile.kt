@@ -47,7 +47,7 @@ fun AuthShellMobile(
             .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp, androidx.compose.ui.Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),

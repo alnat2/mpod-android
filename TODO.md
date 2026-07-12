@@ -20,7 +20,7 @@
 - [x] Optimize Subscriptions if long episode lists still create jank.
 - [x] Verify Settings screen spacing, typography, states, and lower-screen scrolling on Nexus 5.
 - [x] Verify Add podcast modal states: RSS URL, OPML picker, loading, error, success.
-- [ ] Verify auth/setup screens against Figma, including password visibility behavior.
+- [x] Verify auth/setup screens against Figma, including password visibility behavior.
 - [ ] Verify show notes modal layout, scrolling, close behavior, and long text.
 - [ ] Verify empty, loading, and error states across Home, Subscriptions, Add podcast, and Settings.
 - [ ] Run a focused performance pass on the slowest remaining flow with `gfxinfo`, and Perfetto if needed.
