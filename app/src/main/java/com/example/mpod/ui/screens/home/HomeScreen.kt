@@ -105,12 +105,15 @@ fun HomeRoute(
     LaunchedEffect(player, currentEpisode?.id) {
         while (true) {
             val durationMs = player.duration.takeIf { it > 0 } ?: ((currentEpisode?.durationSeconds ?: 0) * 1000L)
-            playbackState = playbackState.copy(
+            val nextPlaybackState = playbackState.copy(
                 positionSeconds = (player.currentPosition / 1000).toInt().coerceAtLeast(0),
                 durationSeconds = (durationMs / 1000).toInt().coerceAtLeast(0),
                 isPlaying = player.isPlaying
             )
-            delay(500)
+            if (nextPlaybackState != playbackState) {
+                playbackState = nextPlaybackState
+            }
+            delay(if (player.isPlaying) 500 else 1_500)
         }
     }
 
