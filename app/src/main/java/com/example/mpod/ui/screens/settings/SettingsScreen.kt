@@ -72,7 +72,6 @@ fun SettingsScreen(
 ) {
     var backendAddress by remember { mutableStateOf(state.backendAddress) }
     var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
-    var useDarkTheme by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.backendAddress) {
         backendAddress = state.backendAddress
@@ -198,18 +197,6 @@ fun SettingsScreen(
                     onCheckedChange = onProxyEnabledChange,
                     enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading,
                     contentDescription = "Use SOCKS5 proxy"
-                )
-            }
-        )
-
-        SettingCard(
-            title = "Use dark theme",
-            description = "Use this option if it feels more comfortable for you.",
-            action = {
-                MpodSwitch(
-                    checked = useDarkTheme,
-                    onCheckedChange = { useDarkTheme = it },
-                    contentDescription = "Use dark theme"
                 )
             }
         )
