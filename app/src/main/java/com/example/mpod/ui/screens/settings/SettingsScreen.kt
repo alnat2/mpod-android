@@ -196,7 +196,8 @@ fun SettingsScreen(
                 MpodSwitch(
                     checked = state.proxyEnabled,
                     onCheckedChange = onProxyEnabledChange,
-                    enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading
+                    enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading,
+                    contentDescription = "Use SOCKS5 proxy"
                 )
             }
         )
@@ -205,7 +206,11 @@ fun SettingsScreen(
             title = "Use dark theme",
             description = "Use this option if it feels more comfortable for you.",
             action = {
-                MpodSwitch(checked = useDarkTheme, onCheckedChange = { useDarkTheme = it })
+                MpodSwitch(
+                    checked = useDarkTheme,
+                    onCheckedChange = { useDarkTheme = it },
+                    contentDescription = "Use dark theme"
+                )
             }
         )
 
@@ -226,7 +231,7 @@ fun SettingsScreen(
 
         SettingCard(
             title = "Session",
-            description = "End the current browser session",
+            description = "End the current app session",
             action = {
                 MpodButton(
                     text = "Log out",

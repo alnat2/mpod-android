@@ -34,6 +34,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -323,7 +328,8 @@ fun MpodSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    contentDescription: String? = null
 ) {
     val track = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     val thumb = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.background
@@ -332,6 +338,17 @@ fun MpodSwitch(
             .size(width = 44.dp, height = 24.dp)
             .clip(CircleShape)
             .background(track)
+            .then(
+                if (contentDescription == null) {
+                    Modifier
+                } else {
+                    Modifier.semantics {
+                        this.contentDescription = contentDescription
+                        this.stateDescription = if (checked) "On" else "Off"
+                        role = Role.Switch
+                    }
+                }
+            )
             .alpha(if (enabled) 1f else 0.65f)
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(2.dp),
