@@ -3,6 +3,7 @@ package com.example.mpod.ui.screens.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,10 +29,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -72,6 +76,7 @@ fun SettingsScreen(
 ) {
     var backendAddress by remember { mutableStateOf(state.backendAddress) }
     var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
+    var darkThemeEnabled by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.backendAddress) {
         backendAddress = state.backendAddress
@@ -140,12 +145,9 @@ fun SettingsScreen(
                     onValueChange = { backendAddress = it },
                     modifier = Modifier.weight(1f)
                 )
-                MpodButton(
-                    text = "Save",
-                    height = 36.dp,
-                    radius = 10.dp,
-                    modifier = Modifier.width(100.dp),
-                    enabled = backendAddress != state.backendAddress,
+                SettingsPrimaryButton(
+                    text = "Save conf",
+                    enabled = !state.isLoading,
                     onClick = { onSaveBackendAddress(backendAddress) }
                 )
             }
@@ -169,11 +171,8 @@ fun SettingsScreen(
                         onValueChange = { feedRefreshTime = it },
                         modifier = Modifier.weight(1f)
                     )
-                    MpodButton(
-                        text = "Save",
-                        height = 36.dp,
-                        radius = 10.dp,
-                        modifier = Modifier.width(100.dp),
+                    SettingsPrimaryButton(
+                        text = "Save time",
                         enabled = !state.isSavingRefreshTime && !state.isLoading,
                         onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
                     )
@@ -202,14 +201,26 @@ fun SettingsScreen(
         )
 
         SettingCard(
+            title = "Use dark theme",
+            description = "Use this option if it feels more comfortable for you.",
+            action = {
+                MpodSwitch(
+                    checked = darkThemeEnabled,
+                    onCheckedChange = { darkThemeEnabled = it },
+                    contentDescription = "Use dark theme"
+                )
+            }
+        )
+
+        SettingCard(
             title = "Export OPML",
             description = "Download the current subscription list as an OPML file.",
             action = {
-                MpodButton(
+                SettingsPrimaryButton(
                     text = if (state.isExportingOpml) "Exporting" else "Export OPML",
+                    width = 113.dp,
                     height = 32.dp,
                     radius = 6.dp,
-                    modifier = Modifier.width(113.dp),
                     enabled = !state.isExportingOpml && !state.isLoading,
                     onClick = onExportOpml
                 )
@@ -238,6 +249,36 @@ fun SettingsScreen(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun SettingsPrimaryButton(
+    text: String,
+    width: Dp = 100.dp,
+    height: Dp = 36.dp,
+    radius: Dp = 10.dp,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(radius))
+            .background(MaterialTheme.colorScheme.primary)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onPrimary,
+            maxLines = 1
         )
     }
 }

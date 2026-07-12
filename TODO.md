@@ -18,7 +18,7 @@
 
 - [x] Audit the Subscriptions screen on Nexus 5 against Figma and current backend data.
 - [x] Optimize Subscriptions if long episode lists still create jank.
-- [ ] Verify Settings screen spacing, typography, states, and lower-screen scrolling on Nexus 5.
+- [x] Verify Settings screen spacing, typography, states, and lower-screen scrolling on Nexus 5.
 - [ ] Verify Add podcast modal states: RSS URL, OPML picker, loading, error, success.
 - [ ] Verify auth/setup screens against Figma, including password visibility behavior.
 - [ ] Verify show notes modal layout, scrolling, close behavior, and long text.
