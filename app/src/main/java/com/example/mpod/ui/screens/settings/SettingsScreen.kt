@@ -142,7 +142,7 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f)
                 )
                 MpodButton(
-                    text = "Save conf",
+                    text = "Save",
                     height = 36.dp,
                     radius = 10.dp,
                     modifier = Modifier.width(100.dp),
@@ -170,14 +170,14 @@ fun SettingsScreen(
                         onValueChange = { feedRefreshTime = it },
                         modifier = Modifier.weight(1f)
                     )
-                MpodButton(
-                    text = "Save time",
-                    height = 36.dp,
-                    radius = 10.dp,
-                    modifier = Modifier.width(100.dp),
-                    enabled = !state.isSavingRefreshTime && !state.isLoading,
-                    onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
-                )
+                    MpodButton(
+                        text = "Save",
+                        height = 36.dp,
+                        radius = 10.dp,
+                        modifier = Modifier.width(100.dp),
+                        enabled = !state.isSavingRefreshTime && !state.isLoading,
+                        onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                    )
                 }
                 Text(
                     text = state.schedulerStatusText,
