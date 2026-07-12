@@ -55,7 +55,7 @@ class AppLaunchViewModel @Inject constructor(
             }.getOrNull()
             if (response?.isSuccessful == true) {
                 _authUiState.value = AuthUiState()
-                refreshSession()
+                _state.value = AppLaunchState.Authenticated
             } else {
                 _authUiState.value = AuthUiState(
                     errorMessage = authErrorMessage(response, "Could not log in. Check your username and password.")
@@ -73,7 +73,7 @@ class AppLaunchViewModel @Inject constructor(
             }.getOrNull()
             if (response?.isSuccessful == true) {
                 _authUiState.value = AuthUiState()
-                refreshSession()
+                _state.value = AppLaunchState.Authenticated
             } else {
                 _authUiState.value = AuthUiState(
                     errorMessage = authErrorMessage(response, "Could not create the account. Try another username.")
