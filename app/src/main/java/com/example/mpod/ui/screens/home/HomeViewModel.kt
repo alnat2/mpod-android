@@ -2,6 +2,7 @@ package com.example.mpod.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.PersistentCookieJar
 import com.example.mpod.data.network.model.EpisodeListenedRequest
@@ -21,11 +22,10 @@ import retrofit2.Response
 import java.time.Instant
 import javax.inject.Inject
 
-private const val MPOD_BASE_URL = "http://192.168.0.222:5051/"
-
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val api: MpodApi,
+    private val backendConfig: BackendConfig,
     private val cookieJar: PersistentCookieJar
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
@@ -74,7 +74,7 @@ class HomeViewModel @Inject constructor(
             id = id,
             title = cleanFeedText(title).ifBlank { "Untitled episode" },
             podcastTitle = cleanFeedText(podcast?.title).ifBlank { "Podcast" },
-            audioUrl = "${MPOD_BASE_URL}api/episodes/$id/audio",
+            audioUrl = "${backendConfig.baseUrl}api/episodes/$id/audio",
             durationSeconds = duration.toDurationSeconds(),
             isListened = isListened,
             downloaded = downloaded == true,
@@ -208,7 +208,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun audioRequestHeaders(): Map<String, String> {
-        val cookies = cookieJar.loadForRequest(MPOD_BASE_URL.toHttpUrl())
+        val cookies = cookieJar.loadForRequest(backendConfig.baseUrl.toHttpUrl())
         if (cookies.isEmpty()) return emptyMap()
 
         return mapOf(
