@@ -258,7 +258,7 @@ fun FileDropzone(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Drag and drop your file",
+                text = "Choose OPML file",
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
@@ -271,14 +271,14 @@ fun FileDropzone(
                 modifier = Modifier.size(80.dp)
             )
             Text(
-                text = "or click to browse from your computer",
+                text = "Tap to browse files on this device",
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         MpodButton(
-            text = "Browse files",
+            text = "Choose file",
             primary = false,
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.primary,
