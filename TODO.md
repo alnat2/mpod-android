@@ -16,7 +16,7 @@
 
 ## Next
 
-- [ ] Audit the Subscriptions screen on Nexus 5 against Figma and current backend data.
+- [x] Audit the Subscriptions screen on Nexus 5 against Figma and current backend data.
 - [ ] Optimize Subscriptions if long episode lists still create jank.
 - [ ] Verify Settings screen spacing, typography, states, and lower-screen scrolling on Nexus 5.
 - [ ] Verify Add podcast modal states: RSS URL, OPML picker, loading, error, success.
