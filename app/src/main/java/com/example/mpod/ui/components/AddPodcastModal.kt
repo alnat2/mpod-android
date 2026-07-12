@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 import com.example.mpod.ui.theme.MpodTheme
+import java.net.URI
 
 enum class AddPodcastMode {
     RssFeedUrl,
@@ -57,17 +58,33 @@ fun AddPodcastModal(
 ) {
     var mode by remember(initialMode) { mutableStateOf(initialMode) }
     var url by remember { mutableStateOf("") }
+    var inputError by remember { mutableStateOf<String?>(null) }
+
+    fun submitRssUrl() {
+        val trimmedUrl = url.trim()
+        inputError = when {
+            trimmedUrl.isBlank() -> "Paste RSS feed URL."
+            !trimmedUrl.isHttpUrl() -> "Enter a valid http or https RSS feed URL."
+            else -> null
+        }
+        if (inputError == null) {
+            onAddUrl(trimmedUrl)
+        }
+    }
 
     ModalScreenMobile {
         AddPodcastMobile(
             mode = mode,
             onModeChange = { mode = it },
             url = url,
-            onUrlChange = { url = it },
+            onUrlChange = {
+                url = it
+                inputError = null
+            },
             isSubmitting = isSubmitting,
-            errorMessage = errorMessage,
+            errorMessage = inputError ?: errorMessage,
             onDismiss = onDismiss,
-            onAddUrl = { onAddUrl(url) },
+            onAddUrl = ::submitRssUrl,
             onImportOpml = onImportOpml
         )
     }
@@ -364,3 +381,8 @@ private fun ModalTab(
         )
     }
 }
+
+private fun String.isHttpUrl(): Boolean = runCatching {
+    val uri = URI(this)
+    uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
+}.getOrDefault(false)

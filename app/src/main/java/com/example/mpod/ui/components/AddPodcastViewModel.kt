@@ -20,6 +20,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.Response
+import java.net.URI
 import javax.inject.Inject
 
 @HiltViewModel
@@ -34,6 +35,10 @@ class AddPodcastViewModel @Inject constructor(
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
             _state.value = AddPodcastUiState(errorMessage = "Paste RSS feed URL.")
+            return
+        }
+        if (!trimmedUrl.isHttpUrl()) {
+            _state.value = AddPodcastUiState(errorMessage = "Enter a valid http or https RSS feed URL.")
             return
         }
 
@@ -114,6 +119,11 @@ class AddPodcastViewModel @Inject constructor(
                 ?: JSONObject(rawError).optString("message").takeIf { it.isNotBlank() }
         }.getOrNull() ?: fallback
     }
+
+    private fun String.isHttpUrl(): Boolean = runCatching {
+        val uri = URI(this)
+        uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
+    }.getOrDefault(false)
 }
 
 data class AddPodcastUiState(
