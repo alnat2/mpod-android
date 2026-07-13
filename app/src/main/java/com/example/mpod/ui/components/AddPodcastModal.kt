@@ -347,6 +347,48 @@ private fun ImportOpmlModalPreview() {
     }
 }
 
+@Preview(
+    name = "Add RSS feed error / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun AddRssFeedErrorPreview() {
+    MpodTheme {
+        ModalScreenMobile {
+            AddPodcastMobile(
+                mode = AddPodcastMode.RssFeedUrl,
+                onModeChange = {},
+                url = "ftp://example.com/feed.xml",
+                onUrlChange = {},
+                errorMessage = "Enter a valid http or https RSS feed URL."
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Add RSS feed loading / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun AddRssFeedLoadingPreview() {
+    MpodTheme {
+        ModalScreenMobile {
+            AddPodcastMobile(
+                mode = AddPodcastMode.RssFeedUrl,
+                onModeChange = {},
+                url = "https://feeds.example.com/podcast.xml",
+                onUrlChange = {},
+                isSubmitting = true
+            )
+        }
+    }
+}
+
 @Composable
 private fun ModalTab(
     text: String,

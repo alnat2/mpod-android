@@ -22,7 +22,7 @@
 - [x] Verify Add podcast modal states: RSS URL, OPML picker, loading, error, success.
 - [x] Verify auth/setup screens against Figma, including password visibility behavior.
 - [x] Verify show notes modal layout, scrolling, close behavior, and long text.
-- [ ] Verify empty, loading, and error states across Home, Subscriptions, Add podcast, and Settings.
+- [x] Verify empty, loading, and error states across Home, Subscriptions, Add podcast, and Settings.
 - [ ] Run a focused performance pass on the slowest remaining flow with `gfxinfo`, and Perfetto if needed.
 - [ ] Check real-device or physical-phone performance after emulator checks are stable.
 

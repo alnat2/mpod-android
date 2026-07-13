@@ -396,3 +396,66 @@ private fun SubscriptionsErrorScreenPreview() {
         }
     }
 }
+
+@Preview(
+    name = "Subscriptions loading / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SubscriptionsLoadingPreview() {
+    MpodTheme {
+        SubscriptionsPreviewShell {
+            SubscriptionsScreen(state = SubscriptionsUiState(isLoading = true))
+        }
+    }
+}
+
+@Preview(
+    name = "Subscriptions load error / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SubscriptionsLoadErrorPreview() {
+    MpodTheme {
+        SubscriptionsPreviewShell {
+            SubscriptionsScreen(state = SubscriptionsUiState(errorMessage = "Could not load subscriptions."))
+        }
+    }
+}
+
+@Preview(
+    name = "Subscriptions empty / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SubscriptionsEmptyPreview() {
+    MpodTheme {
+        SubscriptionsPreviewShell {
+            SubscriptionsScreen(state = SubscriptionsUiState(podcasts = emptyList()))
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionsPreviewShell(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            content()
+        }
+        MpodBottomNav(
+            currentRoute = Screen.Subscriptions.route,
+            onNavigate = {},
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+    }
+}

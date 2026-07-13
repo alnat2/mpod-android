@@ -578,3 +578,71 @@ private fun NoPodcastsScreenPreview() {
         }
     }
 }
+
+@Preview(
+    name = "Home loading / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun HomeLoadingPreview() {
+    MpodTheme {
+        HomePreviewShell {
+            HomeScreen(state = HomeUiState(isLoading = true))
+        }
+    }
+}
+
+@Preview(
+    name = "Home load error / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun HomeLoadErrorPreview() {
+    MpodTheme {
+        HomePreviewShell {
+            HomeScreen(state = HomeUiState(errorMessage = "Could not load playlist."))
+        }
+    }
+}
+
+@Preview(
+    name = "Home empty playlist / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun HomeEmptyPlaylistPreview() {
+    MpodTheme {
+        HomePreviewShell {
+            HomeScreen(
+                state = HomeUiState(
+                    hasPodcasts = true,
+                    queue = emptyList()
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomePreviewShell(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            content()
+        }
+        MpodBottomNav(
+            currentRoute = Screen.Home.route,
+            onNavigate = {},
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+    }
+}

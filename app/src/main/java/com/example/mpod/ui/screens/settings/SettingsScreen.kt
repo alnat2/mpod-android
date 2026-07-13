@@ -34,6 +34,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +44,7 @@ import com.example.mpod.ui.components.MpodInput
 import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
+import com.example.mpod.ui.theme.MpodTheme
 
 @Composable
 fun SettingsRoute(
@@ -98,68 +100,41 @@ fun SettingsScreen(
     ) {
         PageHeader(title = "Settings")
 
-        if (state.errorMessage != null) {
-            Text(
-                text = state.errorMessage,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (state.exportMessage != null) {
-            Text(
-                text = state.exportMessage,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (state.backendMessage != null) {
-            Text(
-                text = state.backendMessage,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        SettingCard(
-            title = "Backend address",
-            description = "Enter the backend's IP address and port, separated by a colon."
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MpodInput(
-                    value = backendAddress,
-                    onValueChange = { backendAddress = it },
-                    modifier = Modifier.weight(1f)
-                )
-                SettingsPrimaryButton(
-                    text = "Save conf",
-                    enabled = !state.isLoading,
-                    onClick = { onSaveBackendAddress(backendAddress) }
+        if (state.isLoading) {
+            SettingsStatusCard(message = "Loading settings")
+        } else {
+            if (state.errorMessage != null) {
+                SettingsStatusCard(
+                    message = state.errorMessage,
+                    isError = true
                 )
             }
-        }
 
-        SettingCard(
-            title = "Feed daily refresh",
-            description = "Feeds are refreshed once per day at a single global time."
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            if (state.exportMessage != null) {
+                Text(
+                    text = state.exportMessage,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (state.backendMessage != null) {
+                Text(
+                    text = state.backendMessage,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            SettingCard(
+                title = "Backend address",
+                description = "Enter the backend's IP address and port, separated by a colon."
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -167,88 +142,137 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     MpodInput(
-                        value = feedRefreshTime,
-                        onValueChange = { feedRefreshTime = it },
+                        value = backendAddress,
+                        onValueChange = { backendAddress = it },
                         modifier = Modifier.weight(1f)
                     )
                     SettingsPrimaryButton(
-                        text = "Save time",
-                        enabled = !state.isSavingRefreshTime && !state.isLoading,
-                        onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                        text = "Save conf",
+                        enabled = !state.isLoading,
+                        onClick = { onSaveBackendAddress(backendAddress) }
                     )
                 }
-                Text(
-                    text = state.schedulerStatusText,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
             }
+
+            SettingCard(
+                title = "Feed daily refresh",
+                description = "Feeds are refreshed once per day at a single global time."
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MpodInput(
+                            value = feedRefreshTime,
+                            onValueChange = { feedRefreshTime = it },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SettingsPrimaryButton(
+                            text = "Save time",
+                            enabled = !state.isSavingRefreshTime && !state.isLoading,
+                            onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                        )
+                    }
+                    Text(
+                        text = state.schedulerStatusText,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+
+            SettingCard(
+                title = "Use SOCKS5 proxy",
+                description = state.proxyStatusText,
+                action = {
+                    MpodSwitch(
+                        checked = state.proxyEnabled,
+                        onCheckedChange = onProxyEnabledChange,
+                        enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading,
+                        contentDescription = "Use SOCKS5 proxy"
+                    )
+                }
+            )
+
+            SettingCard(
+                title = "Use dark theme",
+                description = "Use this option if it feels more comfortable for you.",
+                action = {
+                    MpodSwitch(
+                        checked = darkThemeEnabled,
+                        onCheckedChange = { darkThemeEnabled = it },
+                        contentDescription = "Use dark theme"
+                    )
+                }
+            )
+
+            SettingCard(
+                title = "Export OPML",
+                description = "Download the current subscription list as an OPML file.",
+                action = {
+                    SettingsPrimaryButton(
+                        text = if (state.isExportingOpml) "Exporting" else "Export OPML",
+                        width = 113.dp,
+                        height = 32.dp,
+                        radius = 6.dp,
+                        enabled = !state.isExportingOpml && !state.isLoading,
+                        onClick = onExportOpml
+                    )
+                }
+            )
+
+            SettingCard(
+                title = "Session",
+                description = "End the current app session",
+                action = {
+                    MpodButton(
+                        text = "Log out",
+                        primary = false,
+                        height = 32.dp,
+                        radius = 6.dp,
+                        modifier = Modifier.width(113.dp),
+                        onClick = onLogout
+                    )
+                }
+            )
+
+            Text(
+                text = "Current app build: ${state.appBuild ?: "unknown"}",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
+    }
+}
 
-        SettingCard(
-            title = "Use SOCKS5 proxy",
-            description = state.proxyStatusText,
-            action = {
-                MpodSwitch(
-                    checked = state.proxyEnabled,
-                    onCheckedChange = onProxyEnabledChange,
-                    enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading,
-                    contentDescription = "Use SOCKS5 proxy"
-                )
-            }
-        )
-
-        SettingCard(
-            title = "Use dark theme",
-            description = "Use this option if it feels more comfortable for you.",
-            action = {
-                MpodSwitch(
-                    checked = darkThemeEnabled,
-                    onCheckedChange = { darkThemeEnabled = it },
-                    contentDescription = "Use dark theme"
-                )
-            }
-        )
-
-        SettingCard(
-            title = "Export OPML",
-            description = "Download the current subscription list as an OPML file.",
-            action = {
-                SettingsPrimaryButton(
-                    text = if (state.isExportingOpml) "Exporting" else "Export OPML",
-                    width = 113.dp,
-                    height = 32.dp,
-                    radius = 6.dp,
-                    enabled = !state.isExportingOpml && !state.isLoading,
-                    onClick = onExportOpml
-                )
-            }
-        )
-
-        SettingCard(
-            title = "Session",
-            description = "End the current app session",
-            action = {
-                MpodButton(
-                    text = "Log out",
-                    primary = false,
-                    height = 32.dp,
-                    radius = 6.dp,
-                    modifier = Modifier.width(113.dp),
-                    onClick = onLogout
-                )
-            }
-        )
-
+@Composable
+private fun SettingsStatusCard(
+    message: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false
+) {
+    MpodOutlinedSurface(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Current app build: ${state.appBuild ?: "unknown"}",
+            text = message,
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.fillMaxWidth()
+            color = if (isError) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.padding(16.dp)
         )
     }
 }
@@ -279,6 +303,36 @@ private fun SettingsPrimaryButton(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onPrimary,
             maxLines = 1
+        )
+    }
+}
+
+@Preview(
+    name = "Settings loading / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SettingsLoadingPreview() {
+    MpodTheme {
+        SettingsScreen(state = SettingsUiState(isLoading = true))
+    }
+}
+
+@Preview(
+    name = "Settings error / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun SettingsErrorPreview() {
+    MpodTheme {
+        SettingsScreen(
+            state = SettingsUiState(
+                errorMessage = "Could not load settings."
+            )
         )
     }
 }
