@@ -128,7 +128,11 @@ fun HomeRoute(
             viewModel.updatePlayback(
                 episodeId = currentEpisode.id,
                 positionSeconds = (player.currentPosition / 1000).toInt(),
-                durationSeconds = ((player.duration.takeIf { it > 0 } ?: 0L) / 1000).toInt()
+                durationSeconds = currentPlaybackDurationSeconds(
+                    playerDurationMs = player.duration,
+                    playbackStateDurationSeconds = playbackState.durationSeconds,
+                    episodeDurationSeconds = currentEpisode.durationSeconds
+                )
             )
         }
     }
@@ -142,7 +146,11 @@ fun HomeRoute(
                     viewModel.updatePlayback(
                         episodeId = episode.id,
                         positionSeconds = (player.currentPosition / 1000).toInt(),
-                        durationSeconds = ((player.duration.takeIf { it > 0 } ?: 0L) / 1000).toInt()
+                        durationSeconds = currentPlaybackDurationSeconds(
+                            playerDurationMs = player.duration,
+                            playbackStateDurationSeconds = playbackState.durationSeconds,
+                            episodeDurationSeconds = episode.durationSeconds
+                        )
                     )
                 }
                 player.pause()
@@ -152,14 +160,19 @@ fun HomeRoute(
         },
         onSeekBy = { seconds ->
             currentEpisode?.let { episode ->
-                val durationMs = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                val knownDurationSeconds = currentPlaybackDurationSeconds(
+                    playerDurationMs = player.duration,
+                    playbackStateDurationSeconds = playbackState.durationSeconds,
+                    episodeDurationSeconds = episode.durationSeconds
+                )
+                val durationMs = knownDurationSeconds.takeIf { it > 0 }?.let { it * 1000L } ?: Long.MAX_VALUE
                 val nextPosition = (player.currentPosition + seconds * 1000L)
                     .coerceIn(0L, durationMs)
                 player.seekTo(nextPosition)
                 viewModel.updatePlayback(
                     episodeId = episode.id,
                     positionSeconds = (nextPosition / 1000).toInt(),
-                    durationSeconds = ((player.duration.takeIf { it > 0 } ?: 0L) / 1000).toInt(),
+                    durationSeconds = knownDurationSeconds,
                     didSeek = true
                 )
             }
@@ -177,6 +190,20 @@ fun HomeRoute(
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onDownloadEpisode = viewModel::downloadEpisode
     )
+}
+
+private fun currentPlaybackDurationSeconds(
+    playerDurationMs: Long,
+    playbackStateDurationSeconds: Int,
+    episodeDurationSeconds: Int?
+): Int {
+    val playerDurationSeconds = (playerDurationMs.takeIf { it > 0 } ?: 0L) / 1000L
+    return when {
+        playerDurationSeconds > 0L -> playerDurationSeconds.toInt()
+        playbackStateDurationSeconds > 0 -> playbackStateDurationSeconds
+        episodeDurationSeconds != null && episodeDurationSeconds > 0 -> episodeDurationSeconds
+        else -> 0
+    }
 }
 
 @Composable

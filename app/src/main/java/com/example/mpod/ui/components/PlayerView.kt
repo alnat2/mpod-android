@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,14 +43,22 @@ fun PlayerView(
     onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
+    val speedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val speeds = listOf("0.5", "0.75", "1.0", "1.3", "1.5", "2.0")
 
     if (showSpeedSheet) {
         ModalBottomSheet(
             onDismissRequest = { showSpeedSheet = false },
+            sheetState = speedSheetState,
             containerColor = MaterialTheme.colorScheme.surface
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
                 Text("Playback Speed", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(16.dp))
                 speeds.forEach { speed ->
@@ -210,7 +220,7 @@ fun PlayerView(
                         .clickable(onClick = onPlayClick)
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_play),
+                        painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
