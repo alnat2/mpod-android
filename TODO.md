@@ -31,7 +31,7 @@
 - [x] Implement playlist drag and drop/reorder behavior.
 - [x] Finish episode menu actions: add/remove playlist, listened/unlistened, download, show notes.
 - [ ] Verify playback controls end to end: play/pause, seek -10/+15, speed, progress saving.
-- [ ] Verify RSS add flow against the backend with success and duplicate/error cases.
+- [x] Verify RSS add flow against the backend with success and duplicate/error cases.
 - [ ] Verify OPML import/export flows with real files.
 - [ ] Replace placeholder podcast artwork with real artwork once backend/database data is ready.
 - [ ] Add focused tests for session restore, backend config, playlist actions, and feed text cleanup.
