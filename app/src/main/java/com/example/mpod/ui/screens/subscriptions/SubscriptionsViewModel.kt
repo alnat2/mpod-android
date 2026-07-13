@@ -203,6 +203,7 @@ class SubscriptionsViewModel @Inject constructor(
             id = id,
             title = cleanFeedText(title).ifBlank { "Untitled podcast" },
             description = cleanFeedText(description).ifBlank { rssUrl.orEmpty() },
+            imageUrl = imageUrl,
             totalEpisodeCount = totalEpisodeCount,
             unlistenedEpisodeCount = unlistenedEpisodeCount,
             episodes = episodes
@@ -249,6 +250,7 @@ data class SubscriptionPodcastUi(
     val id: Int,
     val title: String,
     val description: String,
+    val imageUrl: String?,
     val totalEpisodeCount: Int,
     val unlistenedEpisodeCount: Int,
     val episodes: List<SubscriptionEpisodeUi>

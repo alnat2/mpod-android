@@ -8,14 +8,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.mpod.R
 
 @Composable
@@ -25,6 +30,7 @@ fun PodcastCard(
     selected: Boolean,
     onUnsubscribe: () -> Unit,
     modifier: Modifier = Modifier,
+    imageUrl: String? = null,
     isRefreshing: Boolean = false,
     isUnsubscribing: Boolean = false,
     onRefresh: () -> Unit = {}
@@ -52,24 +58,7 @@ fun PodcastCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(88.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.onBackground)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "THE\nREAL\nTALK",
-                    fontSize = 12.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    maxLines = 3
-                )
-            }
+            PodcastArtwork(title = title, imageUrl = imageUrl)
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -123,6 +112,56 @@ fun PodcastCard(
             )
         }
     }
+}
+
+@Composable
+private fun PodcastArtwork(
+    title: String,
+    imageUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val imageRequest = remember(context, imageUrl) {
+        imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
+            ImageRequest.Builder(context)
+                .data(url)
+                .setHeader("User-Agent", "Mozilla/5.0 mpod-android")
+                .crossfade(false)
+                .build()
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(88.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.onBackground)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        PodcastArtworkFallback()
+        if (imageRequest != null) {
+            AsyncImage(
+                model = imageRequest,
+                contentDescription = "$title cover",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+@Composable
+private fun PodcastArtworkFallback() {
+    Text(
+        text = "THE\nREAL\nTALK",
+        fontSize = 12.sp,
+        lineHeight = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onPrimary,
+        maxLines = 3,
+        modifier = Modifier.padding(8.dp)
+    )
 }
 
 @Composable

@@ -157,6 +157,7 @@ fun SubscriptionsScreen(
                                     PodcastCard(
                                         title = podcast.title,
                                         description = podcast.description,
+                                        imageUrl = podcast.imageUrl,
                                         selected = index == 0,
                                         onUnsubscribe = { pendingUnsubscribe = podcast },
                                         isRefreshing = podcast.id in state.refreshingPodcastIds,
@@ -355,6 +356,7 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
                 id = 1,
                 title = "Decoder Ring",
                 description = "Culture stories behind everyday design",
+                imageUrl = null,
                 totalEpisodeCount = episodes.size,
                 unlistenedEpisodeCount = episodes.count { !it.isListened },
                 episodes = episodes
@@ -363,6 +365,7 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
                 id = 2,
                 title = "Rude Emails",
                 description = "Workplace stories and tiny disasters",
+                imageUrl = null,
                 totalEpisodeCount = episodes.size,
                 unlistenedEpisodeCount = episodes.count { !it.isListened },
                 episodes = episodes
