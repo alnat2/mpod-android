@@ -29,7 +29,7 @@
 ## Functional Follow-Ups
 
 - [x] Implement playlist drag and drop/reorder behavior.
-- [ ] Finish episode menu actions: add/remove playlist, listened/unlistened, download, show notes.
+- [x] Finish episode menu actions: add/remove playlist, listened/unlistened, download, show notes.
 - [ ] Verify playback controls end to end: play/pause, seek -10/+15, speed, progress saving.
 - [ ] Verify RSS add flow against the backend with success and duplicate/error cases.
 - [ ] Verify OPML import/export flows with real files.
