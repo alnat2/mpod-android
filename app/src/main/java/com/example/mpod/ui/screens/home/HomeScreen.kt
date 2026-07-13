@@ -1,6 +1,7 @@
 package com.example.mpod.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -20,7 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +55,7 @@ import com.example.mpod.ui.util.formatEpisodeDuration
 import com.example.mpod.ui.util.formatProgressTime
 import com.example.mpod.ui.util.formatTotalDuration
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @Composable
 fun HomeRoute(
@@ -194,6 +199,9 @@ fun HomeScreen(
     onDownloadEpisode: (Int) -> Unit = {}
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
+    var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
+    var dragAccumulatorPx by remember { mutableStateOf(0f) }
+    val reorderStepPx = with(LocalDensity.current) { 80.dp.toPx() }
     val currentEpisode = state.queue.firstOrNull()
 
     Box(
@@ -307,6 +315,7 @@ fun HomeScreen(
                         items = state.queue,
                         key = { _, episode -> episode.id }
                     ) { index, episode ->
+                        val isDragging = draggedEpisodeId == episode.id
                         EpisodeRow(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
@@ -324,7 +333,40 @@ fun HomeScreen(
                             } else {
                                 episode.podcastTitle
                             },
-                            modifier = Modifier.padding(bottom = 4.dp),
+                            modifier = Modifier
+                                .padding(bottom = 4.dp)
+                                .alpha(if (isDragging) 0.82f else 1f)
+                                .then(
+                                    if (episode.id in state.busyEpisodeIds || state.queue.size < 2) {
+                                        Modifier
+                                    } else {
+                                        Modifier.pointerInput(episode.id, index, state.queue.size) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    draggedEpisodeId = episode.id
+                                                    dragAccumulatorPx = 0f
+                                                },
+                                                onDragCancel = {
+                                                    draggedEpisodeId = null
+                                                    dragAccumulatorPx = 0f
+                                                },
+                                                onDragEnd = {
+                                                    draggedEpisodeId = null
+                                                    dragAccumulatorPx = 0f
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    dragAccumulatorPx += dragAmount.y
+                                                    if (abs(dragAccumulatorPx) >= reorderStepPx) {
+                                                        val offset = if (dragAccumulatorPx < 0f) -1 else 1
+                                                        onMoveEpisode(episode.id, offset)
+                                                        dragAccumulatorPx -= reorderStepPx * offset
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                ),
                             onAction = { action ->
                                 when (action) {
                                     EpisodeRowAction.AddToPlaylist -> Unit

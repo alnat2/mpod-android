@@ -28,7 +28,7 @@
 
 ## Functional Follow-Ups
 
-- [ ] Implement playlist drag and drop/reorder behavior.
+- [x] Implement playlist drag and drop/reorder behavior.
 - [ ] Finish episode menu actions: add/remove playlist, listened/unlistened, download, show notes.
 - [ ] Verify playback controls end to end: play/pause, seek -10/+15, speed, progress saving.
 - [ ] Verify RSS add flow against the backend with success and duplicate/error cases.

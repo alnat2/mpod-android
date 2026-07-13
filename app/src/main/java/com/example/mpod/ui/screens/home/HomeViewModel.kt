@@ -132,6 +132,8 @@ class HomeViewModel @Inject constructor(
 
     fun moveEpisode(episodeId: Int, offset: Int) {
         val currentQueue = _state.value.queue
+        if (episodeId in _state.value.busyEpisodeIds) return
+
         val currentIndex = currentQueue.indexOfFirst { it.id == episodeId }
         val targetIndex = (currentIndex + offset).coerceIn(0, currentQueue.lastIndex)
         if (currentIndex < 0 || currentIndex == targetIndex) return
