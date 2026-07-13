@@ -1,7 +1,5 @@
 package com.example.mpod.ui.util
 
-import android.os.Build
-import android.text.Html
 import kotlin.math.roundToInt
 
 fun formatEpisodeDuration(seconds: Int?): String {
@@ -44,16 +42,35 @@ fun formatPublishedDate(value: String?): String? {
 
 fun cleanFeedText(value: String?): String {
     if (value.isNullOrBlank()) return ""
-    val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        Html.fromHtml(value, Html.FROM_HTML_MODE_LEGACY)
-    } else {
-        @Suppress("DEPRECATION")
-        Html.fromHtml(value)
-    }
-    return decoded.toString()
+    return value
+        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), " ")
+        .replace(Regex("</p\\s*>", RegexOption.IGNORE_CASE), " ")
+        .replace(Regex("<[^>]+>"), " ")
+        .decodeHtmlEntities()
+        .replace(Regex("<[^>]+>"), " ")
         .replace('\u00A0', ' ')
         .replace(Regex("\\s+"), " ")
         .trim()
 }
 
 fun Double?.toDurationSeconds(): Int? = this?.roundToInt()?.takeIf { it > 0 }
+
+private fun String.decodeHtmlEntities(): String {
+    return replace(Regex("&(#x[0-9a-fA-F]+|#\\d+|[a-zA-Z][a-zA-Z0-9]+);")) { match ->
+        val entity = match.groupValues[1]
+        when {
+            entity.startsWith("#x", ignoreCase = true) -> entity.drop(2).toIntOrNull(16)?.toChar()?.toString()
+            entity.startsWith("#") -> entity.drop(1).toIntOrNull()?.toChar()?.toString()
+            else -> namedHtmlEntities[entity]
+        } ?: match.value
+    }
+}
+
+private val namedHtmlEntities = mapOf(
+    "amp" to "&",
+    "apos" to "'",
+    "gt" to ">",
+    "lt" to "<",
+    "nbsp" to " ",
+    "quot" to "\""
+)

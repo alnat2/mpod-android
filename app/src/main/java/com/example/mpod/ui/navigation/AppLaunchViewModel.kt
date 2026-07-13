@@ -32,13 +32,7 @@ class AppLaunchViewModel @Inject constructor(
             _state.value = AppLaunchState.Loading
             val nextState = runCatching {
                 val response = api.getSession()
-                val session = response.body()
-                when {
-                    !response.isSuccessful || session == null -> AppLaunchState.Unauthenticated
-                    session.setupRequired -> AppLaunchState.SetupRequired
-                    session.authenticated -> AppLaunchState.Authenticated
-                    else -> AppLaunchState.Unauthenticated
-                }
+                resolveLaunchState(response.isSuccessful, response.body())
             }.getOrElse {
                 AppLaunchState.Unauthenticated
             }
@@ -123,4 +117,16 @@ sealed interface AppLaunchState {
     data object SetupRequired : AppLaunchState
     data object Unauthenticated : AppLaunchState
     data object Authenticated : AppLaunchState
+}
+
+internal fun resolveLaunchState(
+    responseSuccessful: Boolean,
+    session: com.example.mpod.data.network.model.SessionDto?
+): AppLaunchState {
+    return when {
+        !responseSuccessful || session == null -> AppLaunchState.Unauthenticated
+        session.setupRequired -> AppLaunchState.SetupRequired
+        session.authenticated -> AppLaunchState.Authenticated
+        else -> AppLaunchState.Unauthenticated
+    }
 }

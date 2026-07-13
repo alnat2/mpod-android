@@ -2,7 +2,6 @@ package com.example.mpod.data.network
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,10 +15,10 @@ class BackendConfig @Inject constructor(
         get() = preferences.getString(KEY_ADDRESS, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_ADDRESS
 
     val baseUrl: String
-        get() = address.toBaseUrlOrNull() ?: DEFAULT_BASE_URL
+        get() = BackendAddressNormalizer.toBaseUrlOrNull(address) ?: DEFAULT_BASE_URL
 
     fun saveAddress(input: String): Result<String> {
-        val normalized = input.toDisplayAddressOrNull()
+        val normalized = BackendAddressNormalizer.toDisplayAddressOrNull(input)
             ?: return Result.failure(IllegalArgumentException("Enter a valid backend address, for example 192.168.0.222:5051."))
 
         preferences.edit()
@@ -27,34 +26,6 @@ class BackendConfig @Inject constructor(
             .apply()
 
         return Result.success(normalized)
-    }
-
-    private fun String.toDisplayAddressOrNull(): String? {
-        val url = toBaseUrlOrNull()?.toHttpUrlOrNull() ?: return null
-        val usesDefaultPort = (url.scheme == "http" && url.port == 80) ||
-            (url.scheme == "https" && url.port == 443)
-        val port = if (usesDefaultPort) "" else ":${url.port}"
-        return "${url.host}$port"
-    }
-
-    private fun String.toBaseUrlOrNull(): String? {
-        val trimmed = trim()
-        if (trimmed.isBlank()) return null
-
-        val candidate = if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-            trimmed
-        } else {
-            "http://$trimmed"
-        }
-
-        val withTrailingSlash = if (candidate.endsWith("/")) candidate else "$candidate/"
-        return withTrailingSlash.toHttpUrlOrNull()
-            ?.newBuilder()
-            ?.encodedPath("/")
-            ?.query(null)
-            ?.fragment(null)
-            ?.build()
-            ?.toString()
     }
 
     companion object {

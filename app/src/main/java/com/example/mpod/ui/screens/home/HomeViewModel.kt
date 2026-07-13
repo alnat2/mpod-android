@@ -134,13 +134,11 @@ class HomeViewModel @Inject constructor(
         val currentQueue = _state.value.queue
         if (episodeId in _state.value.busyEpisodeIds) return
 
-        val currentIndex = currentQueue.indexOfFirst { it.id == episodeId }
-        val targetIndex = (currentIndex + offset).coerceIn(0, currentQueue.lastIndex)
-        if (currentIndex < 0 || currentIndex == targetIndex) return
-
-        val nextQueue = currentQueue.toMutableList()
-        val movedEpisode = nextQueue.removeAt(currentIndex)
-        nextQueue.add(targetIndex, movedEpisode)
+        val nextQueue = reorderEpisodes(
+            episodes = currentQueue,
+            episodeId = episodeId,
+            offset = offset
+        ) ?: return
 
         viewModelScope.launch {
             _state.value = _state.value.copy(
@@ -239,3 +237,20 @@ data class HomeEpisodeUi(
     val downloaded: Boolean,
     val summary: String?
 )
+
+internal fun reorderEpisodes(
+    episodes: List<HomeEpisodeUi>,
+    episodeId: Int,
+    offset: Int
+): List<HomeEpisodeUi>? {
+    val currentIndex = episodes.indexOfFirst { it.id == episodeId }
+    if (currentIndex < 0) return null
+
+    val targetIndex = (currentIndex + offset).coerceIn(0, episodes.lastIndex)
+    if (currentIndex == targetIndex) return null
+
+    return episodes.toMutableList().apply {
+        val movedEpisode = removeAt(currentIndex)
+        add(targetIndex, movedEpisode)
+    }
+}
