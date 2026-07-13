@@ -57,6 +57,8 @@ import com.example.mpod.ui.util.formatTotalDuration
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
+private const val PLAYER_NETWORK_TIMEOUT_MS = 30_000
+
 @Composable
 fun HomeRoute(
     refreshKey: Int = 0,
@@ -70,6 +72,8 @@ fun HomeRoute(
     var playbackState by remember { mutableStateOf(HomePlaybackUiState()) }
     val player = remember(state.audioRequestHeaders) {
         val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setConnectTimeoutMs(PLAYER_NETWORK_TIMEOUT_MS)
+            .setReadTimeoutMs(PLAYER_NETWORK_TIMEOUT_MS)
             .setDefaultRequestProperties(state.audioRequestHeaders)
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
