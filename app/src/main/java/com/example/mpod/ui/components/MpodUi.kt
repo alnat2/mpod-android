@@ -56,6 +56,8 @@ fun PageHeader(
     subtitle: String? = null,
     showActions: Boolean = false,
     onRefreshClick: (() -> Unit)? = null,
+    viewActionDescription: String = "View",
+    onViewClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -99,10 +101,11 @@ fun PageHeader(
                 )
                 SquareIconButton(
                     iconRes = R.drawable.ic_view,
-                    contentDescription = "View",
+                    contentDescription = viewActionDescription,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = 1.dp
+                    elevation = 1.dp,
+                    onClick = onViewClick
                 )
             }
         }

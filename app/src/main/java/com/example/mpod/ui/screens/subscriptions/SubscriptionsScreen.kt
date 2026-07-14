@@ -19,12 +19,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -110,9 +108,17 @@ fun SubscriptionsScreen(
     onDismissDownloadFailure: () -> Unit = {},
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
-    val podcasts = state.podcasts
+    var visibility by remember { mutableStateOf(SubscriptionVisibility.Unlistened) }
+    val podcasts = state.podcasts.visibleFor(visibility)
     val refreshErrorMessage = state.actionErrorMessage
     var showNotesEpisode by remember { mutableStateOf<Pair<SubscriptionPodcastUi, SubscriptionEpisodeUi>?>(null) }
+    val toggleVisibility = {
+        visibility = if (visibility == SubscriptionVisibility.Unlistened) {
+            SubscriptionVisibility.All
+        } else {
+            SubscriptionVisibility.Unlistened
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -138,7 +144,7 @@ fun SubscriptionsScreen(
                     SubscriptionsStatusCard(message = state.errorMessage)
                 }
 
-                podcasts.isEmpty() -> {
+                state.podcasts.isEmpty() -> {
                     PageHeader(
                         title = "No podcasts",
                         subtitle = "Start with one RSS feed or import subscriptions from another app."
@@ -146,12 +152,34 @@ fun SubscriptionsScreen(
                     SubscriptionsStatusCard(message = "No podcasts yet")
                 }
 
+                podcasts.isEmpty() -> {
+                    PageHeader(
+                        title = "Subscriptions",
+                        subtitle = podcastCountLabel(state.podcasts.size),
+                        showActions = true,
+                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
+                        viewActionDescription = "Show all",
+                        onViewClick = toggleVisibility
+                    )
+                    AllCaughtUpState(onShowAll = toggleVisibility)
+                }
+
                 else -> {
                     PageHeader(
                         title = "Subscriptions",
-                        subtitle = if (hasRefreshError) "Last refresh · today 3:04" else podcastCountLabel(podcasts.size),
+                        subtitle = if (hasRefreshError) {
+                            "Last refresh · today 3:04"
+                        } else {
+                            podcastCountLabel(state.podcasts.size)
+                        },
                         showActions = true,
-                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll
+                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
+                        viewActionDescription = if (visibility == SubscriptionVisibility.All) {
+                            "Show unlistened"
+                        } else {
+                            "Show all"
+                        },
+                        onViewClick = toggleVisibility
                     )
 
                     BoxWithConstraints(
@@ -170,7 +198,8 @@ fun SubscriptionsScreen(
                                 Column(
                                     modifier = Modifier
                                         .width(itemWidth)
-                                        .fillMaxHeight(),
+                                        .fillMaxHeight()
+                                        .animateItem(),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     PodcastCard(
@@ -313,6 +342,41 @@ private fun SubscriptionsStatusCard(
 }
 
 @Composable
+private fun AllCaughtUpState(
+    onShowAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .figmaDropShadow(radius = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "All caught up",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "There are no unlistened episodes. Show all to browse your listened podcasts.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            MpodButton(
+                text = "Show all",
+                onClick = onShowAll
+            )
+        }
+    }
+}
+
+@Composable
 private fun RefreshErrorBanner(
     message: String,
     onRetry: () -> Unit = {},
@@ -358,6 +422,22 @@ private fun podcastCountLabel(count: Int): String {
 
 private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {
     return "${podcast.totalEpisodeCount} / ${podcast.unlistenedEpisodeCount} episodes"
+}
+
+internal enum class SubscriptionVisibility {
+    Unlistened,
+    All
+}
+
+internal fun List<SubscriptionPodcastUi>.visibleFor(
+    visibility: SubscriptionVisibility
+): List<SubscriptionPodcastUi> {
+    if (visibility == SubscriptionVisibility.All) return this
+
+    return filter { podcast -> podcast.unlistenedEpisodeCount > 0 }
+        .map { podcast ->
+            podcast.copy(episodes = podcast.episodes.filterNot { it.isListened })
+        }
 }
 
 private fun previewSubscriptionsState(): SubscriptionsUiState {

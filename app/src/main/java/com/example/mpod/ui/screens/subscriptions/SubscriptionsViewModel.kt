@@ -21,8 +21,6 @@ import kotlinx.coroutines.launch
 import retrofit2.Response
 import javax.inject.Inject
 
-private const val VISIBLE_EPISODE_LIMIT = 20
-
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val api: MpodApi,
@@ -322,7 +320,6 @@ class SubscriptionsViewModel @Inject constructor(
 
             podcast.toSubscriptionPodcast(
                 episodes = allEpisodes
-                    .take(VISIBLE_EPISODE_LIMIT)
                     .map { it.toSubscriptionEpisode(playlistEpisodeIds) },
                 totalEpisodeCount = allEpisodes.size,
                 unlistenedEpisodeCount = allEpisodes.count { !it.isListened }
