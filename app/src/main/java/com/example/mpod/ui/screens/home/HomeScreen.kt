@@ -38,6 +38,9 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.EpisodeRowAction
@@ -66,6 +69,7 @@ fun HomeRoute(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var controller by remember { mutableStateOf<MediaController?>(null) }
     var playbackState by remember { mutableStateOf(HomePlaybackUiState()) }
     val controllerFuture = remember(context) {
@@ -73,6 +77,14 @@ fun HomeRoute(
             context,
             SessionToken(context, ComponentName(context, PlaybackService::class.java))
         ).buildAsync()
+    }
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(controllerFuture) {

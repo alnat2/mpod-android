@@ -2,6 +2,8 @@ package com.example.mpod.playback
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -26,6 +28,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.time.Instant
 import javax.inject.Inject
@@ -39,6 +44,7 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var api: MpodApi
     @Inject lateinit var backendConfig: BackendConfig
     @Inject lateinit var cookieJar: PersistentCookieJar
+    @Inject lateinit var queueInvalidator: PlaybackQueueInvalidator
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
@@ -47,6 +53,7 @@ class PlaybackService : MediaSessionService() {
     private var previousEpisodeId: Int? = null
     private var lastCompletedEpisodeId: Int? = null
     private var applyingServerSpeed = false
+    private val queueReconciliationMutex = Mutex()
 
     @UnstableApi
     override fun onCreate() {
@@ -56,8 +63,14 @@ class PlaybackService : MediaSessionService() {
             .setReadTimeoutMs(NETWORK_TIMEOUT_MS)
             .setDefaultRequestProperties(audioRequestHeaders())
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+            .build()
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setAudioAttributes(audioAttributes, true)
+            .setHandleAudioBecomingNoisy(true)
             .build()
             .also { it.addListener(playerListener) }
         mediaSession = MediaSession.Builder(this, player).build()
@@ -65,6 +78,11 @@ class PlaybackService : MediaSessionService() {
         serviceScope.launch {
             loadSettings()
             loadInitialQueue()
+        }
+        serviceScope.launch {
+            queueInvalidator.events.collectLatest {
+                reconcileQueueWithBackend()
+            }
         }
     }
 
@@ -89,23 +107,67 @@ class PlaybackService : MediaSessionService() {
     }
 
     private suspend fun loadInitialQueue() {
-        val response = runCatching { api.getPlaybackQueue() }.getOrNull()
-        val payload = response?.takeIf { it.isSuccessful }?.body() ?: return
-        val queue = payload.queue
-        if (queue.isEmpty()) {
-            player.clearMediaItems()
-            previousEpisodeId = null
-            return
-        }
+        reconcileQueueWithBackend()
+    }
 
-        val activeIndex = payload.activePlayback?.episodeId
-            ?.let { activeId -> queue.indexOfFirst { it.id == activeId } }
-            ?.takeIf { it >= 0 }
-            ?: 0
-        val startPositionMs = (queue[activeIndex].playback?.positionSeconds ?: 0) * 1_000L
-        player.setMediaItems(queue.map { it.toMediaItem() }, activeIndex, startPositionMs)
-        previousEpisodeId = queue[activeIndex].id
-        player.prepare()
+    private suspend fun reconcileQueueWithBackend(
+        preferredEpisodeId: Int? = null,
+        forcePlayPreferred: Boolean = false
+    ): Unit {
+        queueReconciliationMutex.withLock {
+            val response = runCatching { api.getPlaybackQueue() }.getOrNull()
+            val payload = response?.takeIf { it.isSuccessful }?.body() ?: return@withLock
+            val queue = payload.queue
+            val currentEpisodeId = currentEpisodeId()
+            val target = resolveQueuePlaybackTarget(
+                queue = queue.map {
+                    QueueEpisodeState(
+                        episodeId = it.id,
+                        savedPositionMs = (it.playback?.positionSeconds ?: 0) * 1_000L
+                    )
+                },
+                backendActiveEpisodeId = payload.activePlayback?.episodeId,
+                currentEpisodeId = currentEpisodeId,
+                currentPositionMs = player.currentPosition,
+                currentPlayWhenReady = player.playWhenReady,
+                preferredEpisodeId = preferredEpisodeId,
+                forcePlayPreferred = forcePlayPreferred
+            )
+
+            if (target == null) {
+                syncJob?.cancel()
+                syncJob = null
+                player.removeListener(playerListener)
+                player.stop()
+                player.clearMediaItems()
+                previousEpisodeId = null
+                player.addListener(playerListener)
+                return@withLock
+            }
+
+            if (currentEpisodeId != null && queue.any { it.id == currentEpisodeId }) {
+                syncCurrentPlayback()
+            }
+
+            val targetIndex = queue.indexOfFirst { it.id == target.episodeId }
+            player.removeListener(playerListener)
+            player.setMediaItems(queue.map { it.toMediaItem() }, targetIndex, target.positionMs)
+            previousEpisodeId = target.episodeId
+            lastCompletedEpisodeId = null
+            player.prepare()
+            player.playWhenReady = target.playWhenReady
+            player.addListener(playerListener)
+
+            if (target.playWhenReady) {
+                startPeriodicSync()
+                if (preferredEpisodeId == target.episodeId && forcePlayPreferred) {
+                    runCatching { api.setActivePlayback(ActivePlaybackRequest(target.episodeId)) }
+                }
+            } else {
+                syncJob?.cancel()
+                syncJob = null
+            }
+        }
     }
 
     private val playerListener = object : Player.Listener {
@@ -165,6 +227,7 @@ class PlaybackService : MediaSessionService() {
                     nextEpisodeId?.let {
                         runCatching { api.setActivePlayback(ActivePlaybackRequest(it)) }
                     }
+                    reconcileQueueWithBackend()
                 }
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
                 serviceScope.launch {
@@ -181,7 +244,12 @@ class PlaybackService : MediaSessionService() {
             serviceScope.launch {
                 val fallbackEpisodeId = completeEpisode(episodeId)
                 if (fallbackEpisodeId != null) {
-                    startFallbackEpisode(fallbackEpisodeId)
+                    reconcileQueueWithBackend(
+                        preferredEpisodeId = fallbackEpisodeId,
+                        forcePlayPreferred = true
+                    )
+                } else {
+                    reconcileQueueWithBackend()
                 }
             }
         }
@@ -238,19 +306,6 @@ class PlaybackService : MediaSessionService() {
             )
         }.getOrNull()
         return response?.takeIf { it.isSuccessful }?.body()?.nextEpisodeId
-    }
-
-    private suspend fun startFallbackEpisode(episodeId: Int) {
-        val response = runCatching { api.getPlaybackQueue() }.getOrNull()
-        val payload = response?.takeIf { it.isSuccessful }?.body() ?: return
-        val index = payload.queue.indexOfFirst { it.id == episodeId }
-        if (index < 0) return
-
-        player.setMediaItems(payload.queue.map { it.toMediaItem() }, index, 0L)
-        previousEpisodeId = episodeId
-        player.prepare()
-        runCatching { api.setActivePlayback(ActivePlaybackRequest(episodeId)) }
-        player.play()
     }
 
     private fun playbackRequest(

@@ -6,6 +6,7 @@ import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.PlaybackQueueEpisodeDto
 import com.example.mpod.data.network.model.PlaylistReorderRequest
+import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +19,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val api: MpodApi
+    private val api: MpodApi,
+    private val queueInvalidator: PlaybackQueueInvalidator
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
@@ -67,7 +69,11 @@ class HomeViewModel @Inject constructor(
     }
 
     fun removeEpisodeFromPlaylist(episodeId: Int) {
-        performEpisodeAction(episodeId, "Could not remove episode from playlist.") {
+        performEpisodeAction(
+            episodeId = episodeId,
+            defaultErrorMessage = "Could not remove episode from playlist.",
+            invalidatePlaybackQueue = true
+        ) {
             api.removeFromPlaylist(episodeId)
         }
     }
@@ -79,7 +85,8 @@ class HomeViewModel @Inject constructor(
                 "Could not mark episode as listened."
             } else {
                 "Could not mark episode as unlistened."
-            }
+            },
+            invalidatePlaybackQueue = isListened
         ) {
             api.setEpisodeListened(episodeId, EpisodeListenedRequest(isListened = isListened))
         }
@@ -112,6 +119,7 @@ class HomeViewModel @Inject constructor(
             }.getOrNull()
 
             if (response?.isSuccessful == true) {
+                queueInvalidator.invalidate()
                 val nextState = runCatching { loadHomeState() }.getOrElse { error ->
                     _state.value.copy(
                         busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
@@ -132,6 +140,7 @@ class HomeViewModel @Inject constructor(
     private fun performEpisodeAction(
         episodeId: Int,
         defaultErrorMessage: String,
+        invalidatePlaybackQueue: Boolean = false,
         request: suspend () -> Response<Unit>
     ) {
         viewModelScope.launch {
@@ -141,6 +150,7 @@ class HomeViewModel @Inject constructor(
             )
             val response = runCatching { request() }.getOrNull()
             if (response?.isSuccessful == true) {
+                if (invalidatePlaybackQueue) queueInvalidator.invalidate()
                 val nextState = runCatching { loadHomeState() }.getOrElse { error ->
                     _state.value.copy(
                         busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,

@@ -7,6 +7,7 @@ import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PodcastDto
+import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +22,8 @@ private const val VISIBLE_EPISODE_LIMIT = 20
 
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
-    private val api: MpodApi
+    private val api: MpodApi,
+    private val queueInvalidator: PlaybackQueueInvalidator
 ) : ViewModel() {
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
@@ -93,6 +95,7 @@ class SubscriptionsViewModel @Inject constructor(
             )
             val response = runCatching { api.removePodcast(podcastId) }.getOrNull()
             if (response?.isSuccessful == true) {
+                queueInvalidator.invalidate()
                 val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
                     _state.value.copy(
                         unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
@@ -110,13 +113,21 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     fun addEpisodeToPlaylist(episodeId: Int) {
-        performEpisodeAction(episodeId, "Could not add episode to playlist.") {
+        performEpisodeAction(
+            episodeId = episodeId,
+            defaultErrorMessage = "Could not add episode to playlist.",
+            invalidatePlaybackQueue = true
+        ) {
             api.addToPlaylist(PlaylistAddRequest(episodeId = episodeId))
         }
     }
 
     fun removeEpisodeFromPlaylist(episodeId: Int) {
-        performEpisodeAction(episodeId, "Could not remove episode from playlist.") {
+        performEpisodeAction(
+            episodeId = episodeId,
+            defaultErrorMessage = "Could not remove episode from playlist.",
+            invalidatePlaybackQueue = true
+        ) {
             api.removeFromPlaylist(episodeId)
         }
     }
@@ -128,7 +139,8 @@ class SubscriptionsViewModel @Inject constructor(
                 "Could not mark episode as listened."
             } else {
                 "Could not mark episode as unlistened."
-            }
+            },
+            invalidatePlaybackQueue = isListened
         ) {
             api.setEpisodeListened(episodeId, EpisodeListenedRequest(isListened = isListened))
         }
@@ -143,6 +155,7 @@ class SubscriptionsViewModel @Inject constructor(
     private fun performEpisodeAction(
         episodeId: Int,
         defaultErrorMessage: String,
+        invalidatePlaybackQueue: Boolean = false,
         request: suspend () -> Response<Unit>
     ) {
         viewModelScope.launch {
@@ -152,6 +165,7 @@ class SubscriptionsViewModel @Inject constructor(
             )
             val response = runCatching { request() }.getOrNull()
             if (response?.isSuccessful == true) {
+                if (invalidatePlaybackQueue) queueInvalidator.invalidate()
                 val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
                     _state.value.copy(
                         busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
