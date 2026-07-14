@@ -21,8 +21,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val preferences = getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE)
+        if (preferences.getInt(THEME_SCHEMA_KEY, 0) < THEME_SCHEMA_VERSION) {
+            preferences.edit {
+                putString(THEME_MODE_KEY, ThemeMode.System.storageValue)
+                putInt(THEME_SCHEMA_KEY, THEME_SCHEMA_VERSION)
+            }
+        }
         setContent {
-            val preferences = remember { getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE) }
             var themeMode by remember {
                 mutableStateOf(ThemeMode.fromStorage(preferences.getString(THEME_MODE_KEY, null)))
             }
@@ -51,5 +57,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val THEME_PREFERENCES = "mpod_appearance"
         private const val THEME_MODE_KEY = "theme_mode"
+        private const val THEME_SCHEMA_KEY = "theme_schema"
+        private const val THEME_SCHEMA_VERSION = 1
     }
 }
