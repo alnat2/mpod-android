@@ -54,6 +54,19 @@ class SubscriptionVisibilityTest {
         )
     }
 
+    @Test
+    fun unlistenedVisibilityKeepsPodcastWhoseEpisodesFailedToLoad() {
+        val failedPodcast = podcast(id = 1, episodes = emptyList()).copy(
+            errorMessage = "Episodes unavailable.",
+            episodesUnavailable = true
+        )
+
+        assertEquals(
+            listOf(failedPodcast),
+            listOf(failedPodcast).visibleFor(SubscriptionVisibility.Unlistened)
+        )
+    }
+
     private fun podcast(
         id: Int,
         episodes: List<SubscriptionEpisodeUi>

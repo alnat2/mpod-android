@@ -115,7 +115,19 @@ fun AppNavigation(
                         }
                     )
                 }
-                composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
+                composable(Screen.Subscriptions.route) {
+                    SubscriptionsRoute(
+                        refreshKey = libraryRefreshKey,
+                        onAddRssFeed = {
+                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
+                            navController.navigate(Screen.AddPodcast.route)
+                        },
+                        onImportOpml = {
+                            addPodcastInitialMode = AddPodcastMode.ImportOpmlFile
+                            navController.navigate(Screen.AddPodcast.route)
+                        }
+                    )
+                }
                 composable(Screen.Settings.route) {
                     SettingsRoute(
                         themeMode = themeMode,

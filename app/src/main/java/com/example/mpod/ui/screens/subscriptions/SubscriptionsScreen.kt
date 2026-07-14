@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +37,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.DownloadFailureBanner
@@ -63,6 +68,8 @@ import com.example.mpod.ui.util.formatPublishedDate
 @Composable
 fun SubscriptionsRoute(
     refreshKey: Int = 0,
+    onAddRssFeed: () -> Unit = {},
+    onImportOpml: () -> Unit = {},
     viewModel: SubscriptionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -88,7 +95,11 @@ fun SubscriptionsRoute(
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onDownloadEpisode = viewModel::downloadEpisode,
-        onDismissDownloadFailure = viewModel::dismissDownloadFailure
+        onDismissDownloadFailure = viewModel::dismissDownloadFailure,
+        onRetryLoad = viewModel::refresh,
+        onRetryRefresh = viewModel::retryLastAction,
+        onAddRssFeed = onAddRssFeed,
+        onImportOpml = onImportOpml
     )
 }
 
@@ -106,6 +117,9 @@ fun SubscriptionsScreen(
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
     onDownloadEpisode: (Int) -> Unit = {},
     onDismissDownloadFailure: () -> Unit = {},
+    onRetryLoad: () -> Unit = {},
+    onAddRssFeed: () -> Unit = {},
+    onImportOpml: () -> Unit = {},
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
     var visibility by remember { mutableStateOf(SubscriptionVisibility.Unlistened) }
@@ -141,7 +155,11 @@ fun SubscriptionsScreen(
 
                 state.errorMessage != null -> {
                     PageHeader(title = "Subscriptions")
-                    SubscriptionsStatusCard(message = state.errorMessage)
+                    SubscriptionsStatusCard(
+                        message = state.errorMessage,
+                        actionLabel = "Try again",
+                        onAction = onRetryLoad
+                    )
                 }
 
                 state.podcasts.isEmpty() -> {
@@ -149,7 +167,12 @@ fun SubscriptionsScreen(
                         title = "No podcasts",
                         subtitle = "Start with one RSS feed or import subscriptions from another app."
                     )
-                    SubscriptionsStatusCard(message = "No podcasts yet")
+                    SubscriptionsEmptyState(
+                        title = "No podcasts yet",
+                        description = "Add one RSS feed or bring subscriptions from another podcast app with OPML.",
+                        onAddRssFeed = onAddRssFeed,
+                        onImportOpml = onImportOpml
+                    )
                 }
 
                 podcasts.isEmpty() -> {
@@ -161,7 +184,11 @@ fun SubscriptionsScreen(
                         viewActionDescription = "Show all",
                         onViewClick = toggleVisibility
                     )
-                    AllCaughtUpState(onShowAll = toggleVisibility)
+                    AllCaughtUpState(
+                        onShowAll = toggleVisibility,
+                        onAddRssFeed = onAddRssFeed,
+                        onImportOpml = onImportOpml
+                    )
                 }
 
                 else -> {
@@ -212,49 +239,57 @@ fun SubscriptionsScreen(
                                         isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
                                         isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
                                         unsubscribeEnabled = state.pendingUnsubscribe == null,
+                                        errorMessage = podcast.errorMessage,
                                         onRefresh = { onRefreshPodcast(podcast.id) }
                                     )
-                                    LazyColumn(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f)
-                                            .padding(horizontal = 2.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        item {
-                                            val isMarkingAll = podcast.id in state.markingAllListenedPodcastIds
-                                            MarkAllListenedHeader(
-                                                summary = podcastEpisodeSummary(podcast),
-                                                enabled = podcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
-                                                isLoading = isMarkingAll,
-                                                onMarkAllListened = { onMarkAllListened(podcast.id) }
-                                            )
-                                        }
-                                        items(podcast.episodes, key = { episode -> episode.id }) { episode ->
-                                            EpisodeRow(
-                                                title = episode.title,
-                                                podcastName = podcast.title,
-                                                duration = formatEpisodeDuration(episode.durationSeconds),
-                                                date = formatPublishedDate(episode.publishedAt),
-                                                inPlaylist = episode.inPlaylist,
-                                                isListened = episode.isListened,
-                                                downloaded = episode.downloaded,
-                                                isDownloading = episode.id in state.downloadingEpisodeIds,
-                                                actionsEnabled = episode.id !in state.busyEpisodeIds,
-                                                showDragHandle = index != 0,
-                                                onAction = { action ->
-                                                    when (action) {
-                                                        EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
-                                                        EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
-                                                        EpisodeRowAction.ShowNotes -> showNotesEpisode = podcast to episode
-                                                        EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
-                                                        EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
-                                                        EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
-                                                        EpisodeRowAction.MoveUp -> Unit
-                                                        EpisodeRowAction.MoveDown -> Unit
+                                    if (podcast.episodesUnavailable) {
+                                        SubscriptionsStatusCard(
+                                            message = "Episodes could not be loaded. Use Refresh on the podcast card to try again.",
+                                            modifier = Modifier.padding(horizontal = 2.dp)
+                                        )
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f)
+                                                .padding(horizontal = 2.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            item {
+                                                val isMarkingAll = podcast.id in state.markingAllListenedPodcastIds
+                                                MarkAllListenedHeader(
+                                                    summary = podcastEpisodeSummary(podcast),
+                                                    enabled = podcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
+                                                    isLoading = isMarkingAll,
+                                                    onMarkAllListened = { onMarkAllListened(podcast.id) }
+                                                )
+                                            }
+                                            items(podcast.episodes, key = { episode -> episode.id }) { episode ->
+                                                EpisodeRow(
+                                                    title = episode.title,
+                                                    podcastName = podcast.title,
+                                                    duration = formatEpisodeDuration(episode.durationSeconds),
+                                                    date = formatPublishedDate(episode.publishedAt),
+                                                    inPlaylist = episode.inPlaylist,
+                                                    isListened = episode.isListened,
+                                                    downloaded = episode.downloaded,
+                                                    isDownloading = episode.id in state.downloadingEpisodeIds,
+                                                    actionsEnabled = episode.id !in state.busyEpisodeIds,
+                                                    showDragHandle = index != 0,
+                                                    onAction = { action ->
+                                                        when (action) {
+                                                            EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
+                                                            EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
+                                                            EpisodeRowAction.ShowNotes -> showNotesEpisode = podcast to episode
+                                                            EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
+                                                            EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
+                                                            EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                                            EpisodeRowAction.MoveUp -> Unit
+                                                            EpisodeRowAction.MoveDown -> Unit
+                                                        }
                                                     }
-                                                }
-                                            )
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -321,6 +356,8 @@ fun SubscriptionsScreen(
 @Composable
 private fun SubscriptionsStatusCard(
     message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -331,19 +368,96 @@ private fun SubscriptionsStatusCard(
             .fillMaxWidth()
             .figmaDropShadow(radius = 8.dp)
     ) {
-        Text(
-            text = message,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp)
-        )
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (actionLabel != null) {
+                MpodButton(text = actionLabel, onClick = onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionsEmptyState(
+    title: String,
+    description: String,
+    onAddRssFeed: () -> Unit,
+    onImportOpml: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_podcast_empty),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            MpodButton(
+                text = "Add RSS feed",
+                modifier = Modifier.weight(1f),
+                onClick = onAddRssFeed
+            )
+            MpodButton(
+                text = "Import OPML",
+                primary = false,
+                outlined = true,
+                modifier = Modifier.weight(1f),
+                onClick = onImportOpml
+            )
+        }
     }
 }
 
 @Composable
 private fun AllCaughtUpState(
     onShowAll: () -> Unit,
+    onAddRssFeed: () -> Unit,
+    onImportOpml: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -370,8 +484,28 @@ private fun AllCaughtUpState(
             )
             MpodButton(
                 text = "Show all",
+                modifier = Modifier.fillMaxWidth(),
                 onClick = onShowAll
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                MpodButton(
+                    text = "Add RSS feed",
+                    primary = false,
+                    outlined = true,
+                    modifier = Modifier.weight(1f),
+                    onClick = onAddRssFeed
+                )
+                MpodButton(
+                    text = "Import OPML",
+                    primary = false,
+                    outlined = true,
+                    modifier = Modifier.weight(1f),
+                    onClick = onImportOpml
+                )
+            }
         }
     }
 }
@@ -434,7 +568,7 @@ internal fun List<SubscriptionPodcastUi>.visibleFor(
 ): List<SubscriptionPodcastUi> {
     if (visibility == SubscriptionVisibility.All) return this
 
-    return filter { podcast -> podcast.unlistenedEpisodeCount > 0 }
+    return filter { podcast -> podcast.unlistenedEpisodeCount > 0 || podcast.errorMessage != null }
         .map { podcast ->
             podcast.copy(episodes = podcast.episodes.filterNot { it.isListened })
         }

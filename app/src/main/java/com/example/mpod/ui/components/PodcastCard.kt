@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,9 +39,23 @@ fun PodcastCard(
     isUnsubscribing: Boolean = false,
     isUnsubscribePending: Boolean = false,
     unsubscribeEnabled: Boolean = true,
+    errorMessage: String? = null,
     onRefresh: () -> Unit = {}
 ) {
     val background = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+    val cardBorder = when {
+        errorMessage != null -> Modifier.border(
+            1.dp,
+            MaterialTheme.colorScheme.error,
+            RoundedCornerShape(16.dp)
+        )
+        !selected -> Modifier.border(
+            1.dp,
+            MaterialTheme.colorScheme.outline,
+            RoundedCornerShape(16.dp)
+        )
+        else -> Modifier
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -46,13 +63,7 @@ fun PodcastCard(
             .figmaDropShadow(radius = 16.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(background)
-            .then(
-                if (selected) Modifier else Modifier.border(
-                    1.dp,
-                    MaterialTheme.colorScheme.outline,
-                    RoundedCornerShape(16.dp)
-                )
-            )
+            .then(cardBorder)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -67,21 +78,50 @@ fun PodcastCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        fontSize = 20.sp,
+                        lineHeight = 28.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (errorMessage != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.errorContainer)
+                                .semantics { contentDescription = "Podcast error" },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "!",
+                                fontSize = 14.sp,
+                                lineHeight = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
                 Text(
-                    text = title,
-                    fontSize = 20.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = description,
+                    text = errorMessage ?: description,
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
                     fontWeight = FontWeight.Normal,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (errorMessage == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

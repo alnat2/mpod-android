@@ -36,9 +36,22 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            val current = _state.value
+            _state.value = current.copy(
+                isLoading = current.podcasts.isEmpty(),
+                errorMessage = null,
+                actionErrorMessage = null
+            )
             val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
-                SubscriptionsUiState(errorMessage = error.message ?: "Could not load subscriptions.")
+                val message = error.message ?: "Could not load subscriptions."
+                if (current.podcasts.isEmpty()) {
+                    SubscriptionsUiState(errorMessage = message)
+                } else {
+                    current.copy(
+                        isLoading = false,
+                        actionErrorMessage = message
+                    )
+                }
             }
             _state.value = nextState.withTransientStateFrom(_state.value)
         }
@@ -81,11 +94,22 @@ class SubscriptionsViewModel @Inject constructor(
                 }
                 _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
+                val message = response.errorMessage("Could not refresh this podcast.")
                 _state.value = _state.value.copy(
                     refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
-                    actionErrorMessage = response.errorMessage("Could not refresh this podcast.")
+                    actionErrorMessage = message,
+                    podcasts = _state.value.podcasts.withPodcastError(podcastId, message)
                 )
             }
+        }
+    }
+
+    fun retryLastAction() {
+        val failedPodcast = _state.value.podcasts.firstOrNull { it.errorMessage != null }
+        when {
+            failedPodcast == null -> refreshAll()
+            failedPodcast.episodesUnavailable -> refresh()
+            else -> refreshPodcast(failedPodcast.id)
         }
     }
 
@@ -313,26 +337,46 @@ class SubscriptionsViewModel @Inject constructor(
             .map { it.episodeId }
             .toSet()
 
+        var hasEpisodeLoadFailures = false
         val podcastItems = podcasts.map { podcast ->
-            val allEpisodes = api.getPodcastEpisodes(podcast.id)
-                .requireBody("Could not load episodes.")
-                .episodes
+            val episodesResult = runCatching {
+                api.getPodcastEpisodes(podcast.id)
+                    .requireBody("Could not load episodes.")
+                    .episodes
+            }
+            val allEpisodes = episodesResult.getOrNull().orEmpty()
+            val loadErrorMessage = if (episodesResult.isFailure) {
+                hasEpisodeLoadFailures = true
+                "Episodes unavailable. Refresh this podcast to try again."
+            } else {
+                null
+            }
 
             podcast.toSubscriptionPodcast(
-                episodes = allEpisodes
-                    .map { it.toSubscriptionEpisode(playlistEpisodeIds) },
+                episodes = allEpisodes.map { it.toSubscriptionEpisode(playlistEpisodeIds) },
                 totalEpisodeCount = allEpisodes.size,
-                unlistenedEpisodeCount = allEpisodes.count { !it.isListened }
+                unlistenedEpisodeCount = allEpisodes.count { !it.isListened },
+                errorMessage = loadErrorMessage,
+                episodesUnavailable = episodesResult.isFailure
             )
         }
 
-        return SubscriptionsUiState(podcasts = podcastItems)
+        return SubscriptionsUiState(
+            actionErrorMessage = if (hasEpisodeLoadFailures) {
+                "Some podcast episodes could not be loaded."
+            } else {
+                null
+            },
+            podcasts = podcastItems
+        )
     }
 
     private fun PodcastDto.toSubscriptionPodcast(
         episodes: List<SubscriptionEpisodeUi>,
         totalEpisodeCount: Int,
-        unlistenedEpisodeCount: Int
+        unlistenedEpisodeCount: Int,
+        errorMessage: String? = null,
+        episodesUnavailable: Boolean = false
     ): SubscriptionPodcastUi {
         return SubscriptionPodcastUi(
             id = id,
@@ -341,7 +385,9 @@ class SubscriptionsViewModel @Inject constructor(
             imageUrl = imageUrl,
             totalEpisodeCount = totalEpisodeCount,
             unlistenedEpisodeCount = unlistenedEpisodeCount,
-            episodes = episodes
+            episodes = episodes,
+            errorMessage = errorMessage,
+            episodesUnavailable = episodesUnavailable
         )
     }
 
@@ -362,11 +408,11 @@ class SubscriptionsViewModel @Inject constructor(
         if (isSuccessful) {
             body()?.let { return it }
         }
-        throw IllegalStateException(errorBody()?.string().orEmpty().ifBlank { defaultMessage })
+        throw IllegalStateException(apiErrorMessage(errorBody()?.string(), defaultMessage))
     }
 
     private fun Response<*>?.errorMessage(defaultMessage: String): String {
-        return this?.errorBody()?.string().orEmpty().ifBlank { defaultMessage }
+        return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
     }
 }
 
@@ -437,6 +483,15 @@ internal fun List<SubscriptionPodcastUi>.markAllListenedOptimistically(
     }
 }
 
+private fun List<SubscriptionPodcastUi>.withPodcastError(
+    podcastId: Int,
+    errorMessage: String?
+): List<SubscriptionPodcastUi> {
+    return map { podcast ->
+        if (podcast.id == podcastId) podcast.copy(errorMessage = errorMessage) else podcast
+    }
+}
+
 data class SubscriptionPodcastUi(
     val id: Int,
     val title: String,
@@ -444,7 +499,9 @@ data class SubscriptionPodcastUi(
     val imageUrl: String?,
     val totalEpisodeCount: Int,
     val unlistenedEpisodeCount: Int,
-    val episodes: List<SubscriptionEpisodeUi>
+    val episodes: List<SubscriptionEpisodeUi>,
+    val errorMessage: String? = null,
+    val episodesUnavailable: Boolean = false
 )
 
 data class SubscriptionEpisodeUi(
