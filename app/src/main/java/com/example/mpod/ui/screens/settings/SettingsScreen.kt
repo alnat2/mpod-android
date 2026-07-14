@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,10 +47,11 @@ import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.theme.ThemeMode
+import com.example.mpod.ui.theme.isDark
 
 @Composable
 fun SettingsRoute(
-    themeMode: ThemeMode = ThemeMode.Light,
+    themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
@@ -74,7 +76,7 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
-    themeMode: ThemeMode = ThemeMode.Light,
+    themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyEnabledChange: (Boolean) -> Unit = {},
@@ -172,7 +174,7 @@ fun SettingsScreen(
                 description = "Use this option if it feels more comfortable for you.",
                 action = {
                     MpodSwitch(
-                        checked = themeMode == ThemeMode.Dark,
+                        checked = themeMode.isDark(isSystemInDarkTheme()),
                         onCheckedChange = { useDarkTheme ->
                             onThemeModeChange(
                                 if (useDarkTheme) ThemeMode.Dark else ThemeMode.Light

@@ -268,7 +268,6 @@ fun HomeScreen(
                     item {
                         PageHeader(
                             title = "Now playing",
-                            showActions = true,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
@@ -279,7 +278,6 @@ fun HomeScreen(
                     item {
                         PageHeader(
                             title = "Now playing",
-                            showActions = true,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
@@ -347,6 +345,14 @@ fun HomeScreen(
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
                             showDragHandle = true,
+                            compactPlaybackMenu = true,
+                            compactPlaybackActionLabel = if (
+                                episode.id == currentEpisode.id && playbackState.isPlaying
+                            ) {
+                                "Pause"
+                            } else {
+                                "Play"
+                            },
                             statusTextOverride = if (episode.id == currentEpisode.id) {
                                 "${episode.podcastTitle} · now playing"
                             } else {
@@ -389,6 +395,10 @@ fun HomeScreen(
                             onClick = { onPlayEpisode(episode.id) },
                             onAction = { action ->
                                 when (action) {
+                                    EpisodeRowAction.Play -> {
+                                        if (episode.id == currentEpisode.id) onPlayToggle()
+                                        else onPlayEpisode(episode.id)
+                                    }
                                     EpisodeRowAction.AddToPlaylist -> Unit
                                     EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
                                     EpisodeRowAction.ShowNotes -> showNotesEpisode = episode

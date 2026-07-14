@@ -53,25 +53,28 @@ enum class ThemeMode(val storageValue: String) {
 
     companion object {
         fun fromStorage(value: String?): ThemeMode = when (value) {
+            System.storageValue -> System
             Light.storageValue -> Light
             Dark.storageValue -> Dark
-            else -> Light
+            else -> System
         }
     }
 }
 
+internal fun ThemeMode.isDark(systemDark: Boolean): Boolean = when (this) {
+    ThemeMode.System -> systemDark
+    ThemeMode.Light -> false
+    ThemeMode.Dark -> true
+}
+
 @Composable
 fun MpodTheme(
-    themeMode: ThemeMode = ThemeMode.Light,
+    themeMode: ThemeMode = ThemeMode.System,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themeMode) {
-        ThemeMode.System -> isSystemInDarkTheme()
-        ThemeMode.Light -> false
-        ThemeMode.Dark -> true
-    }
+    val darkTheme = themeMode.isDark(isSystemInDarkTheme())
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current

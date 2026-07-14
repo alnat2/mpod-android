@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 
 enum class EpisodeRowAction {
+    Play,
     AddToPlaylist,
     RemoveFromPlaylist,
     ShowNotes,
@@ -52,6 +54,8 @@ fun EpisodeRow(
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
     showDragHandle: Boolean = true,
+    compactPlaybackMenu: Boolean = false,
+    compactPlaybackActionLabel: String = "Play",
     statusTextOverride: String? = null,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
@@ -173,58 +177,86 @@ fun EpisodeRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    if (canMoveUp) {
+                    if (compactPlaybackMenu) {
                         EpisodeActionItem(
-                            text = "Move up",
+                            text = compactPlaybackActionLabel,
+                            iconRes = if (compactPlaybackActionLabel == "Pause") {
+                                R.drawable.ic_pause
+                            } else {
+                                R.drawable.ic_play
+                            },
+                            modifier = Modifier.testTag("home_episode_play_action"),
                             onClick = {
                                 menuExpanded = false
-                                onAction(EpisodeRowAction.MoveUp)
+                                onAction(EpisodeRowAction.Play)
+                            }
+                        )
+                        EpisodeActionItem(
+                            text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
+                            iconRes = R.drawable.ic_playlist_remove,
+                            modifier = Modifier.testTag("home_episode_playlist_action"),
+                            onClick = {
+                                menuExpanded = false
+                                onAction(
+                                    if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist
+                                    else EpisodeRowAction.AddToPlaylist
+                                )
+                            }
+                        )
+                    } else {
+                        if (canMoveUp) {
+                            EpisodeActionItem(
+                                text = "Move up",
+                                onClick = {
+                                    menuExpanded = false
+                                    onAction(EpisodeRowAction.MoveUp)
+                                }
+                            )
+                        }
+                        if (canMoveDown) {
+                            EpisodeActionItem(
+                                text = "Move down",
+                                onClick = {
+                                    menuExpanded = false
+                                    onAction(EpisodeRowAction.MoveDown)
+                                }
+                            )
+                        }
+                        EpisodeActionItem(
+                            text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
+                            onClick = {
+                                menuExpanded = false
+                                onAction(if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist else EpisodeRowAction.AddToPlaylist)
+                            }
+                        )
+                        EpisodeActionItem(
+                            text = "Show notes",
+                            onClick = {
+                                menuExpanded = false
+                                onAction(EpisodeRowAction.ShowNotes)
+                            }
+                        )
+                        EpisodeActionItem(
+                            text = when {
+                                isDownloading -> "Downloading…"
+                                downloaded -> "Downloaded"
+                                else -> "Download"
+                            },
+                            enabled = !downloaded && !isDownloading,
+                            showProgress = isDownloading,
+                            onClick = {
+                                menuExpanded = false
+                                onAction(EpisodeRowAction.Download)
+                            }
+                        )
+                        EpisodeActionItem(
+                            text = if (isListened) "Mark as unlistened" else "Mark as listened",
+                            onClick = {
+                                menuExpanded = false
+                                onAction(if (isListened) EpisodeRowAction.MarkUnlistened else EpisodeRowAction.MarkListened)
                             }
                         )
                     }
-                    if (canMoveDown) {
-                        EpisodeActionItem(
-                            text = "Move down",
-                            onClick = {
-                                menuExpanded = false
-                                onAction(EpisodeRowAction.MoveDown)
-                            }
-                        )
-                    }
-                    EpisodeActionItem(
-                        text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
-                        onClick = {
-                            menuExpanded = false
-                            onAction(if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist else EpisodeRowAction.AddToPlaylist)
-                        }
-                    )
-                    EpisodeActionItem(
-                        text = "Show notes",
-                        onClick = {
-                            menuExpanded = false
-                            onAction(EpisodeRowAction.ShowNotes)
-                        }
-                    )
-                    EpisodeActionItem(
-                        text = when {
-                            isDownloading -> "Downloading…"
-                            downloaded -> "Downloaded"
-                            else -> "Download"
-                        },
-                        enabled = !downloaded && !isDownloading,
-                        showProgress = isDownloading,
-                        onClick = {
-                            menuExpanded = false
-                            onAction(EpisodeRowAction.Download)
-                        }
-                    )
-                    EpisodeActionItem(
-                        text = if (isListened) "Mark as unlistened" else "Mark as listened",
-                        onClick = {
-                            menuExpanded = false
-                            onAction(if (isListened) EpisodeRowAction.MarkUnlistened else EpisodeRowAction.MarkListened)
-                        }
-                    )
                 }
             }
         }
@@ -236,9 +268,12 @@ private fun EpisodeActionItem(
     text: String,
     enabled: Boolean = true,
     showProgress: Boolean = false,
+    iconRes: Int? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     DropdownMenuItem(
+        modifier = modifier,
         text = {
             Text(
                 text = text,
@@ -246,15 +281,25 @@ private fun EpisodeActionItem(
                 lineHeight = 20.sp
             )
         },
-        leadingIcon = if (showProgress) {
-            {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp
-                )
+        leadingIcon = when {
+            showProgress -> {
+                {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
             }
-        } else {
-            null
+            iconRes != null -> {
+                {
+                    Icon(
+                        painter = painterResource(iconRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            else -> null
         },
         enabled = enabled,
         onClick = onClick

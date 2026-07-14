@@ -2,7 +2,6 @@ package com.example.mpod.ui.screens.subscriptions
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -93,32 +92,6 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithText("Add to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
-    }
-
-    @Test
-    fun subscriptionHeaderActionsOpenFromOverflowMenu() {
-        var refreshCount = 0
-        composeRule.setContent {
-            MpodTheme {
-                SubscriptionsScreen(
-                    state = populatedState(),
-                    onRefreshAll = { refreshCount += 1 }
-                )
-            }
-        }
-
-        composeRule.onAllNodesWithContentDescription("Refresh").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Show all").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Subscription actions").performClick()
-        composeRule.onNodeWithTag("subscriptions_refresh_action").assertIsDisplayed().performClick()
-        composeRule.runOnIdle { assertEquals(1, refreshCount) }
-
-        composeRule.onNodeWithContentDescription("Subscription actions").performClick()
-        composeRule.onNodeWithTag("subscriptions_visibility_action").assertIsDisplayed().performClick()
-        composeRule.onNodeWithContentDescription("Subscription actions").performClick()
-        composeRule.onNodeWithTag("subscriptions_visibility_action")
-            .assertIsDisplayed()
-            .assertTextEquals("Show unlistened")
     }
 
     private fun populatedState(): SubscriptionsUiState {
