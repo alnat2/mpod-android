@@ -4,10 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,9 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -209,90 +207,80 @@ fun SubscriptionsScreen(
                         onViewClick = toggleVisibility
                     )
 
-                    BoxWithConstraints(
+                    val pagerState = rememberPagerState(pageCount = { podcasts.size })
+                    val selectedPodcast = podcasts.getOrNull(pagerState.currentPage) ?: podcasts.first()
+
+                    HorizontalPager(
+                        state = pagerState,
+                        key = { page -> podcasts[page].id },
+                        pageSpacing = 4.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
+                            .height(160.dp)
                     ) {
-                        val itemWidth = maxWidth
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        val podcast = podcasts[it]
+                        PodcastCard(
+                            title = podcast.title,
+                            description = podcast.description,
+                            imageUrl = podcast.imageUrl,
+                            selected = it == pagerState.currentPage,
+                            onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
+                            isRefreshing = podcast.id in state.refreshingPodcastIds,
+                            isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
+                            isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
+                            unsubscribeEnabled = state.pendingUnsubscribe == null,
+                            errorMessage = podcast.errorMessage,
+                            onRefresh = { onRefreshPodcast(podcast.id) }
+                        )
+                    }
+
+                    if (selectedPodcast.episodesUnavailable) {
+                        SubscriptionsStatusCard(
+                            message = "Episodes could not be loaded. Use Refresh on the podcast card to try again.",
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        )
+                    } else {
+                        LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .fillMaxHeight()
+                                .weight(1f)
+                                .padding(horizontal = 2.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            itemsIndexed(podcasts, key = { _, podcast -> podcast.id }) { index, podcast ->
-                                Column(
-                                    modifier = Modifier
-                                        .width(itemWidth)
-                                        .fillMaxHeight()
-                                        .animateItem(),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    PodcastCard(
-                                        title = podcast.title,
-                                        description = podcast.description,
-                                        imageUrl = podcast.imageUrl,
-                                        selected = index == 0,
-                                        onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
-                                        isRefreshing = podcast.id in state.refreshingPodcastIds,
-                                        isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
-                                        isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
-                                        unsubscribeEnabled = state.pendingUnsubscribe == null,
-                                        errorMessage = podcast.errorMessage,
-                                        onRefresh = { onRefreshPodcast(podcast.id) }
-                                    )
-                                    if (podcast.episodesUnavailable) {
-                                        SubscriptionsStatusCard(
-                                            message = "Episodes could not be loaded. Use Refresh on the podcast card to try again.",
-                                            modifier = Modifier.padding(horizontal = 2.dp)
-                                        )
-                                    } else {
-                                        LazyColumn(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .weight(1f)
-                                                .padding(horizontal = 2.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            item {
-                                                val isMarkingAll = podcast.id in state.markingAllListenedPodcastIds
-                                                MarkAllListenedHeader(
-                                                    summary = podcastEpisodeSummary(podcast),
-                                                    enabled = podcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
-                                                    isLoading = isMarkingAll,
-                                                    onMarkAllListened = { onMarkAllListened(podcast.id) }
-                                                )
-                                            }
-                                            items(podcast.episodes, key = { episode -> episode.id }) { episode ->
-                                                EpisodeRow(
-                                                    title = episode.title,
-                                                    podcastName = podcast.title,
-                                                    duration = formatEpisodeDuration(episode.durationSeconds),
-                                                    date = formatPublishedDate(episode.publishedAt),
-                                                    inPlaylist = episode.inPlaylist,
-                                                    isListened = episode.isListened,
-                                                    downloaded = episode.downloaded,
-                                                    isDownloading = episode.id in state.downloadingEpisodeIds,
-                                                    actionsEnabled = episode.id !in state.busyEpisodeIds,
-                                                    showDragHandle = index != 0,
-                                                    onAction = { action ->
-                                                        when (action) {
-                                                            EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
-                                                            EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
-                                                            EpisodeRowAction.ShowNotes -> showNotesEpisode = podcast to episode
-                                                            EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
-                                                            EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
-                                                            EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
-                                                            EpisodeRowAction.MoveUp -> Unit
-                                                            EpisodeRowAction.MoveDown -> Unit
-                                                        }
-                                                    }
-                                                )
-                                            }
+                            item {
+                                val isMarkingAll = selectedPodcast.id in state.markingAllListenedPodcastIds
+                                MarkAllListenedHeader(
+                                    summary = podcastEpisodeSummary(selectedPodcast),
+                                    enabled = selectedPodcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
+                                    isLoading = isMarkingAll,
+                                    onMarkAllListened = { onMarkAllListened(selectedPodcast.id) }
+                                )
+                            }
+                            items(selectedPodcast.episodes, key = { episode -> episode.id }) { episode ->
+                                EpisodeRow(
+                                    title = episode.title,
+                                    podcastName = selectedPodcast.title,
+                                    duration = formatEpisodeDuration(episode.durationSeconds),
+                                    date = formatPublishedDate(episode.publishedAt),
+                                    inPlaylist = episode.inPlaylist,
+                                    isListened = episode.isListened,
+                                    downloaded = episode.downloaded,
+                                    isDownloading = episode.id in state.downloadingEpisodeIds,
+                                    actionsEnabled = episode.id !in state.busyEpisodeIds,
+                                    showDragHandle = false,
+                                    onAction = { action ->
+                                        when (action) {
+                                            EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
+                                            EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
+                                            EpisodeRowAction.ShowNotes -> showNotesEpisode = selectedPodcast to episode
+                                            EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
+                                            EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
+                                            EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
+                                            EpisodeRowAction.MoveUp -> Unit
+                                            EpisodeRowAction.MoveDown -> Unit
                                         }
                                     }
-                                }
+                                )
                             }
                         }
                     }
