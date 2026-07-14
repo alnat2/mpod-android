@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -217,6 +218,7 @@ fun SubscriptionsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
+                            .testTag("subscriptions_podcast_pager")
                     ) {
                         val podcast = podcasts[it]
                         PodcastCard(
