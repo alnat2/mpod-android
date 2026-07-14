@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ fun EpisodeRow(
     inPlaylist: Boolean = false,
     isListened: Boolean = false,
     downloaded: Boolean = false,
+    isDownloading: Boolean = false,
     actionsEnabled: Boolean = true,
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
@@ -60,7 +62,9 @@ fun EpisodeRow(
         MaterialTheme.colorScheme.surfaceVariant
     else
         MaterialTheme.colorScheme.surface
-    val statusText = statusTextOverride ?: when {
+    val statusText = when {
+        isDownloading -> "Downloading…"
+        statusTextOverride != null -> statusTextOverride
         inPlaylist -> "In playlist"
         isPlaying -> "$podcastName · now playing"
         else -> podcastName
@@ -202,8 +206,13 @@ fun EpisodeRow(
                         }
                     )
                     EpisodeActionItem(
-                        text = if (downloaded) "Downloaded" else "Download",
-                        enabled = !downloaded,
+                        text = when {
+                            isDownloading -> "Downloading…"
+                            downloaded -> "Downloaded"
+                            else -> "Download"
+                        },
+                        enabled = !downloaded && !isDownloading,
+                        showProgress = isDownloading,
                         onClick = {
                             menuExpanded = false
                             onAction(EpisodeRowAction.Download)
@@ -226,6 +235,7 @@ fun EpisodeRow(
 private fun EpisodeActionItem(
     text: String,
     enabled: Boolean = true,
+    showProgress: Boolean = false,
     onClick: () -> Unit
 ) {
     DropdownMenuItem(
@@ -235,6 +245,16 @@ private fun EpisodeActionItem(
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             )
+        },
+        leadingIcon = if (showProgress) {
+            {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        } else {
+            null
         },
         enabled = enabled,
         onClick = onClick

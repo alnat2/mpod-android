@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.EpisodeRowAction
+import com.example.mpod.ui.components.DownloadFailureBanner
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodBottomNav
@@ -179,7 +180,8 @@ fun HomeRoute(
         onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
-        onDownloadEpisode = viewModel::downloadEpisode
+        onDownloadEpisode = viewModel::downloadEpisode,
+        onDismissDownloadFailure = viewModel::dismissDownloadFailure
     )
 }
 
@@ -201,7 +203,8 @@ fun HomeScreen(
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
-    onDownloadEpisode: (Int) -> Unit = {}
+    onDownloadEpisode: (Int) -> Unit = {},
+    onDismissDownloadFailure: () -> Unit = {}
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
     var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
@@ -339,6 +342,7 @@ fun HomeScreen(
                             inPlaylist = true,
                             isListened = episode.isListened,
                             downloaded = episode.downloaded,
+                            isDownloading = episode.id in state.downloadingEpisodeIds,
                             actionsEnabled = episode.id !in state.busyEpisodeIds,
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
@@ -409,6 +413,18 @@ fun HomeScreen(
                     onClose = { showNotesEpisode = null }
                 )
             }
+        }
+
+        state.downloadFailure?.let { failure ->
+            DownloadFailureBanner(
+                message = failure.message,
+                onDismiss = onDismissDownloadFailure,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp)
+                    .align(Alignment.TopCenter)
+            )
         }
     }
 }

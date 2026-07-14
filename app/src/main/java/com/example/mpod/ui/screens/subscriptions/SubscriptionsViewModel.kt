@@ -9,11 +9,13 @@ import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PodcastDto
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
+import com.example.mpod.ui.util.apiErrorMessage
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Response
 import javax.inject.Inject
@@ -38,7 +40,7 @@ class SubscriptionsViewModel @Inject constructor(
             val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
                 SubscriptionsUiState(errorMessage = error.message ?: "Could not load subscriptions.")
             }
-            _state.value = nextState
+            _state.value = nextState.withDownloadStateFrom(_state.value)
         }
     }
 
@@ -53,7 +55,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState
+                _state.value = nextState.withDownloadStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     isRefreshingAll = false,
@@ -77,7 +79,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState
+                _state.value = nextState.withDownloadStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
@@ -102,7 +104,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState
+                _state.value = nextState.withDownloadStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
@@ -147,9 +149,45 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     fun downloadEpisode(episodeId: Int) {
-        performEpisodeAction(episodeId, "Could not start episode download.") {
-            api.downloadEpisode(episodeId)
+        if (episodeId in _state.value.downloadingEpisodeIds) return
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                downloadingEpisodeIds = _state.value.downloadingEpisodeIds + episodeId,
+                downloadFailure = null
+            )
+            val response = runCatching { api.downloadEpisode(episodeId) }.getOrNull()
+            if (response?.isSuccessful == true) {
+                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                    _state.value.copy(
+                        downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
+                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                    )
+                }
+                _state.value = nextState.withDownloadStateFrom(
+                    current = _state.value,
+                    completedEpisodeId = episodeId
+                )
+            } else {
+                val failure = SubscriptionDownloadFailureUi(
+                    episodeId = episodeId,
+                    message = apiErrorMessage(
+                        response?.errorBody()?.string(),
+                        "Could not download this episode. Try again."
+                    )
+                )
+                _state.value = _state.value.copy(
+                    downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
+                    downloadFailure = failure
+                )
+                delay(DOWNLOAD_FAILURE_TIMEOUT_MS)
+                if (_state.value.downloadFailure == failure) dismissDownloadFailure()
+            }
         }
+    }
+
+    fun dismissDownloadFailure() {
+        _state.value = _state.value.copy(downloadFailure = null)
     }
 
     private fun performEpisodeAction(
@@ -172,7 +210,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState
+                _state.value = nextState.withDownloadStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
@@ -253,12 +291,33 @@ data class SubscriptionsUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
+    val downloadFailure: SubscriptionDownloadFailureUi? = null,
+    val downloadingEpisodeIds: Set<Int> = emptySet(),
     val isRefreshingAll: Boolean = false,
     val refreshingPodcastIds: Set<Int> = emptySet(),
     val unsubscribingPodcastIds: Set<Int> = emptySet(),
     val busyEpisodeIds: Set<Int> = emptySet(),
     val podcasts: List<SubscriptionPodcastUi> = emptyList()
 )
+
+data class SubscriptionDownloadFailureUi(
+    val episodeId: Int,
+    val message: String
+)
+
+private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
+
+private fun SubscriptionsUiState.withDownloadStateFrom(
+    current: SubscriptionsUiState,
+    completedEpisodeId: Int? = null
+): SubscriptionsUiState {
+    return copy(
+        downloadFailure = current.downloadFailure,
+        downloadingEpisodeIds = completedEpisodeId?.let {
+            current.downloadingEpisodeIds - it
+        } ?: current.downloadingEpisodeIds
+    )
+}
 
 data class SubscriptionPodcastUi(
     val id: Int,

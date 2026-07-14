@@ -47,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.EpisodeRow
+import com.example.mpod.ui.components.DownloadFailureBanner
 import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodBottomNav
@@ -85,7 +86,8 @@ fun SubscriptionsRoute(
         onAddEpisodeToPlaylist = viewModel::addEpisodeToPlaylist,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
-        onDownloadEpisode = viewModel::downloadEpisode
+        onDownloadEpisode = viewModel::downloadEpisode,
+        onDismissDownloadFailure = viewModel::dismissDownloadFailure
     )
 }
 
@@ -100,6 +102,7 @@ fun SubscriptionsScreen(
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
     onDownloadEpisode: (Int) -> Unit = {},
+    onDismissDownloadFailure: () -> Unit = {},
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
     val podcasts = state.podcasts
@@ -195,6 +198,7 @@ fun SubscriptionsScreen(
                                                 inPlaylist = episode.inPlaylist,
                                                 isListened = episode.isListened,
                                                 downloaded = episode.downloaded,
+                                                isDownloading = episode.id in state.downloadingEpisodeIds,
                                                 actionsEnabled = episode.id !in state.busyEpisodeIds,
                                                 showDragHandle = index != 0,
                                                 onAction = { action ->
@@ -220,7 +224,19 @@ fun SubscriptionsScreen(
             }
         }
 
-        if (hasRefreshError || refreshErrorMessage != null) {
+        state.downloadFailure?.let { failure ->
+            DownloadFailureBanner(
+                message = failure.message,
+                onDismiss = onDismissDownloadFailure,
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp)
+                    .align(Alignment.TopCenter)
+            )
+        }
+
+        if (state.downloadFailure == null && (hasRefreshError || refreshErrorMessage != null)) {
             RefreshErrorBanner(
                 message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
                 onRetry = onRetryRefresh,
