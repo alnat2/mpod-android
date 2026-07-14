@@ -214,7 +214,7 @@ fun SettingsScreen(
             )
 
             Text(
-                text = "Current app build: ${state.appBuild ?: "unknown"}",
+                text = "Backend build: ${state.appBuild ?: "unknown"}",
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
