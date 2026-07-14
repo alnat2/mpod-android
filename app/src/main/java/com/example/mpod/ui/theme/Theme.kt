@@ -55,14 +55,14 @@ enum class ThemeMode(val storageValue: String) {
         fun fromStorage(value: String?): ThemeMode = when (value) {
             Light.storageValue -> Light
             Dark.storageValue -> Dark
-            else -> System
+            else -> Light
         }
     }
 }
 
 @Composable
 fun MpodTheme(
-    themeMode: ThemeMode = ThemeMode.System,
+    themeMode: ThemeMode = ThemeMode.Light,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit

@@ -37,7 +37,7 @@ import com.example.mpod.ui.theme.ThemeMode
 
 @Composable
 fun AppNavigation(
-    themeMode: ThemeMode = ThemeMode.System,
+    themeMode: ThemeMode = ThemeMode.Light,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     launchViewModel: AppLaunchViewModel = hiltViewModel()
 ) {

@@ -59,6 +59,7 @@ fun PageHeader(
     onRefreshClick: (() -> Unit)? = null,
     viewActionDescription: String = "View",
     onViewClick: (() -> Unit)? = null,
+    actionContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -90,7 +91,9 @@ fun PageHeader(
             }
         }
 
-        if (showActions) {
+        if (actionContent != null) {
+            actionContent()
+        } else if (showActions) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SquareIconButton(
                     iconRes = R.drawable.ic_refresh_dot,

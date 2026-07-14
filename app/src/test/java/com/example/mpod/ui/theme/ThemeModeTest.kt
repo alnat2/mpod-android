@@ -5,9 +5,10 @@ import org.junit.Test
 
 class ThemeModeTest {
     @Test
-    fun unknownOrMissingPreferenceFallsBackToSystem() {
-        assertEquals(ThemeMode.System, ThemeMode.fromStorage(null))
-        assertEquals(ThemeMode.System, ThemeMode.fromStorage("unexpected"))
+    fun unknownOrMissingPreferenceFallsBackToLight() {
+        assertEquals(ThemeMode.Light, ThemeMode.fromStorage(null))
+        assertEquals(ThemeMode.Light, ThemeMode.fromStorage("unexpected"))
+        assertEquals(ThemeMode.Light, ThemeMode.fromStorage("system"))
     }
 
     @Test

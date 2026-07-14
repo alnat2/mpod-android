@@ -20,7 +20,7 @@ class SettingsScreenTest {
             MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(),
-                    themeMode = ThemeMode.System,
+                    themeMode = ThemeMode.Light,
                     onThemeModeChange = { selectedMode = it }
                 )
             }
@@ -32,7 +32,7 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun darkThemeSwitchReturnsToSystemMode() {
+    fun darkThemeSwitchReturnsToLightMode() {
         var selectedMode: ThemeMode? = null
         composeRule.setContent {
             MpodTheme(themeMode = ThemeMode.Dark) {
@@ -46,6 +46,6 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithContentDescription("Use dark theme").performClick()
 
-        composeRule.runOnIdle { assertEquals(ThemeMode.System, selectedMode) }
+        composeRule.runOnIdle { assertEquals(ThemeMode.Light, selectedMode) }
     }
 }

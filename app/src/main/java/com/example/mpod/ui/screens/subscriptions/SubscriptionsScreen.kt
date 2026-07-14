@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.subscriptions
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,6 +61,7 @@ import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PodcastCard
 import com.example.mpod.ui.components.ShowNotesMobile
+import com.example.mpod.ui.components.SquareIconButton
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
@@ -178,10 +182,14 @@ fun SubscriptionsScreen(
                     PageHeader(
                         title = "Subscriptions",
                         subtitle = podcastCountLabel(state.podcasts.size),
-                        showActions = true,
-                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
-                        viewActionDescription = "Show all",
-                        onViewClick = toggleVisibility
+                        actionContent = {
+                            SubscriptionActionsMenu(
+                                isRefreshing = state.isRefreshingAll,
+                                visibilityActionLabel = "Show all",
+                                onRefresh = onRefreshAll,
+                                onToggleVisibility = toggleVisibility
+                            )
+                        }
                     )
                     AllCaughtUpState(
                         onShowAll = toggleVisibility,
@@ -198,14 +206,18 @@ fun SubscriptionsScreen(
                         } else {
                             podcastCountLabel(state.podcasts.size)
                         },
-                        showActions = true,
-                        onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
-                        viewActionDescription = if (visibility == SubscriptionVisibility.All) {
-                            "Show unlistened"
-                        } else {
-                            "Show all"
-                        },
-                        onViewClick = toggleVisibility
+                        actionContent = {
+                            SubscriptionActionsMenu(
+                                isRefreshing = state.isRefreshingAll,
+                                visibilityActionLabel = if (visibility == SubscriptionVisibility.All) {
+                                    "Show unlistened"
+                                } else {
+                                    "Show all"
+                                },
+                                onRefresh = onRefreshAll,
+                                onToggleVisibility = toggleVisibility
+                            )
+                        }
                     )
 
                     val pagerState = rememberPagerState(pageCount = { podcasts.size })
@@ -339,6 +351,65 @@ fun SubscriptionsScreen(
                     onClose = { showNotesEpisode = null }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionActionsMenu(
+    isRefreshing: Boolean,
+    visibilityActionLabel: String,
+    onRefresh: () -> Unit,
+    onToggleVisibility: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        SquareIconButton(
+            iconRes = R.drawable.ic_ellipsis_vertical,
+            contentDescription = "Subscription actions",
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.primary,
+            elevation = 0.dp,
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline
+            ),
+            onClick = { expanded = true }
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                modifier = Modifier.testTag("subscriptions_refresh_action"),
+                text = { Text(if (isRefreshing) "Refreshing…" else "Refresh") },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_refresh_dot),
+                        contentDescription = null
+                    )
+                },
+                enabled = !isRefreshing,
+                onClick = {
+                    expanded = false
+                    onRefresh()
+                }
+            )
+            DropdownMenuItem(
+                modifier = Modifier.testTag("subscriptions_visibility_action"),
+                text = { Text(visibilityActionLabel) },
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_view),
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onToggleVisibility()
+                }
+            )
         }
     }
 }

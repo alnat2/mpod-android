@@ -49,7 +49,7 @@ import com.example.mpod.ui.theme.ThemeMode
 
 @Composable
 fun SettingsRoute(
-    themeMode: ThemeMode = ThemeMode.System,
+    themeMode: ThemeMode = ThemeMode.Light,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
@@ -74,7 +74,7 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
-    themeMode: ThemeMode = ThemeMode.System,
+    themeMode: ThemeMode = ThemeMode.Light,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyEnabledChange: (Boolean) -> Unit = {},
@@ -175,7 +175,7 @@ fun SettingsScreen(
                         checked = themeMode == ThemeMode.Dark,
                         onCheckedChange = { useDarkTheme ->
                             onThemeModeChange(
-                                if (useDarkTheme) ThemeMode.Dark else ThemeMode.System
+                                if (useDarkTheme) ThemeMode.Dark else ThemeMode.Light
                             )
                         },
                         contentDescription = "Use dark theme"
