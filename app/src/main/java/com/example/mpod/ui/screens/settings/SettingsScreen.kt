@@ -45,9 +45,12 @@ import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.theme.MpodTheme
+import com.example.mpod.ui.theme.ThemeMode
 
 @Composable
 fun SettingsRoute(
+    themeMode: ThemeMode = ThemeMode.System,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -59,7 +62,8 @@ fun SettingsRoute(
     }
     SettingsScreen(
         state = state,
-        onSaveBackendAddress = viewModel::saveBackendAddress,
+        themeMode = themeMode,
+        onThemeModeChange = onThemeModeChange,
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyEnabledChange = viewModel::setProxyEnabled,
         onExportOpml = { opmlExportLauncher.launch("mpod-subscriptions.opml") },
@@ -70,19 +74,14 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
-    onSaveBackendAddress: (String) -> Unit = {},
+    themeMode: ThemeMode = ThemeMode.System,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyEnabledChange: (Boolean) -> Unit = {},
     onExportOpml: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
-    var backendAddress by remember { mutableStateOf(state.backendAddress) }
     var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
-    var darkThemeEnabled by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.backendAddress) {
-        backendAddress = state.backendAddress
-    }
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
@@ -119,39 +118,6 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
-
-            if (state.backendMessage != null) {
-                Text(
-                    text = state.backendMessage,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            SettingCard(
-                title = "Backend address",
-                description = "Enter the backend's IP address and port, separated by a colon."
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MpodInput(
-                        value = backendAddress,
-                        onValueChange = { backendAddress = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                    SettingsPrimaryButton(
-                        text = "Save conf",
-                        enabled = !state.isLoading,
-                        onClick = { onSaveBackendAddress(backendAddress) }
-                    )
-                }
             }
 
             SettingCard(
@@ -202,16 +168,26 @@ fun SettingsScreen(
             )
 
             SettingCard(
-                title = "Use dark theme",
-                description = "Use this option if it feels more comfortable for you.",
-                action = {
-                    MpodSwitch(
-                        checked = darkThemeEnabled,
-                        onCheckedChange = { darkThemeEnabled = it },
-                        contentDescription = "Use dark theme"
-                    )
+                title = "Theme",
+                description = "Follow the device theme or choose an app theme."
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(ThemeMode.System, ThemeMode.Light, ThemeMode.Dark).forEach { mode ->
+                        MpodButton(
+                            text = mode.name,
+                            primary = mode == themeMode,
+                            outlined = mode != themeMode,
+                            height = 36.dp,
+                            radius = 8.dp,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onThemeModeChange(mode) }
+                        )
+                    }
                 }
-            )
+            }
 
             SettingCard(
                 title = "Export OPML",

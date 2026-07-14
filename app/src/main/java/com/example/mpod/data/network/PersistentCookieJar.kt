@@ -2,6 +2,7 @@ package com.example.mpod.data.network
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -28,15 +29,33 @@ class PersistentCookieJar(context: Context) : CookieJar {
         }
     }
 
+    @Synchronized
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val freshCookies = cookies.filter { it.expiresAt > System.currentTimeMillis() }
-        if (freshCookies.isEmpty()) return
-
         val key = url.storageKey()
-        cookieStore[key] = freshCookies
+        val now = System.currentTimeMillis()
+        val merged = cookieStore[key].orEmpty()
+            .filter { it.expiresAt > now }
+            .associateBy { it.identityKey() }
+            .toMutableMap()
 
-        val cookieString = freshCookies.joinToString("\n") { it.toString() }
-        preferences.edit().putString(key, cookieString).commit()
+        cookies.forEach { cookie ->
+            if (cookie.expiresAt <= now) {
+                merged.remove(cookie.identityKey())
+            } else {
+                merged[cookie.identityKey()] = cookie
+            }
+        }
+
+        val freshCookies = merged.values.toList()
+        if (freshCookies.isEmpty()) {
+            cookieStore.remove(key)
+            preferences.edit { remove(key) }
+        } else {
+            cookieStore[key] = freshCookies
+            preferences.edit {
+                putString(key, freshCookies.joinToString("\n") { it.toString() })
+            }
+        }
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
@@ -48,6 +67,8 @@ class PersistentCookieJar(context: Context) : CookieJar {
     private fun HttpUrl.storageKey(): String {
         return "$scheme://$host:$port/"
     }
+
+    private fun Cookie.identityKey(): String = "$name|$domain|$path"
 
     private fun String.toCookieUrlOrNull(): HttpUrl? {
         val candidate = when {

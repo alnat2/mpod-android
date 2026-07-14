@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.model.ProxyStatusDto
 import com.example.mpod.data.network.model.SchedulerStatusDto
@@ -24,7 +23,6 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val backendConfig: BackendConfig,
     private val api: MpodApi
 ) : ViewModel() {
     private val _state = MutableStateFlow(SettingsUiState(isLoading = true))
@@ -43,22 +41,6 @@ class SettingsViewModel @Inject constructor(
                     errorMessage = error.message ?: "Could not load settings."
                 )
             }
-        }
-    }
-
-    fun saveBackendAddress(value: String) {
-        val result = backendConfig.saveAddress(value)
-        _state.value = if (result.isSuccess) {
-            _state.value.copy(
-                backendAddress = result.getOrThrow(),
-                backendMessage = "Backend address saved. Restart the app to reconnect.",
-                errorMessage = null
-            )
-        } else {
-            _state.value.copy(
-                backendMessage = null,
-                errorMessage = result.exceptionOrNull()?.message ?: "Could not save backend address."
-            )
         }
     }
 
@@ -136,14 +118,12 @@ class SettingsViewModel @Inject constructor(
         val proxy = api.getProxyStatus().body()?.proxy
 
         return SettingsUiState(
-            backendAddress = backendConfig.address,
             dailyRefreshTime = settings.dailyRefreshTime ?: "03:00",
             proxyEnabled = settings.proxyEnabled == true,
             proxyConfigured = settings.proxyConfigured == true || proxy?.proxyConfigured == true,
             proxyStatusText = proxyStatusText(settings, proxy),
             schedulerStatusText = schedulerStatusText(scheduler),
             appBuild = settings.appBuild,
-            backendMessage = _state.value.backendMessage,
             exportMessage = _state.value.exportMessage,
             isLoading = false
         )
@@ -188,8 +168,6 @@ class SettingsViewModel @Inject constructor(
 data class SettingsUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val backendAddress: String = BackendConfig.DEFAULT_ADDRESS,
-    val backendMessage: String? = null,
     val dailyRefreshTime: String = "03:00",
     val isSavingRefreshTime: Boolean = false,
     val proxyEnabled: Boolean = false,

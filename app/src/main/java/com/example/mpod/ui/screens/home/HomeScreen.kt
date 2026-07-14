@@ -32,12 +32,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackParameters
+import android.content.ComponentName
+import androidx.core.content.ContextCompat
 import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRow
@@ -50,14 +49,13 @@ import com.example.mpod.ui.components.PlayerView
 import com.example.mpod.ui.components.ShowNotesMobile
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.navigation.Screen
+import com.example.mpod.playback.PlaybackService
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.util.formatEpisodeDuration
 import com.example.mpod.ui.util.formatProgressTime
 import com.example.mpod.ui.util.formatTotalDuration
 import kotlinx.coroutines.delay
 import kotlin.math.abs
-
-private const val PLAYER_NETWORK_TIMEOUT_MS = 30_000
 
 @Composable
 fun HomeRoute(
@@ -68,28 +66,27 @@ fun HomeRoute(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    val currentEpisode = state.queue.firstOrNull()
+    var controller by remember { mutableStateOf<MediaController?>(null) }
     var playbackState by remember { mutableStateOf(HomePlaybackUiState()) }
-    val player = remember(state.audioRequestHeaders) {
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setConnectTimeoutMs(PLAYER_NETWORK_TIMEOUT_MS)
-            .setReadTimeoutMs(PLAYER_NETWORK_TIMEOUT_MS)
-            .setDefaultRequestProperties(state.audioRequestHeaders)
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
-            .build()
+    val controllerFuture = remember(context) {
+        MediaController.Builder(
+            context,
+            SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        ).buildAsync()
     }
 
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                playbackState = playbackState.copy(isPlaying = isPlaying)
-            }
-        }
-        player.addListener(listener)
+    DisposableEffect(controllerFuture) {
+        controllerFuture.addListener(
+            { runCatching { controllerFuture.get() }.onSuccess { controller = it } },
+            ContextCompat.getMainExecutor(context)
+        )
         onDispose {
-            player.removeListener(listener)
-            player.release()
+            controller = null
+            if (controllerFuture.isDone) {
+                runCatching { controllerFuture.get().release() }
+            } else {
+                controllerFuture.cancel(true)
+            }
         }
     }
 
@@ -97,47 +94,35 @@ fun HomeRoute(
         if (refreshKey > 0) viewModel.refresh()
     }
 
-    LaunchedEffect(player, currentEpisode?.id) {
-        if (currentEpisode == null) {
-            player.stop()
-            playbackState = HomePlaybackUiState()
-        } else {
-            player.setMediaItem(MediaItem.fromUri(currentEpisode.audioUrl))
-            player.prepare()
-            playbackState = HomePlaybackUiState(
-                durationSeconds = currentEpisode.durationSeconds ?: 0,
-                speedLabel = playbackState.speedLabel
-            )
-        }
-    }
-
-    LaunchedEffect(player, currentEpisode?.id) {
+    LaunchedEffect(controller, state.activeEpisodeId, state.queue) {
         while (true) {
-            val durationMs = player.duration.takeIf { it > 0 } ?: ((currentEpisode?.durationSeconds ?: 0) * 1000L)
-            val nextPlaybackState = playbackState.copy(
-                positionSeconds = (player.currentPosition / 1000).toInt().coerceAtLeast(0),
-                durationSeconds = (durationMs / 1000).toInt().coerceAtLeast(0),
-                isPlaying = player.isPlaying
+            val player = controller
+            val episodeId = player?.currentMediaItem?.mediaId?.toIntOrNull()
+                ?: state.activeEpisodeId
+                ?: state.queue.firstOrNull()?.id
+            val episode = state.queue.firstOrNull { it.id == episodeId }
+            val durationMs = player?.duration?.takeIf { it > 0 }
+                ?: ((episode?.durationSeconds ?: 0) * 1_000L)
+            playbackState = HomePlaybackUiState(
+                currentEpisodeId = episodeId,
+                positionSeconds = ((player?.currentPosition ?: episode?.playbackPositionSeconds?.times(1_000L) ?: 0L) / 1_000L)
+                    .toInt().coerceAtLeast(0),
+                durationSeconds = (durationMs / 1_000L).toInt().coerceAtLeast(0),
+                isPlaying = player?.isPlaying == true,
+                speedLabel = player?.playbackParameters?.speed.toSpeedLabel(),
+                errorMessage = player?.playerError?.let {
+                    "Could not play this episode. Check its audio source and try again."
+                }
             )
-            if (nextPlaybackState != playbackState) {
-                playbackState = nextPlaybackState
-            }
-            delay(if (player.isPlaying) 500 else 1_500)
+            delay(if (player?.isPlaying == true) 500 else 1_500)
         }
     }
 
-    LaunchedEffect(player, currentEpisode?.id, playbackState.isPlaying) {
-        while (currentEpisode != null && playbackState.isPlaying) {
-            delay(15_000)
-            viewModel.updatePlayback(
-                episodeId = currentEpisode.id,
-                positionSeconds = (player.currentPosition / 1000).toInt(),
-                durationSeconds = currentPlaybackDurationSeconds(
-                    playerDurationMs = player.duration,
-                    playbackStateDurationSeconds = playbackState.durationSeconds,
-                    episodeDurationSeconds = currentEpisode.durationSeconds
-                )
-            )
+    LaunchedEffect(playbackState.currentEpisodeId) {
+        val episodeId = playbackState.currentEpisodeId ?: return@LaunchedEffect
+        if (episodeId != state.activeEpisodeId) {
+            delay(500)
+            viewModel.refresh()
         }
     }
 
@@ -145,46 +130,36 @@ fun HomeRoute(
         state = state,
         playbackState = playbackState,
         onPlayToggle = {
-            if (player.isPlaying) {
-                currentEpisode?.let { episode ->
-                    viewModel.updatePlayback(
-                        episodeId = episode.id,
-                        positionSeconds = (player.currentPosition / 1000).toInt(),
-                        durationSeconds = currentPlaybackDurationSeconds(
-                            playerDurationMs = player.duration,
-                            playbackStateDurationSeconds = playbackState.durationSeconds,
-                            episodeDurationSeconds = episode.durationSeconds
-                        )
-                    )
+            controller?.let { player ->
+                if (player.isPlaying) {
+                    player.pause()
+                } else {
+                    if (player.playerError != null) player.prepare()
+                    player.play()
                 }
-                player.pause()
-            } else {
-                player.play()
             }
         },
         onSeekBy = { seconds ->
-            currentEpisode?.let { episode ->
-                val knownDurationSeconds = currentPlaybackDurationSeconds(
-                    playerDurationMs = player.duration,
-                    playbackStateDurationSeconds = playbackState.durationSeconds,
-                    episodeDurationSeconds = episode.durationSeconds
-                )
-                val durationMs = knownDurationSeconds.takeIf { it > 0 }?.let { it * 1000L } ?: Long.MAX_VALUE
-                val nextPosition = (player.currentPosition + seconds * 1000L)
+            controller?.let { player ->
+                val durationMs = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
+                val nextPosition = (player.currentPosition + seconds * 1_000L)
                     .coerceIn(0L, durationMs)
                 player.seekTo(nextPosition)
-                viewModel.updatePlayback(
-                    episodeId = episode.id,
-                    positionSeconds = (nextPosition / 1000).toInt(),
-                    durationSeconds = knownDurationSeconds,
-                    didSeek = true
-                )
             }
         },
         onSpeedChange = { speed ->
             speed.toFloatOrNull()?.let { speedValue ->
-                player.playbackParameters = PlaybackParameters(speedValue)
-                playbackState = playbackState.copy(speedLabel = speed)
+                controller?.setPlaybackSpeed(speedValue)
+            }
+        },
+        onPlayEpisode = { episodeId ->
+            controller?.let { player ->
+                val index = (0 until player.mediaItemCount)
+                    .firstOrNull { player.getMediaItemAt(it).mediaId == episodeId.toString() }
+                if (index != null) {
+                    player.seekToDefaultPosition(index)
+                    player.play()
+                }
             }
         },
         onAddRssFeed = onAddRssFeed,
@@ -194,20 +169,6 @@ fun HomeRoute(
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onDownloadEpisode = viewModel::downloadEpisode
     )
-}
-
-private fun currentPlaybackDurationSeconds(
-    playerDurationMs: Long,
-    playbackStateDurationSeconds: Int,
-    episodeDurationSeconds: Int?
-): Int {
-    val playerDurationSeconds = (playerDurationMs.takeIf { it > 0 } ?: 0L) / 1000L
-    return when {
-        playerDurationSeconds > 0L -> playerDurationSeconds.toInt()
-        playbackStateDurationSeconds > 0 -> playbackStateDurationSeconds
-        episodeDurationSeconds != null && episodeDurationSeconds > 0 -> episodeDurationSeconds
-        else -> 0
-    }
 }
 
 @Composable
@@ -222,6 +183,7 @@ fun HomeScreen(
     onPlayToggle: () -> Unit = {},
     onSeekBy: (Int) -> Unit = {},
     onSpeedChange: (String) -> Unit = {},
+    onPlayEpisode: (Int) -> Unit = {},
     onAddRssFeed: () -> Unit = {},
     onImportOpml: () -> Unit = {},
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
@@ -233,7 +195,8 @@ fun HomeScreen(
     var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
     var dragAccumulatorPx by remember { mutableStateOf(0f) }
     val reorderStepPx = with(LocalDensity.current) { 80.dp.toPx() }
-    val currentEpisode = state.queue.firstOrNull()
+    val currentEpisode = state.queue.firstOrNull { it.id == playbackState.currentEpisodeId }
+        ?: state.queue.firstOrNull()
 
     Box(
         modifier = Modifier
@@ -315,6 +278,15 @@ fun HomeScreen(
                         }
                     }
 
+                    playbackState.errorMessage?.let { message ->
+                        item {
+                            StatusCard(
+                                message = message,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                        }
+                    }
+
                     item {
                         PlayerView(
                             modifier = Modifier
@@ -351,7 +323,7 @@ fun HomeScreen(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
                             duration = formatEpisodeDuration(episode.durationSeconds),
-                            isPlaying = index == 0,
+                            isPlaying = episode.id == currentEpisode.id,
                             inPlaylist = true,
                             isListened = episode.isListened,
                             downloaded = episode.downloaded,
@@ -359,7 +331,7 @@ fun HomeScreen(
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
                             showDragHandle = true,
-                            statusTextOverride = if (index == 0) {
+                            statusTextOverride = if (episode.id == currentEpisode.id) {
                                 "${episode.podcastTitle} · now playing"
                             } else {
                                 episode.podcastTitle
@@ -398,6 +370,7 @@ fun HomeScreen(
                                         }
                                     }
                                 ),
+                            onClick = { onPlayEpisode(episode.id) },
                             onAction = { action ->
                                 when (action) {
                                     EpisodeRowAction.AddToPlaylist -> Unit
@@ -489,10 +462,12 @@ private fun queueSummary(episodes: List<HomeEpisodeUi>): String {
 }
 
 data class HomePlaybackUiState(
+    val currentEpisodeId: Int? = null,
     val positionSeconds: Int = 0,
     val durationSeconds: Int = 0,
     val isPlaying: Boolean = false,
-    val speedLabel: String = "1.5"
+    val speedLabel: String = "1.3",
+    val errorMessage: String? = null
 ) {
     val remainingSeconds: Int
         get() = (durationSeconds - positionSeconds).coerceAtLeast(0)
@@ -505,6 +480,16 @@ data class HomePlaybackUiState(
         }
 }
 
+private fun Float?.toSpeedLabel(): String = when (this) {
+    0.5f -> "0.5"
+    0.75f -> "0.75"
+    1f -> "1.0"
+    1.3f -> "1.3"
+    1.5f -> "1.5"
+    2f -> "2.0"
+    else -> "1.3"
+}
+
 private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
     if (!hasPodcasts) return HomeUiState(hasPodcasts = false)
 
@@ -515,8 +500,8 @@ private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
                 id = 1,
                 title = "Why store loyalty cards became a UX minefield",
                 podcastTitle = "Decoder Ring",
-                audioUrl = "http://192.168.0.222:5051/api/episodes/1/audio",
                 durationSeconds = 54 * 60,
+                playbackPositionSeconds = 0,
                 isListened = false,
                 downloaded = false,
                 summary = "A story about loyalty cards, UX traps, and the tiny design decisions that become habits."
@@ -525,8 +510,8 @@ private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
                 id = 2,
                 title = "How public transit maps teach invisible habits",
                 podcastTitle = "Decoder Ring",
-                audioUrl = "http://192.168.0.222:5051/api/episodes/2/audio",
                 durationSeconds = 36 * 60,
+                playbackPositionSeconds = 0,
                 isListened = false,
                 downloaded = false,
                 summary = "Transit maps look simple, but the choices behind them shape how people move through cities."
@@ -535,8 +520,8 @@ private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
                 id = 3,
                 title = "The app menu nobody understands but everyone...",
                 podcastTitle = "Decoder Ring",
-                audioUrl = "http://192.168.0.222:5051/api/episodes/3/audio",
                 durationSeconds = 43 * 60,
+                playbackPositionSeconds = 0,
                 isListened = false,
                 downloaded = false,
                 summary = "A short note about menu design and why obvious labels are sometimes the hardest thing to ship."

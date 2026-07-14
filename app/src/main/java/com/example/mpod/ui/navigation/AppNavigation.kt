@@ -33,9 +33,12 @@ import com.example.mpod.ui.components.MpodLogo
 import com.example.mpod.ui.screens.home.HomeRoute
 import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
+import com.example.mpod.ui.theme.ThemeMode
 
 @Composable
 fun AppNavigation(
+    themeMode: ThemeMode = ThemeMode.System,
+    onThemeModeChange: (ThemeMode) -> Unit = {},
     launchViewModel: AppLaunchViewModel = hiltViewModel()
 ) {
     val launchState by launchViewModel.state.collectAsState()
@@ -44,7 +47,7 @@ fun AppNavigation(
         AppLaunchState.Loading -> null
         AppLaunchState.SetupRequired -> Screen.Setup.route
         AppLaunchState.Unauthenticated -> Screen.Login.route
-        AppLaunchState.Authenticated -> Screen.Home.route
+        AppLaunchState.Authenticated -> Screen.Subscriptions.route
     }
 
     if (startDestination == null) {
@@ -113,7 +116,13 @@ fun AppNavigation(
                     )
                 }
                 composable(Screen.Subscriptions.route) { SubscriptionsRoute(refreshKey = libraryRefreshKey) }
-                composable(Screen.Settings.route) { SettingsRoute(onLogout = launchViewModel::logout) }
+                composable(Screen.Settings.route) {
+                    SettingsRoute(
+                        themeMode = themeMode,
+                        onThemeModeChange = onThemeModeChange,
+                        onLogout = launchViewModel::logout
+                    )
+                }
                 dialog(
                     route = Screen.AddPodcast.route,
                     dialogProperties = DialogProperties(usePlatformDefaultWidth = false)

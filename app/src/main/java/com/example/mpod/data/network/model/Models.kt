@@ -78,11 +78,6 @@ data class PlaylistItemDto(
     @SerializedName("position") val position: Int
 )
 
-data class PlaybackSyncRequest(
-    @SerializedName("episode_id") val episodeId: Int,
-    @SerializedName("position_seconds") val positionSeconds: Int
-)
-
 data class PlaybackUpdateRequest(
     @SerializedName("episodeId") val episodeId: Int,
     @SerializedName("positionSeconds") val positionSeconds: Int,
@@ -92,12 +87,58 @@ data class PlaybackUpdateRequest(
     @SerializedName("clientUpdatedAt") val clientUpdatedAt: String
 )
 
+data class PlaybackStateDto(
+    @SerializedName("episodeId") val episodeId: Int,
+    @SerializedName("positionSeconds") val positionSeconds: Int,
+    @SerializedName("lastUpdated") val lastUpdated: String
+)
+
+data class ActivePlaybackDto(
+    @SerializedName("episodeId") val episodeId: Int,
+    @SerializedName("lastUpdated") val lastUpdated: String
+)
+
+data class ActivePlaybackRequest(
+    @SerializedName("episodeId") val episodeId: Int
+)
+
+data class ActivePlaybackResponse(
+    @SerializedName("activePlayback") val activePlayback: ActivePlaybackDto
+)
+
+data class PlaybackQueueEpisodeDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("podcastId") val podcastId: Int,
+    @SerializedName("title") val title: String?,
+    @SerializedName("description") val description: String?,
+    @SerializedName("showNotes") val showNotes: String?,
+    @SerializedName("audioUrl") val audioUrl: String?,
+    @SerializedName("duration") val duration: Double?,
+    @SerializedName("downloaded") val downloaded: Boolean,
+    @SerializedName("isListened") val isListened: Boolean,
+    @SerializedName("publishedAt") val publishedAt: String?,
+    @SerializedName("podcastTitle") val podcastTitle: String?,
+    @SerializedName("podcastImageUrl") val podcastImageUrl: String?,
+    @SerializedName("playback") val playback: PlaybackStateDto?
+)
+
+data class PlaybackQueueResponse(
+    @SerializedName("queue") val queue: List<PlaybackQueueEpisodeDto> = emptyList(),
+    @SerializedName("activePlayback") val activePlayback: ActivePlaybackDto?
+)
+
+data class PlaybackUpdateResponse(
+    @SerializedName("playback") val playback: PlaybackStateDto,
+    @SerializedName("nextEpisodeId") val nextEpisodeId: Int?
+)
+
 data class SettingsResponse(
     @SerializedName("settings") val settings: SettingsDto
 )
 
 data class SettingsDto(
     @SerializedName("dailyRefreshTime") val dailyRefreshTime: String?,
+    @SerializedName("playbackSpeed") val playbackSpeed: String?,
     @SerializedName("proxyEnabled") val proxyEnabled: Boolean?,
     @SerializedName("proxyConfigured") val proxyConfigured: Boolean?,
     @SerializedName("appBuild") val appBuild: String?
@@ -105,6 +146,7 @@ data class SettingsDto(
 
 data class SettingsUpdateRequest(
     @SerializedName("dailyRefreshTime") val dailyRefreshTime: String? = null,
+    @SerializedName("playbackSpeed") val playbackSpeed: String? = null,
     @SerializedName("proxyEnabled") val proxyEnabled: Boolean? = null
 )
 

@@ -2,14 +2,10 @@ package com.example.mpod.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
-import com.example.mpod.data.network.PersistentCookieJar
 import com.example.mpod.data.network.model.EpisodeListenedRequest
-import com.example.mpod.data.network.model.EpisodeDto
-import com.example.mpod.data.network.model.PlaybackUpdateRequest
+import com.example.mpod.data.network.model.PlaybackQueueEpisodeDto
 import com.example.mpod.data.network.model.PlaylistReorderRequest
-import com.example.mpod.data.network.model.PodcastDto
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.toDurationSeconds
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,16 +13,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import retrofit2.Response
-import java.time.Instant
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val api: MpodApi,
-    private val backendConfig: BackendConfig,
-    private val cookieJar: PersistentCookieJar
+    private val api: MpodApi
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
@@ -51,58 +43,27 @@ class HomeViewModel @Inject constructor(
             return HomeUiState(hasPodcasts = false)
         }
 
-        val podcastsById = podcasts.associateBy { it.id }
-        val playlistItems = api.getPlaylist()
-            .requireBody("Could not load playlist.")
-            .items
-            .sortedBy { it.position }
-
-        val queue = playlistItems.mapNotNull { item ->
-            api.getEpisode(item.episodeId).body()?.episode?.toHomeEpisode(podcastsById)
-        }
+        val playbackQueue = api.getPlaybackQueue()
+            .requireBody("Could not load playback queue.")
 
         return HomeUiState(
             hasPodcasts = true,
-            audioRequestHeaders = audioRequestHeaders(),
-            queue = queue
+            activeEpisodeId = playbackQueue.activePlayback?.episodeId,
+            queue = playbackQueue.queue.map { it.toHomeEpisode() }
         )
     }
 
-    private fun EpisodeDto.toHomeEpisode(podcastsById: Map<Int, PodcastDto>): HomeEpisodeUi {
-        val podcast = podcastsById[podcastId]
+    private fun PlaybackQueueEpisodeDto.toHomeEpisode(): HomeEpisodeUi {
         return HomeEpisodeUi(
             id = id,
             title = cleanFeedText(title).ifBlank { "Untitled episode" },
-            podcastTitle = cleanFeedText(podcast?.title).ifBlank { "Podcast" },
-            audioUrl = "${backendConfig.baseUrl}api/episodes/$id/audio",
+            podcastTitle = cleanFeedText(podcastTitle).ifBlank { "Podcast" },
             durationSeconds = duration.toDurationSeconds(),
+            playbackPositionSeconds = playback?.positionSeconds ?: 0,
             isListened = isListened,
-            downloaded = downloaded == true,
-            summary = cleanFeedText(summary).ifBlank { null }
+            downloaded = downloaded,
+            summary = cleanFeedText(showNotes ?: description).ifBlank { null }
         )
-    }
-
-    fun updatePlayback(
-        episodeId: Int,
-        positionSeconds: Int,
-        durationSeconds: Int,
-        didSeek: Boolean = false,
-        completed: Boolean = false
-    ) {
-        viewModelScope.launch {
-            runCatching {
-                api.updatePlayback(
-                    PlaybackUpdateRequest(
-                        episodeId = episodeId,
-                        positionSeconds = positionSeconds.coerceAtLeast(0),
-                        durationSeconds = durationSeconds.coerceAtLeast(0),
-                        completed = completed,
-                        didSeek = didSeek,
-                        clientUpdatedAt = Instant.now().toString()
-                    )
-                )
-            }
-        }
     }
 
     fun removeEpisodeFromPlaylist(episodeId: Int) {
@@ -207,14 +168,6 @@ class HomeViewModel @Inject constructor(
         return this?.errorBody()?.string().orEmpty().ifBlank { defaultMessage }
     }
 
-    private fun audioRequestHeaders(): Map<String, String> {
-        val cookies = cookieJar.loadForRequest(backendConfig.baseUrl.toHttpUrl())
-        if (cookies.isEmpty()) return emptyMap()
-
-        return mapOf(
-            "Cookie" to cookies.joinToString("; ") { cookie -> "${cookie.name}=${cookie.value}" }
-        )
-    }
 }
 
 data class HomeUiState(
@@ -222,8 +175,8 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val busyEpisodeIds: Set<Int> = emptySet(),
-    val audioRequestHeaders: Map<String, String> = emptyMap(),
     val hasPodcasts: Boolean = true,
+    val activeEpisodeId: Int? = null,
     val queue: List<HomeEpisodeUi> = emptyList()
 )
 
@@ -231,8 +184,8 @@ data class HomeEpisodeUi(
     val id: Int,
     val title: String,
     val podcastTitle: String,
-    val audioUrl: String,
     val durationSeconds: Int?,
+    val playbackPositionSeconds: Int,
     val isListened: Boolean,
     val downloaded: Boolean,
     val summary: String?

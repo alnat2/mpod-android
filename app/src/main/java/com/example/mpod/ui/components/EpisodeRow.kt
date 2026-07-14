@@ -52,6 +52,7 @@ fun EpisodeRow(
     showDragHandle: Boolean = true,
     statusTextOverride: String? = null,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     onAction: ((EpisodeRowAction) -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -72,6 +73,7 @@ fun EpisodeRow(
             .figmaDropShadow(radius = 4.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = if (showDragHandle) 8.dp else 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)

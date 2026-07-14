@@ -5,8 +5,11 @@ import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
-import com.example.mpod.data.network.model.PlaybackSyncRequest
+import com.example.mpod.data.network.model.ActivePlaybackRequest
+import com.example.mpod.data.network.model.ActivePlaybackResponse
+import com.example.mpod.data.network.model.PlaybackQueueResponse
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
+import com.example.mpod.data.network.model.PlaybackUpdateResponse
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PlaylistReorderRequest
 import com.example.mpod.data.network.model.PlaylistResponse
@@ -27,6 +30,7 @@ import retrofit2.http.Path
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.PUT
 
 interface MpodApi {
 
@@ -91,11 +95,14 @@ interface MpodApi {
     @PATCH("api/playlist/reorder")
     suspend fun reorderPlaylist(@Body request: PlaylistReorderRequest): Response<Unit>
 
-    @POST("api/playback/sync")
-    suspend fun syncPlayback(@Body request: PlaybackSyncRequest): Response<Unit>
+    @GET("api/playback/queue")
+    suspend fun getPlaybackQueue(): Response<PlaybackQueueResponse>
+
+    @PUT("api/playback/active")
+    suspend fun setActivePlayback(@Body request: ActivePlaybackRequest): Response<ActivePlaybackResponse>
 
     @POST("api/playback")
-    suspend fun updatePlayback(@Body request: PlaybackUpdateRequest): Response<Unit>
+    suspend fun updatePlayback(@Body request: PlaybackUpdateRequest): Response<PlaybackUpdateResponse>
 
     @GET("api/settings")
     suspend fun getSettings(): Response<SettingsResponse>

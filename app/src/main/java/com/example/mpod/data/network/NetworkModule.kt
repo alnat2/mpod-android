@@ -26,7 +26,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(cookieJar: PersistentCookieJar): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.BASIC
         }
         return OkHttpClient.Builder()
             .addInterceptor(logging)

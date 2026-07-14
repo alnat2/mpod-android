@@ -1,10 +1,14 @@
 package com.example.mpod.ui.navigation
 
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.model.LoginRequest
+import com.example.mpod.playback.PlaybackService
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AppLaunchViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val api: MpodApi
 ) : ViewModel() {
     private val _state = MutableStateFlow<AppLaunchState>(AppLaunchState.Loading)
@@ -78,6 +83,7 @@ class AppLaunchViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
+            context.stopService(Intent(context, PlaybackService::class.java))
             _state.value = AppLaunchState.Loading
             _authUiState.value = AuthUiState()
             runCatching { api.logout() }

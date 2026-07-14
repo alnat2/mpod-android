@@ -31,15 +31,47 @@ private val LightColorScheme = lightColorScheme(
 )
 
 // For now, use light scheme for both to exactly match mockups
-private val DarkColorScheme = LightColorScheme
+private val DarkColorScheme = darkColorScheme(
+    primary = DarkPrimary,
+    onPrimary = DarkPrimaryForeground,
+    background = DarkBackground,
+    onBackground = DarkForeground,
+    surface = DarkCard,
+    onSurface = DarkCardForeground,
+    secondaryContainer = DarkSecondary,
+    onSecondaryContainer = DarkSecondaryForeground,
+    surfaceVariant = DarkMuted,
+    onSurfaceVariant = DarkMutedForeground,
+    outline = DarkBorder,
+    tertiary = DarkPrimary
+)
+
+enum class ThemeMode(val storageValue: String) {
+    System("system"),
+    Light("light"),
+    Dark("dark");
+
+    companion object {
+        fun fromStorage(value: String?): ThemeMode = when (value) {
+            Light.storageValue -> Light
+            Dark.storageValue -> Dark
+            else -> System
+        }
+    }
+}
 
 @Composable
 fun MpodTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.System,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current

@@ -10,7 +10,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.mpod"
+        applicationId = "com.prod.mpod.test"
         minSdk = 34
         targetSdk = 36
         versionCode = 1

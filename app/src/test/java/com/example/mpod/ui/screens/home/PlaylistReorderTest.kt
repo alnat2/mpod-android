@@ -40,8 +40,8 @@ class PlaylistReorderTest {
                 id = id,
                 title = "Episode $id",
                 podcastTitle = "Podcast",
-                audioUrl = "https://example.com/$id.mp3",
                 durationSeconds = 60,
+                playbackPositionSeconds = 0,
                 isListened = false,
                 downloaded = false,
                 summary = null
