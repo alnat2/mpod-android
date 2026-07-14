@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.DownloadFailureBanner
+import com.example.mpod.ui.components.UnsubscribeUndoBanner
 import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodBottomNav
@@ -82,7 +83,9 @@ fun SubscriptionsRoute(
         state = state,
         onRefreshAll = viewModel::refreshAll,
         onRefreshPodcast = viewModel::refreshPodcast,
-        onUnsubscribePodcast = viewModel::unsubscribePodcast,
+        onUnsubscribePodcast = viewModel::schedulePodcastUnsubscribe,
+        onUndoPodcastUnsubscribe = viewModel::undoPodcastUnsubscribe,
+        onMarkAllListened = viewModel::markAllListened,
         onAddEpisodeToPlaylist = viewModel::addEpisodeToPlaylist,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
@@ -98,6 +101,8 @@ fun SubscriptionsScreen(
     onRefreshAll: () -> Unit = {},
     onRefreshPodcast: (Int) -> Unit = {},
     onUnsubscribePodcast: (Int) -> Unit = {},
+    onUndoPodcastUnsubscribe: (Int) -> Unit = {},
+    onMarkAllListened: (Int) -> Unit = {},
     onAddEpisodeToPlaylist: (Int) -> Unit = {},
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
@@ -107,7 +112,6 @@ fun SubscriptionsScreen(
 ) {
     val podcasts = state.podcasts
     val refreshErrorMessage = state.actionErrorMessage
-    var pendingUnsubscribe by remember { mutableStateOf<SubscriptionPodcastUi?>(null) }
     var showNotesEpisode by remember { mutableStateOf<Pair<SubscriptionPodcastUi, SubscriptionEpisodeUi>?>(null) }
 
     Box(
@@ -174,9 +178,11 @@ fun SubscriptionsScreen(
                                         description = podcast.description,
                                         imageUrl = podcast.imageUrl,
                                         selected = index == 0,
-                                        onUnsubscribe = { pendingUnsubscribe = podcast },
+                                        onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
                                         isRefreshing = podcast.id in state.refreshingPodcastIds,
                                         isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
+                                        isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
+                                        unsubscribeEnabled = state.pendingUnsubscribe == null,
                                         onRefresh = { onRefreshPodcast(podcast.id) }
                                     )
                                     LazyColumn(
@@ -187,7 +193,13 @@ fun SubscriptionsScreen(
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         item {
-                                            MarkAllListenedHeader(summary = podcastEpisodeSummary(podcast))
+                                            val isMarkingAll = podcast.id in state.markingAllListenedPodcastIds
+                                            MarkAllListenedHeader(
+                                                summary = podcastEpisodeSummary(podcast),
+                                                enabled = podcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
+                                                isLoading = isMarkingAll,
+                                                onMarkAllListened = { onMarkAllListened(podcast.id) }
+                                            )
                                         }
                                         items(podcast.episodes, key = { episode -> episode.id }) { episode ->
                                             EpisodeRow(
@@ -224,7 +236,20 @@ fun SubscriptionsScreen(
             }
         }
 
-        state.downloadFailure?.let { failure ->
+        state.pendingUnsubscribe?.let { pending ->
+            UnsubscribeUndoBanner(
+                podcastTitle = pending.podcastTitle,
+                secondsRemaining = pending.secondsRemaining,
+                onUndo = { onUndoPodcastUnsubscribe(pending.podcastId) },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp)
+                    .align(Alignment.TopCenter)
+            )
+        }
+
+        if (state.pendingUnsubscribe == null) state.downloadFailure?.let { failure ->
             DownloadFailureBanner(
                 message = failure.message,
                 onDismiss = onDismissDownloadFailure,
@@ -236,7 +261,11 @@ fun SubscriptionsScreen(
             )
         }
 
-        if (state.downloadFailure == null && (hasRefreshError || refreshErrorMessage != null)) {
+        if (
+            state.pendingUnsubscribe == null &&
+            state.downloadFailure == null &&
+            (hasRefreshError || refreshErrorMessage != null)
+        ) {
             RefreshErrorBanner(
                 message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
                 onRetry = onRetryRefresh,
@@ -245,29 +274,6 @@ fun SubscriptionsScreen(
                     .padding(horizontal = 20.dp)
                     .padding(top = 10.dp)
                     .align(Alignment.TopCenter)
-            )
-        }
-
-        pendingUnsubscribe?.let { podcast ->
-            AlertDialog(
-                onDismissRequest = { pendingUnsubscribe = null },
-                title = { Text("Unsubscribe from ${podcast.title}?") },
-                text = { Text("Episodes, playlist entries, playback state, and downloads for this podcast will be removed.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            pendingUnsubscribe = null
-                            onUnsubscribePodcast(podcast.id)
-                        }
-                    ) {
-                        Text("Unsubscribe")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingUnsubscribe = null }) {
-                        Text("Cancel")
-                    }
-                }
             )
         }
 

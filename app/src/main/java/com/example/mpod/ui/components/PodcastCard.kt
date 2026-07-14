@@ -2,6 +2,7 @@ package com.example.mpod.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -33,6 +34,8 @@ fun PodcastCard(
     imageUrl: String? = null,
     isRefreshing: Boolean = false,
     isUnsubscribing: Boolean = false,
+    isUnsubscribePending: Boolean = false,
+    unsubscribeEnabled: Boolean = true,
     onRefresh: () -> Unit = {}
 ) {
     val background = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
@@ -102,12 +105,16 @@ fun PodcastCard(
                 onClick = onRefresh
             )
             MpodButton(
-                text = if (isUnsubscribing) "Removing" else "Unsubscribe",
+                text = when {
+                    isUnsubscribing -> "Removing"
+                    isUnsubscribePending -> "Pending"
+                    else -> "Unsubscribe"
+                },
                 primary = false,
                 elevation = 0.dp,
                 height = 32.dp,
                 modifier = Modifier.weight(1f),
-                enabled = !isUnsubscribing,
+                enabled = unsubscribeEnabled && !isUnsubscribing && !isUnsubscribePending,
                 onClick = onUnsubscribe
             )
         }
@@ -167,6 +174,9 @@ private fun PodcastArtworkFallback() {
 @Composable
 fun MarkAllListenedHeader(
     summary: String = "21 / 15 episodes",
+    enabled: Boolean = true,
+    isLoading: Boolean = false,
+    onMarkAllListened: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -190,11 +200,22 @@ fun MarkAllListenedHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Mark all listened",
+                text = if (isLoading) "Marking…" else "Mark all listened",
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.then(
+                    if (enabled && !isLoading) {
+                        Modifier.clickable(onClick = onMarkAllListened)
+                    } else {
+                        Modifier
+                    }
+                )
             )
         }
     }

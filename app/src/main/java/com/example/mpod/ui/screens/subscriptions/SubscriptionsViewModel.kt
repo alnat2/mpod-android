@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import retrofit2.Response
 import javax.inject.Inject
@@ -29,6 +30,7 @@ class SubscriptionsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
+    private var pendingUnsubscribeJob: Job? = null
 
     init {
         refresh()
@@ -40,7 +42,7 @@ class SubscriptionsViewModel @Inject constructor(
             val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
                 SubscriptionsUiState(errorMessage = error.message ?: "Could not load subscriptions.")
             }
-            _state.value = nextState.withDownloadStateFrom(_state.value)
+            _state.value = nextState.withTransientStateFrom(_state.value)
         }
     }
 
@@ -55,7 +57,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     isRefreshingAll = false,
@@ -79,7 +81,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
@@ -89,28 +91,112 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
-    fun unsubscribePodcast(podcastId: Int) {
-        viewModelScope.launch {
+    fun schedulePodcastUnsubscribe(podcastId: Int) {
+        if (_state.value.pendingUnsubscribe != null) return
+        val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
+        val countdown = unsubscribeCountdownSeconds()
+        _state.value = _state.value.copy(
+            pendingUnsubscribe = PendingUnsubscribeUi(
+                podcastId = podcast.id,
+                podcastTitle = podcast.title,
+                secondsRemaining = countdown.first()
+            )
+        )
+
+        pendingUnsubscribeJob = viewModelScope.launch {
+            for (secondsRemaining in countdown.drop(1)) {
+                delay(UNSUBSCRIBE_TICK_MS)
+                _state.value = _state.value.copy(
+                    pendingUnsubscribe = PendingUnsubscribeUi(
+                        podcastId = podcast.id,
+                        podcastTitle = podcast.title,
+                        secondsRemaining = secondsRemaining
+                    )
+                )
+            }
+            delay(UNSUBSCRIBE_TICK_MS)
+
             _state.value = _state.value.copy(
+                pendingUnsubscribe = null,
                 unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
                 actionErrorMessage = null
             )
             val response = runCatching { api.removePodcast(podcastId) }.getOrNull()
             if (response?.isSuccessful == true) {
                 queueInvalidator.invalidate()
+                _state.value = _state.value.copy(
+                    unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId
+                )
                 val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
                     _state.value.copy(
-                        unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
                     actionErrorMessage = response.errorMessage("Could not unsubscribe from this podcast.")
                 )
             }
+            pendingUnsubscribeJob = null
+        }
+    }
+
+    fun undoPodcastUnsubscribe(podcastId: Int) {
+        if (_state.value.pendingUnsubscribe?.podcastId != podcastId) return
+        pendingUnsubscribeJob?.cancel()
+        pendingUnsubscribeJob = null
+        _state.value = _state.value.copy(pendingUnsubscribe = null)
+    }
+
+    fun markAllListened(podcastId: Int) {
+        val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
+        if (podcast.unlistenedEpisodeCount == 0) return
+        if (podcastId in _state.value.markingAllListenedPodcastIds) return
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                podcasts = _state.value.podcasts.markAllListenedOptimistically(podcastId),
+                markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds + podcastId,
+                actionErrorMessage = null
+            )
+
+            val failure = runCatching {
+                val episodes = api.getPodcastEpisodes(podcastId)
+                    .requireBody("Could not load podcast episodes.")
+                    .episodes
+                episodes.filterNot { it.isListened }.forEach { episode ->
+                    val response = api.setEpisodeListened(
+                        episode.id,
+                        EpisodeListenedRequest(isListened = true)
+                    )
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException(
+                            apiErrorMessage(
+                                response.errorBody()?.string(),
+                                "Could not mark all episodes as listened."
+                            )
+                        )
+                    }
+                }
+            }.exceptionOrNull()
+
+            _state.value = _state.value.copy(
+                markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds - podcastId
+            )
+            if (failure == null) queueInvalidator.invalidate()
+
+            val nextState = runCatching { loadSubscriptionsState() }.getOrElse { reloadError ->
+                _state.value.copy(
+                    actionErrorMessage = reloadError.message ?: "Could not reload subscriptions."
+                )
+            }.let { loaded ->
+                if (failure == null) loaded else loaded.copy(
+                    actionErrorMessage = failure.message ?: "Could not mark all episodes as listened."
+                )
+            }
+            _state.value = nextState.withTransientStateFrom(_state.value)
         }
     }
 
@@ -164,7 +250,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(
+                _state.value = nextState.withTransientStateFrom(
                     current = _state.value,
                     completedEpisodeId = episodeId
                 )
@@ -210,7 +296,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
                     busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
@@ -293,6 +379,8 @@ data class SubscriptionsUiState(
     val actionErrorMessage: String? = null,
     val downloadFailure: SubscriptionDownloadFailureUi? = null,
     val downloadingEpisodeIds: Set<Int> = emptySet(),
+    val pendingUnsubscribe: PendingUnsubscribeUi? = null,
+    val markingAllListenedPodcastIds: Set<Int> = emptySet(),
     val isRefreshingAll: Boolean = false,
     val refreshingPodcastIds: Set<Int> = emptySet(),
     val unsubscribingPodcastIds: Set<Int> = emptySet(),
@@ -305,9 +393,17 @@ data class SubscriptionDownloadFailureUi(
     val message: String
 )
 
-private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
+data class PendingUnsubscribeUi(
+    val podcastId: Int,
+    val podcastTitle: String,
+    val secondsRemaining: Int
+)
 
-private fun SubscriptionsUiState.withDownloadStateFrom(
+private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
+private const val UNSUBSCRIBE_WINDOW_SECONDS = 15
+private const val UNSUBSCRIBE_TICK_MS = 1_000L
+
+private fun SubscriptionsUiState.withTransientStateFrom(
     current: SubscriptionsUiState,
     completedEpisodeId: Int? = null
 ): SubscriptionsUiState {
@@ -315,8 +411,33 @@ private fun SubscriptionsUiState.withDownloadStateFrom(
         downloadFailure = current.downloadFailure,
         downloadingEpisodeIds = completedEpisodeId?.let {
             current.downloadingEpisodeIds - it
-        } ?: current.downloadingEpisodeIds
+        } ?: current.downloadingEpisodeIds,
+        pendingUnsubscribe = current.pendingUnsubscribe,
+        markingAllListenedPodcastIds = current.markingAllListenedPodcastIds,
+        unsubscribingPodcastIds = current.unsubscribingPodcastIds
     )
+}
+
+internal fun unsubscribeCountdownSeconds(windowSeconds: Int = UNSUBSCRIBE_WINDOW_SECONDS): List<Int> {
+    return (windowSeconds downTo 1).toList()
+}
+
+internal fun List<SubscriptionPodcastUi>.markAllListenedOptimistically(
+    podcastId: Int
+): List<SubscriptionPodcastUi> {
+    return map { podcast ->
+        if (podcast.id != podcastId) return@map podcast
+        podcast.copy(
+            unlistenedEpisodeCount = 0,
+            episodes = podcast.episodes.map { episode ->
+                if (episode.isListened) episode else episode.copy(
+                    isListened = true,
+                    downloaded = false,
+                    inPlaylist = false
+                )
+            }
+        )
+    }
 }
 
 data class SubscriptionPodcastUi(
