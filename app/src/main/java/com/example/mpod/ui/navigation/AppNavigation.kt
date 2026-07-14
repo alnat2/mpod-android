@@ -181,9 +181,7 @@ fun AppNavigation(
                             }
                         }
                     },
-                    modifier = Modifier
-                        .navigationBarsPadding()
-                        .padding(horizontal = 20.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

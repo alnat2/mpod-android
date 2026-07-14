@@ -5,13 +5,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Rule
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SubscriptionsScreenTest {
@@ -55,6 +58,40 @@ class SubscriptionsScreenTest {
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithContentDescription("Drag").assertCountEquals(0)
+    }
+
+    @Test
+    fun markAllListenedDispatchesSelectedPodcastId() {
+        var selectedPodcastId: Int? = null
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = populatedState(),
+                    onMarkAllListened = { selectedPodcastId = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Mark all listened").performClick()
+        composeRule.runOnIdle { assertEquals(1, selectedPodcastId) }
+    }
+
+    @Test
+    fun addToPlaylistDispatchesSelectedEpisodeId() {
+        var selectedEpisodeId: Int? = null
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = populatedState(),
+                    onAddEpisodeToPlaylist = { selectedEpisodeId = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithText("Add to playlist").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
     }
 
     private fun populatedState(): SubscriptionsUiState {

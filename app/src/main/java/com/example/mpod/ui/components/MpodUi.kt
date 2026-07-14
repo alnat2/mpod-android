@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -379,16 +380,17 @@ fun MpodBottomNav(
         Triple(Screen.AddPodcast, "Add podcast", R.drawable.ic_icon_3)
     )
 
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(65.dp)
-            .background(MaterialTheme.colorScheme.background),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(65.dp)
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             items.forEach { (screen, label, iconRes) ->
@@ -426,6 +428,11 @@ fun MpodBottomNav(
                 }
             }
         }
+        Spacer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+        )
     }
 }
 

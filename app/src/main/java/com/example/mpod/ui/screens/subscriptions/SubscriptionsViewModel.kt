@@ -15,6 +15,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -174,7 +177,8 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun markAllListened(podcastId: Int) {
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
-        if (podcast.unlistenedEpisodeCount == 0) return
+        val episodeIds = podcast.episodes.filterNot { it.isListened }.map { it.id }
+        if (episodeIds.isEmpty()) return
         if (podcastId in _state.value.markingAllListenedPodcastIds) return
 
         viewModelScope.launch {
@@ -184,25 +188,7 @@ class SubscriptionsViewModel @Inject constructor(
                 actionErrorMessage = null
             )
 
-            val failure = runCatching {
-                val episodes = api.getPodcastEpisodes(podcastId)
-                    .requireBody("Could not load podcast episodes.")
-                    .episodes
-                episodes.filterNot { it.isListened }.forEach { episode ->
-                    val response = api.setEpisodeListened(
-                        episode.id,
-                        EpisodeListenedRequest(isListened = true)
-                    )
-                    if (!response.isSuccessful) {
-                        throw IllegalStateException(
-                            apiErrorMessage(
-                                response.errorBody()?.string(),
-                                "Could not mark all episodes as listened."
-                            )
-                        )
-                    }
-                }
-            }.exceptionOrNull()
+            val failure = runCatching { markEpisodesListened(episodeIds) }.exceptionOrNull()
 
             _state.value = _state.value.copy(
                 markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds - podcastId
@@ -226,7 +212,10 @@ class SubscriptionsViewModel @Inject constructor(
         performEpisodeAction(
             episodeId = episodeId,
             defaultErrorMessage = "Could not add episode to playlist.",
-            invalidatePlaybackQueue = true
+            invalidatePlaybackQueue = true,
+            optimisticEpisodeUpdate = { episode ->
+                episode.copy(inPlaylist = true, isListened = false)
+            }
         ) {
             api.addToPlaylist(PlaylistAddRequest(episodeId = episodeId))
         }
@@ -236,7 +225,10 @@ class SubscriptionsViewModel @Inject constructor(
         performEpisodeAction(
             episodeId = episodeId,
             defaultErrorMessage = "Could not remove episode from playlist.",
-            invalidatePlaybackQueue = true
+            invalidatePlaybackQueue = true,
+            optimisticEpisodeUpdate = { episode ->
+                episode.copy(inPlaylist = false, downloaded = false)
+            }
         ) {
             api.removeFromPlaylist(episodeId)
         }
@@ -250,7 +242,14 @@ class SubscriptionsViewModel @Inject constructor(
             } else {
                 "Could not mark episode as unlistened."
             },
-            invalidatePlaybackQueue = isListened
+            invalidatePlaybackQueue = isListened,
+            optimisticEpisodeUpdate = { episode ->
+                episode.copy(
+                    isListened = isListened,
+                    downloaded = if (isListened) false else episode.downloaded,
+                    inPlaylist = if (isListened) false else episode.inPlaylist
+                )
+            }
         ) {
             api.setEpisodeListened(episodeId, EpisodeListenedRequest(isListened = isListened))
         }
@@ -302,10 +301,16 @@ class SubscriptionsViewModel @Inject constructor(
         episodeId: Int,
         defaultErrorMessage: String,
         invalidatePlaybackQueue: Boolean = false,
+        optimisticEpisodeUpdate: ((SubscriptionEpisodeUi) -> SubscriptionEpisodeUi)? = null,
         request: suspend () -> Response<Unit>
     ) {
+        if (episodeId in _state.value.busyEpisodeIds) return
+        val previousEpisode = _state.value.podcasts.findEpisode(episodeId)
         viewModelScope.launch {
             _state.value = _state.value.copy(
+                podcasts = optimisticEpisodeUpdate?.let { update ->
+                    _state.value.podcasts.updateEpisode(episodeId, update)
+                } ?: _state.value.podcasts,
                 busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
                 actionErrorMessage = null
             )
@@ -318,12 +323,41 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload subscriptions."
                     )
                 }
-                _state.value = nextState.withTransientStateFrom(_state.value)
+                val current = _state.value
+                _state.value = nextState.withTransientStateFrom(current).copy(
+                    busyEpisodeIds = current.busyEpisodeIds - episodeId
+                )
             } else {
                 _state.value = _state.value.copy(
+                    podcasts = previousEpisode?.let { episode ->
+                        _state.value.podcasts.replaceEpisode(episode)
+                    } ?: _state.value.podcasts,
                     busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
                     actionErrorMessage = response.errorMessage(defaultErrorMessage)
                 )
+            }
+        }
+    }
+
+    private suspend fun markEpisodesListened(episodeIds: List<Int>) {
+        episodeIds.chunked(MARK_ALL_CONCURRENCY).forEach { episodeIdBatch ->
+            coroutineScope {
+                episodeIdBatch.map { episodeId ->
+                    async {
+                        val response = api.setEpisodeListened(
+                            episodeId,
+                            EpisodeListenedRequest(isListened = true)
+                        )
+                        if (!response.isSuccessful) {
+                            throw IllegalStateException(
+                                apiErrorMessage(
+                                    response.errorBody()?.string(),
+                                    "Could not mark all episodes as listened."
+                                )
+                            )
+                        }
+                    }
+                }.awaitAll()
             }
         }
     }
@@ -445,6 +479,7 @@ data class PendingUnsubscribeUi(
 private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
 private const val UNSUBSCRIBE_WINDOW_SECONDS = 15
 private const val UNSUBSCRIBE_TICK_MS = 1_000L
+private const val MARK_ALL_CONCURRENCY = 8
 
 private fun SubscriptionsUiState.withTransientStateFrom(
     current: SubscriptionsUiState,
@@ -481,6 +516,34 @@ internal fun List<SubscriptionPodcastUi>.markAllListenedOptimistically(
             }
         )
     }
+}
+
+internal fun List<SubscriptionPodcastUi>.updateEpisode(
+    episodeId: Int,
+    update: (SubscriptionEpisodeUi) -> SubscriptionEpisodeUi
+): List<SubscriptionPodcastUi> {
+    return map { podcast ->
+        if (podcast.episodes.none { it.id == episodeId }) return@map podcast
+        val updatedEpisodes = podcast.episodes.map { episode ->
+            if (episode.id == episodeId) update(episode) else episode
+        }
+        podcast.copy(
+            episodes = updatedEpisodes,
+            unlistenedEpisodeCount = updatedEpisodes.count { !it.isListened }
+        )
+    }
+}
+
+private fun List<SubscriptionPodcastUi>.findEpisode(episodeId: Int): SubscriptionEpisodeUi? {
+    return firstNotNullOfOrNull { podcast ->
+        podcast.episodes.firstOrNull { it.id == episodeId }
+    }
+}
+
+private fun List<SubscriptionPodcastUi>.replaceEpisode(
+    episode: SubscriptionEpisodeUi
+): List<SubscriptionPodcastUi> {
+    return updateEpisode(episode.id) { episode }
 }
 
 private fun List<SubscriptionPodcastUi>.withPodcastError(

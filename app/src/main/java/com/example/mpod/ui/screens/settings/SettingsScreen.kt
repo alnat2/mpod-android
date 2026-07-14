@@ -168,26 +168,20 @@ fun SettingsScreen(
             )
 
             SettingCard(
-                title = "Theme",
-                description = "Follow the device theme or choose an app theme."
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(ThemeMode.System, ThemeMode.Light, ThemeMode.Dark).forEach { mode ->
-                        MpodButton(
-                            text = mode.name,
-                            primary = mode == themeMode,
-                            outlined = mode != themeMode,
-                            height = 36.dp,
-                            radius = 8.dp,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onThemeModeChange(mode) }
-                        )
-                    }
+                title = "Use dark theme",
+                description = "Use this option if it feels more comfortable for you.",
+                action = {
+                    MpodSwitch(
+                        checked = themeMode == ThemeMode.Dark,
+                        onCheckedChange = { useDarkTheme ->
+                            onThemeModeChange(
+                                if (useDarkTheme) ThemeMode.Dark else ThemeMode.System
+                            )
+                        },
+                        contentDescription = "Use dark theme"
+                    )
                 }
-            }
+            )
 
             SettingCard(
                 title = "Export OPML",

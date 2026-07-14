@@ -38,6 +38,26 @@ class SubscriptionDestructiveActionsTest {
         assertEquals(podcasts, podcasts.markAllListenedOptimistically(podcastId = 999))
     }
 
+    @Test
+    fun playlistOptimisticUpdateChangesOnlyTargetEpisodeAndRecountsPodcast() {
+        val target = episode(id = 1, isListened = true, inPlaylist = false)
+        val sibling = episode(id = 2, isListened = false, inPlaylist = false)
+        val otherPodcast = podcast(id = 2, episodes = listOf(episode(id = 3)))
+
+        val result = listOf(
+            podcast(id = 1, episodes = listOf(target, sibling)),
+            otherPodcast
+        ).updateEpisode(target.id) { episode ->
+            episode.copy(inPlaylist = true, isListened = false)
+        }
+
+        assertTrue(result.first().episodes.first().inPlaylist)
+        assertFalse(result.first().episodes.first().isListened)
+        assertEquals(2, result.first().unlistenedEpisodeCount)
+        assertEquals(sibling, result.first().episodes[1])
+        assertEquals(otherPodcast, result[1])
+    }
+
     private fun podcast(
         id: Int,
         episodes: List<SubscriptionEpisodeUi>
