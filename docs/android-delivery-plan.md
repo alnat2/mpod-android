@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-15
+Last updated: 2026-07-15 (Stage 1 audit)
 
 Current Android baseline: `1.0.4 (5)`, commit `d5fb07c`
 
@@ -176,7 +176,18 @@ Scope:
 - Classify findings as P0–P3 with reproduction, expected result, actual result, affected code, and missing test.
 - Mark the feature matrix with verified evidence rather than assumptions.
 
-Exit criterion: an agreed prioritized defect backlog.
+Audit result: completed on 2026-07-15 and recorded in
+[`docs/android-stage-1-audit.md`](android-stage-1-audit.md). The proposed backlog has
+no P0 items, four P1 items, four P2 items, and two P3 maintenance items.
+
+Verification evidence:
+
+- Unit tests, lint, debug APK, and Android-test APK: passed.
+- Connected Pixel 9 suite: 13/13 passed.
+- Main light-theme screens checked on the emulator against Figma.
+- Test APK `1.0.4 (5)` and system dark mode confirmed on the physical phone; a new interactive phone pass was blocked by the device lock and was not claimed as completed.
+
+Exit criterion: pending product-owner agreement on the prioritized backlog and the three decisions listed in the Stage 1 audit.
 
 ### Stage 2 — Critical functional completeness
 
