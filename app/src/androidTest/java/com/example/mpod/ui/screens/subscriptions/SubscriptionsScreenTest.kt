@@ -96,6 +96,21 @@ class SubscriptionsScreenTest {
     }
 
     @Test
+    fun showNotesOpensSelectedEpisodeNotes() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(state = populatedState())
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithText("Show notes").performClick()
+
+        composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
+        composeRule.onNodeWithText("First episode notes").assertIsDisplayed()
+    }
+
+    @Test
     fun visibilityActionChangesFromShowAllToShowUnlistened() {
         composeRule.setContent {
             MpodTheme {
@@ -165,7 +180,7 @@ class SubscriptionsScreenTest {
                     publishedAt = "2026-07-14T10:00:00Z",
                     isListened = false,
                     downloaded = false,
-                    summary = null,
+                    summary = "$episodeTitle notes",
                     inPlaylist = false
                 )
             )

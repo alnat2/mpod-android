@@ -1,7 +1,9 @@
 package com.example.mpod.ui.screens.settings
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.theme.ThemeMode
@@ -47,5 +49,19 @@ class SettingsScreenTest {
         composeRule.onNodeWithContentDescription("Use dark theme").performClick()
 
         composeRule.runOnIdle { assertEquals(ThemeMode.Light, selectedMode) }
+    }
+
+    @Test
+    fun dailyRefreshTimeOpensMaterialTimePicker() {
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(state = SettingsUiState(dailyRefreshTime = "04:00"))
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
+
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeRule.onNodeWithText("OK").assertIsDisplayed()
     }
 }

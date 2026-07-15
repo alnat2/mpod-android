@@ -60,6 +60,8 @@ data class EpisodeDto(
     @SerializedName("id") val id: Int,
     @SerializedName(value = "podcastId", alternate = ["podcast_id"]) val podcastId: Int,
     @SerializedName("title") val title: String?,
+    @SerializedName("description") val description: String?,
+    @SerializedName("showNotes") val showNotes: String?,
     @SerializedName(value = "audioUrl", alternate = ["audio_url"]) val audioUrl: String?,
     @SerializedName("duration") val duration: Double?,
     @SerializedName(value = "isListened", alternate = ["is_listened"]) val isListened: Boolean,

@@ -441,7 +441,7 @@ class SubscriptionsViewModel @Inject constructor(
             publishedAt = publishedAt,
             isListened = isListened,
             downloaded = downloaded == true,
-            summary = cleanFeedText(summary).ifBlank { null },
+            summary = subscriptionShowNotes(),
             inPlaylist = id in playlistEpisodeIds
         )
     }
@@ -456,6 +456,12 @@ class SubscriptionsViewModel @Inject constructor(
     private fun Response<*>?.errorMessage(defaultMessage: String): String {
         return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
     }
+}
+
+internal fun EpisodeDto.subscriptionShowNotes(): String? {
+    return sequenceOf(showNotes, description, summary)
+        .firstOrNull { !it.isNullOrBlank() }
+        ?.trim()
 }
 
 data class SubscriptionsUiState(

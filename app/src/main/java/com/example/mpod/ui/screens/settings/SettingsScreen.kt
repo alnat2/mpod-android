@@ -1,8 +1,10 @@
 package com.example.mpod.ui.screens.settings
 
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,6 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.mpod.ui.components.MpodButton
-import com.example.mpod.ui.components.MpodInput
 import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
@@ -73,6 +82,7 @@ fun SettingsRoute(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
@@ -84,6 +94,8 @@ fun SettingsScreen(
     onLogout: () -> Unit = {}
 ) {
     var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
@@ -135,9 +147,10 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        MpodInput(
+                        DailyRefreshTimeField(
                             value = feedRefreshTime,
-                            onValueChange = { feedRefreshTime = it },
+                            enabled = !state.isSavingRefreshTime && !state.isLoading,
+                            onClick = { showTimePicker = true },
                             modifier = Modifier.weight(1f)
                         )
                         SettingsPrimaryButton(
@@ -225,6 +238,81 @@ fun SettingsScreen(
             )
         }
     }
+
+    if (showTimePicker) {
+        val initialTime = parseDailyRefreshTime(feedRefreshTime)
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialTime.first,
+            initialMinute = initialTime.second,
+            is24Hour = DateFormat.is24HourFormat(context)
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        feedRefreshTime = formatDailyRefreshTime(
+                            hour = timePickerState.hour,
+                            minute = timePickerState.minute
+                        )
+                        showTimePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
+    }
+}
+
+@Composable
+private fun DailyRefreshTimeField(
+    value: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = "Daily refresh time" }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    }
+}
+
+internal fun parseDailyRefreshTime(value: String): Pair<Int, Int> {
+    val parts = value.split(':')
+    val hour = parts.getOrNull(0)?.toIntOrNull()
+    val minute = parts.getOrNull(1)?.toIntOrNull()
+    return if (parts.size == 2 && hour in 0..23 && minute in 0..59) {
+        requireNotNull(hour) to requireNotNull(minute)
+    } else {
+        3 to 0
+    }
+}
+
+internal fun formatDailyRefreshTime(hour: Int, minute: Int): String {
+    return "%02d:%02d".format(hour, minute)
 }
 
 @Composable
