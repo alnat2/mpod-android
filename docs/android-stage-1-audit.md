@@ -4,7 +4,7 @@ Audit date: 2026-07-15
 
 Audited baseline: `1.0.4 (5)`, commit `d5fb07c`
 
-Status: audit complete; backlog awaits product-owner agreement
+Status: completed and accepted by the product owner on 2026-07-15
 
 ## Executive result
 
@@ -111,7 +111,7 @@ Affected code: `AppLaunchViewModel.kt:35-44` and `84-91`.
 
 Missing test: valid-cookie + offline startup, 401 versus timeout, logout 200 versus timeout/500, reconnect, and expired-session scenarios.
 
-Required product decision before implementation: wording and interaction for the unavailable-backend state.
+Confirmed decision: show a dedicated unavailable-backend state with a `Retry` action. Do not substitute cached read-only content for this state in the current scope.
 
 ### A-03 — P1 — Session cookie is eligible for Android backup/transfer
 
@@ -174,7 +174,7 @@ Affected code: `SubscriptionsViewModel.kt:186-216` and `350-370`.
 
 Missing test: mixed success/failure batches, queue state after partial completion, and retry.
 
-Required backend decision: add one batch/transaction endpoint, or explicitly accept partial semantics and define the response.
+Confirmed decision: add one atomic backend operation. It must mark all applicable podcast episodes listened in one transaction, apply the related playlist/active-playback lifecycle rules, and leave the operation unapplied if it fails.
 
 ### A-07 — P2 — OPML import reads the whole selected file into memory without a limit
 
@@ -191,7 +191,7 @@ Affected code: `AddPodcastViewModel.kt:62-98`.
 
 Missing test: maximum accepted size, over-limit rejection, provider read failure, cancellation, and streaming upload.
 
-Required product/backend decision: maximum OPML upload size.
+Confirmed decision: Android and backend must both enforce a 5 MB (`5,000,000` bytes) OPML limit and return a clear over-limit error.
 
 ### A-08 — P2 — No CI enforces the existing test gate
 
@@ -246,12 +246,12 @@ These items remain Stage 6 work unless the product owner changes their priority.
 6. Stage 3: A-07 input hardening, A-08 CI, and the complete critical regression matrix.
 7. Opportunistic cleanup: A-09 and A-10 only when adjacent code is changed.
 
-## Decisions needed to accept this backlog
+## Accepted implementation decisions
 
-Only three new answers are required before the affected fixes begin:
+The product owner accepted the prioritized backlog and confirmed:
 
-1. What should the unavailable-backend screen say and offer at cold start: a dedicated Retry state, or cached read-only content plus Retry?
-2. Should Mark all listened become one atomic backend endpoint, or are explicitly reported partial results acceptable?
-3. What maximum OPML file size should Android and backend accept?
+1. An unavailable backend uses a dedicated state with a `Retry` action.
+2. Mark all listened becomes one atomic backend operation, not a client-side set of partially successful episode requests.
+3. OPML import is limited to 5 MB on both Android and backend.
 
-All other items can proceed from existing confirmed decisions after the product owner accepts the priorities.
+Stage 1 is complete. Stage 2 must not start without a separate product-owner instruction.

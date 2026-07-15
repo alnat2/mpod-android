@@ -176,8 +176,8 @@ Scope:
 - Classify findings as P0–P3 with reproduction, expected result, actual result, affected code, and missing test.
 - Mark the feature matrix with verified evidence rather than assumptions.
 
-Audit result: completed on 2026-07-15 and recorded in
-[`docs/android-stage-1-audit.md`](android-stage-1-audit.md). The proposed backlog has
+Audit result: completed and accepted by the product owner on 2026-07-15 and recorded in
+[`docs/android-stage-1-audit.md`](android-stage-1-audit.md). The accepted backlog has
 no P0 items, four P1 items, four P2 items, and two P3 maintenance items.
 
 Verification evidence:
@@ -187,7 +187,13 @@ Verification evidence:
 - Main light-theme screens checked on the emulator against Figma.
 - Test APK `1.0.4 (5)` and system dark mode confirmed on the physical phone; a new interactive phone pass was blocked by the device lock and was not claimed as completed.
 
-Exit criterion: pending product-owner agreement on the prioritized backlog and the three decisions listed in the Stage 1 audit.
+Confirmed implementation decisions:
+
+- Backend unavailable: dedicated state with a `Retry` action.
+- Mark all listened: one atomic backend operation with playlist/active-playback lifecycle handling.
+- OPML import: 5 MB (`5,000,000` bytes) maximum enforced by both Android and backend.
+
+Exit criterion: completed — the product owner accepted the prioritized backlog and the required implementation decisions on 2026-07-15.
 
 ### Stage 2 — Critical functional completeness
 
