@@ -6,19 +6,19 @@ Current Android baseline: `1.0.4 (5)`, commit `d5fb07c`
 
 ## Purpose
 
-This is the living delivery document for the native Android application. It is the single place to track scope, implementation status, verification, acceptance, defects, and release readiness.
+This is the living delivery document for the native Android application. It is the only Android-specific source of truth for scope, decisions, implementation status, verification, acceptance, defects, and release readiness.
 
 The document must be updated in the same commit as any change that alters a tracked status. A feature is not considered complete merely because its UI exists.
 
 ## Sources of truth
 
-Use sources in this order:
+New decisions made in chat must be incorporated here in the same documentation stage. Use sources in this order:
 
 1. Explicit decisions confirmed by the product owner in the Android project chat.
-2. The Android Figma screens and mobile components.
-3. Parent-project product and API documentation under `/Users/cross/Documents/mpod`.
-4. The actual backend contract and behavior.
-5. This document and Android-specific decisions.
+2. This living Android plan after it has been updated with those decisions.
+3. The Android Figma screens and mobile components.
+4. Parent-project product and API documentation under `/Users/cross/Documents/mpod` for shared product/backend behavior.
+5. The actual backend contract and behavior.
 
 If the sources disagree or required information is absent, stop and ask. Do not invent product behavior.
 
@@ -38,6 +38,8 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Primary navigation | Home, Subscriptions, Settings, Add podcast |
 | Theme | Follow the system by default; Settings exposes the approved Light/Dark switch behavior |
 | Active episode | Stored by the backend and restored without autoplay |
+| Mark all listened | Executes immediately, without a confirmation dialog |
+| Subscription episode playback | No separate Play action exists for episodes outside the playlist |
 | Design | Android screens and mobile components in the mpod Figma file |
 
 Figma references:
@@ -60,7 +62,7 @@ Statuses are evidence-based. `Implemented` must never be used as a synonym for `
 
 ## Current product baseline
 
-The current build is a working test baseline, not a release candidate.
+The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-15. This accepts the starting point for further work; it does not make the build a release candidate or automatically mark every individual feature as release-verified.
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
@@ -77,7 +79,7 @@ The current build is a working test baseline, not a release candidate.
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum and real failed-image case | Success/loading/cache matrix across multiple hosts |
 | Episode playlist actions | Implemented | Add/remove callbacks and backend paths exist | Full success/failure reconciliation instrumentation |
 | Show notes | Verified | Backend contract tests, UI test, real Planet Money notes and scrolling | Link handling decision and accessibility review |
-| Mark all listened | Implemented | Unit/UI dispatch coverage and real fix from prior stage | Product decision about confirmation; partial-failure integration coverage |
+| Mark all listened | Implemented | Unit/UI dispatch coverage and real fix from prior stage; immediate execution confirmed | Partial-failure integration coverage |
 | Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
 | Podcast unsubscribe/undo | Implemented | Countdown and optimistic-state unit coverage | End-to-end 15-second commit/cancel and process/lifecycle behavior |
 | Add RSS feed | Implemented | Real success/duplicate checks from earlier stage | Automated UI/API integration and malformed-feed cases |
@@ -87,20 +89,6 @@ The current build is a working test baseline, not a release candidate.
 | Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
 | Logout | Implemented | Backend call and playback service stop exist | Expired-cookie and failure-path instrumentation |
 | Empty/loading/error states | Implemented | States exist across main screens | Complete screenshot and interaction matrix |
-
-## Confirmed implementation gap
-
-The following is a code-confirmed functional gap and must enter the first implementation backlog after the audit:
-
-- `Play` in an episode menu on Subscriptions currently dispatches to `Unit`, so it performs no action. The intended playlist/active-playback behavior must be confirmed before implementation.
-
-## Documentation conflicts to resolve
-
-- `docs/android-product-decisions.md` says the backend address can be modified in Settings. The approved current behavior is a hardcoded address; the Settings UI no longer exposes it.
-- `docs/android-product-decisions.md` requires a confirmation dialog for `Mark all listened`, while the current Android behavior executes immediately. This requires an explicit product decision.
-- `TODO.md` still says placeholder podcast artwork must be replaced, but the app now loads remote artwork and uses the exact approved fallback on missing/error states.
-
-These files must be reconciled only after the product decisions above are confirmed.
 
 ## Test baseline
 
@@ -127,6 +115,19 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 - Process death, rotation, background/foreground, expired session, offline recovery, slow network, and timeout scenarios are not systematically covered.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
 - The physical-phone pass is manual and does not yet use a written repeatable release checklist.
+
+## Risk-based regression policy
+
+Quality checks should be proportional to regression risk so accepted work is not repeatedly re-tested without reason.
+
+- Always run the complete unit, lint, and build suite for code changes.
+- Run connected UI tests affected by the change; run the complete connected suite before an APK handoff, stage acceptance, or release candidate.
+- Deeply re-test every changed flow and its direct dependencies, including backend state transitions.
+- Always re-test P0/P1 paths affected by shared navigation, authentication, networking, persistence, playback, theme, or reusable UI components.
+- Keep already accepted, unchanged, low-risk flows on a short smoke checklist instead of repeating their full manual matrix.
+- Re-open a previously accepted flow only when a dependency changed, an automated test failed, a regression was reported, or release-candidate validation requires it.
+- Use the emulator for repeatable UI and lifecycle checks. Use the physical phone only for device-sensitive behavior, final stage acceptance, and release checks.
+- Record reused evidence and the reason a full manual re-test was not required; never claim a scenario was re-tested when it was only inherited from the accepted baseline.
 
 ## Definition of done for every feature
 
@@ -160,7 +161,7 @@ Deliverables:
 - Prioritized stage sequence.
 - Explicit documentation conflicts and unanswered decisions.
 
-Exit criterion: the product owner accepts this plan structure.
+Exit criterion: completed — the product owner accepted the plan structure and `1.0.4 (5)` baseline on 2026-07-15.
 
 ### Stage 1 — Full audit and defect backlog
 
@@ -171,7 +172,7 @@ Scope:
 - Compare every Android screen and state with Figma.
 - Trace every visible action to ViewModel/API/service behavior.
 - Check parent API documentation against Android DTOs and calls.
-- Execute the critical manual test matrix on emulator and phone.
+- Apply the risk-based regression policy: deep-check unknown, changed, shared, and P0/P1 paths; use smoke checks for accepted unchanged flows.
 - Classify findings as P0–P3 with reproduction, expected result, actual result, affected code, and missing test.
 - Mark the feature matrix with verified evidence rather than assumptions.
 
@@ -183,7 +184,6 @@ Goal: eliminate agreed P0/P1 functional defects.
 
 Expected focus, subject to the Stage 1 backlog:
 
-- Subscription episode Play behavior after product confirmation.
 - Playback lifecycle and backend synchronization.
 - Destructive action and download/file-lifecycle correctness.
 - Auth/session failure recovery.
@@ -273,13 +273,9 @@ Exit criterion: explicit approval to treat the APK as the production release.
 | P2 | Important defect with a reasonable workaround, major visual mismatch, or missing non-critical coverage |
 | P3 | Polish, minor inconsistency, low-risk technical debt, or deferred enhancement |
 
-## Questions requiring product-owner decisions
+## Deferred product-owner input
 
-These questions must be answered before implementing the affected behavior:
-
-1. When `Play` is selected for an episode in Subscriptions that is not in the playlist, should Android add it to the playlist and start playback, or is another behavior required?
-2. Should `Mark all listened` execute immediately, or show the confirmation dialog currently described in Android product decisions?
-3. Release signing details are intentionally deferred until Stage 6; they will be requested when a pre-release is approved.
+There are no unanswered product questions blocking Stage 1. Release signing details are intentionally deferred and will be requested only when Stage 6 begins.
 
 ## Stage report template
 
