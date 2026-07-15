@@ -174,7 +174,24 @@ Affected code: `SubscriptionsViewModel.kt:186-216` and `350-370`.
 
 Missing test: mixed success/failure batches, queue state after partial completion, and retry.
 
-Confirmed decision: add one atomic backend operation. It must mark all applicable podcast episodes listened in one transaction, apply the related playlist/active-playback lifecycle rules, and leave the operation unapplied if it fails.
+Confirmed backend contract:
+
+- `POST /api/podcasts/{podcastId}/mark-all-listened` owns the operation.
+- One SQLite transaction updates `episodes.is_listened`, playlist state, `active_playback`, and `downloaded_path` for the podcast.
+- `markedEpisodes` counts only episodes that actually changed from unlistened to listened.
+- Repeating the request is safe and returns `markedEpisodes: 0`, while still reconciling playlist and active-playback state.
+- Database and filesystem changes are not described as one atomic transaction. Files follow the existing lifecycle rules. A critical deletion failure before the DB commit fails the operation without applying DB changes. A deletion failure after the DB commit may leave a disposable orphan file for reconcile/cleanup; it must not leave partially applied DB state.
+- A missing podcast returns the standard `PODCAST_NOT_FOUND` error.
+- Backend delivery includes updating parent `docs/product-decisions.md`; Android delivery includes keeping this contract and its DTO/error handling in sync.
+
+Success response:
+
+```json
+{
+  "success": true,
+  "markedEpisodes": 12
+}
+```
 
 ### A-07 — P2 — OPML import reads the whole selected file into memory without a limit
 
@@ -191,7 +208,16 @@ Affected code: `AddPodcastViewModel.kt:62-98`.
 
 Missing test: maximum accepted size, over-limit rejection, provider read failure, cancellation, and streaming upload.
 
-Confirmed decision: Android and backend must both enforce a 5 MB (`5,000,000` bytes) OPML limit and return a clear over-limit error.
+Confirmed decision: Android and backend must both enforce a 5 MB (`5,000,000` bytes) OPML limit. Backend rejects an oversized multipart request before parsing it and returns HTTP `413 Request Entity Too Large` with the standard error body:
+
+```json
+{
+  "error": {
+    "code": "OPML_TOO_LARGE",
+    "message": "OPML file is too large"
+  }
+}
+```
 
 ### A-08 — P2 — No CI enforces the existing test gate
 
@@ -251,7 +277,7 @@ These items remain Stage 6 work unless the product owner changes their priority.
 The product owner accepted the prioritized backlog and confirmed:
 
 1. An unavailable backend uses a dedicated state with a `Retry` action.
-2. Mark all listened becomes one atomic backend operation, not a client-side set of partially successful episode requests.
-3. OPML import is limited to 5 MB on both Android and backend.
+2. Mark all listened uses the accepted backend-owned contract above, with an atomic DB transaction and explicitly non-atomic filesystem cleanup.
+3. OPML import is limited to 5 MB on both Android and backend, with the accepted `OPML_TOO_LARGE` error contract.
 
 Stage 1 is complete. Stage 2 must not start without a separate product-owner instruction.

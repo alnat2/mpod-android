@@ -190,8 +190,8 @@ Verification evidence:
 Confirmed implementation decisions:
 
 - Backend unavailable: dedicated state with a `Retry` action.
-- Mark all listened: one atomic backend operation with playlist/active-playback lifecycle handling.
-- OPML import: 5 MB (`5,000,000` bytes) maximum enforced by both Android and backend.
+- Mark all listened: backend-owned `POST /api/podcasts/{podcastId}/mark-all-listened`; atomic DB updates, idempotent `markedEpisodes` response, and explicitly separate filesystem cleanup/reconcile semantics.
+- OPML import: 5 MB (`5,000,000` bytes) maximum enforced by both Android and backend; oversized requests return HTTP 413 with `OPML_TOO_LARGE`.
 
 Exit criterion: completed — the product owner accepted the prioritized backlog and the required implementation decisions on 2026-07-15.
 
