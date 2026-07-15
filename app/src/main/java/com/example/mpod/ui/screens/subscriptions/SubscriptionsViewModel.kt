@@ -7,6 +7,7 @@ import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PodcastDto
+import com.example.mpod.data.network.model.SchedulerStatusDto
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.apiErrorMessage
@@ -67,12 +68,21 @@ class SubscriptionsViewModel @Inject constructor(
             try {
                 val response = runCatching { api.refreshAllPodcasts() }.getOrNull()
                 if (response?.isSuccessful == true) {
-                    val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
-                        _state.value.copy(
-                            actionErrorMessage = error.message ?: "Could not reload subscriptions."
-                        )
+                    when (val completion = awaitRefreshAllCompletion()) {
+                        RefreshAllCompletion.Completed -> {
+                            val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                                _state.value.copy(
+                                    actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                                )
+                            }
+                            _state.value = nextState.withTransientStateFrom(_state.value)
+                        }
+                        is RefreshAllCompletion.Failed -> {
+                            _state.value = _state.value.copy(
+                                actionErrorMessage = completion.message
+                            )
+                        }
                     }
-                    _state.value = nextState.withTransientStateFrom(_state.value)
                 } else {
                     _state.value = _state.value.copy(
                         actionErrorMessage = response.errorMessage("Could not refresh subscriptions.")
@@ -82,6 +92,15 @@ class SubscriptionsViewModel @Inject constructor(
                 _state.value = _state.value.copy(isRefreshingAll = false)
             }
         }
+    }
+
+    private suspend fun awaitRefreshAllCompletion(): RefreshAllCompletion {
+        return awaitRefreshAllCompletion(
+            loadStatus = {
+                val response = api.getJobsStatus()
+                response.takeIf { it.isSuccessful }?.body()?.scheduler
+            }
+        )
     }
 
     fun refreshPodcast(podcastId: Int) {
@@ -494,6 +513,31 @@ private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
 private const val UNSUBSCRIBE_WINDOW_SECONDS = 15
 private const val UNSUBSCRIBE_TICK_MS = 1_000L
 private const val MARK_ALL_CONCURRENCY = 8
+private const val REFRESH_ALL_STATUS_POLL_MS = 3_000L
+
+internal sealed interface RefreshAllCompletion {
+    data object Completed : RefreshAllCompletion
+    data class Failed(val message: String) : RefreshAllCompletion
+}
+
+internal suspend fun awaitRefreshAllCompletion(
+    pollIntervalMs: Long = REFRESH_ALL_STATUS_POLL_MS,
+    loadStatus: suspend () -> SchedulerStatusDto?
+): RefreshAllCompletion {
+    while (true) {
+        delay(pollIntervalMs)
+        val scheduler = runCatching { loadStatus() }.getOrNull() ?: continue
+        when (scheduler.state?.lowercase()) {
+            "running" -> Unit
+            "completed", "idle" -> return RefreshAllCompletion.Completed
+            "failed" -> return RefreshAllCompletion.Failed(
+                scheduler.lastError?.takeIf { it.isNotBlank() }
+                    ?: "Failed to refresh podcasts."
+            )
+            else -> return RefreshAllCompletion.Failed("Backend returned an unknown refresh status.")
+        }
+    }
+}
 
 private fun SubscriptionsUiState.withTransientStateFrom(
     current: SubscriptionsUiState,

@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-15 (Stage 1 audit)
+Last updated: 2026-07-15 (Stage 2.1)
 
-Current Android baseline: `1.0.4 (5)`, commit `d5fb07c`
+Current Android baseline: `1.0.5 (6)`, Stage 2.1 scoped commit
 
 ## Purpose
 
@@ -75,7 +75,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Queue reorder | Implemented | Pure reorder unit tests and manual checks | Backend failure rollback and gesture instrumentation |
 | Playback speed | Implemented | Backend persistence code and manual checks | Automated persistence and restoration test |
 | Subscriptions carousel/filter | Verified | Compose UI tests and real backend checks | Rotation/process-recreation behavior |
-| Refresh one/all | Verified | Real HTTP `200` checks, UI state tests, animation checked | Failure, timeout, overlapping-request and scheduler-running scenarios |
+| Refresh one/all | Verified | Refresh-all accepted/running/completed flow checked on the real test backend; polling unit tests and UI state tests; per-podcast real checks from accepted baseline | Real backend failed-job scenario and long-running/stuck-job policy |
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum and real failed-image case | Success/loading/cache matrix across multiple hosts |
 | Episode playlist actions | Implemented | Add/remove callbacks and backend paths exist | Full success/failure reconciliation instrumentation |
 | Show notes | Verified | Backend contract tests, UI test, real Planet Money notes and scrolling | Link handling decision and accessibility review |
@@ -94,7 +94,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 42 local unit tests.
+- 47 local unit tests.
 - 13 connected Android/Compose UI tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
@@ -207,6 +207,12 @@ Expected focus, subject to the Stage 1 backlog:
 - Data-contract mismatches and state reconciliation.
 
 Exit criterion: no open P0/P1 functional defects in the agreed MVP scope.
+
+Progress:
+
+- Stage 2.1 completed in test build `1.0.5 (6)`: A-01 Refresh all now polls `GET /api/jobs/status` every three seconds, keeps the refreshing state active through the backend job, reloads subscriptions only after completion, and displays backend `lastError` on failure. Temporary status-request failures are retried, matching the established web behavior.
+- Evidence: 47 unit tests, lint/build gate, 13/13 connected Pixel 9 tests, real test-backend `running → completed` check, empty crash log, and installation on the physical phone.
+- Remaining Stage 2 work must not start until the product owner accepts Stage 2.1.
 
 ### Stage 3 — Automated regression coverage
 

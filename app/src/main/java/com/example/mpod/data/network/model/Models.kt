@@ -160,7 +160,8 @@ data class SchedulerStatusDto(
     @SerializedName("state") val state: String?,
     @SerializedName("lastRunAt") val lastRunAt: String?,
     @SerializedName("lastSuccessAt") val lastSuccessAt: String?,
-    @SerializedName("lastFailureAt") val lastFailureAt: String?
+    @SerializedName("lastFailureAt") val lastFailureAt: String?,
+    @SerializedName("lastError") val lastError: String?
 )
 
 data class ProxyStatusResponse(

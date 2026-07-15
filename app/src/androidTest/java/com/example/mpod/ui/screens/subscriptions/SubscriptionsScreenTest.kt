@@ -1,6 +1,7 @@
 package com.example.mpod.ui.screens.subscriptions
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -133,6 +134,7 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithText("Refreshing").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Refresh").assertHasNoClickAction()
     }
 
     @Test

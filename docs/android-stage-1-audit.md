@@ -82,6 +82,8 @@ No new blocking Figma mismatch was proven in Stage 1. Accessibility and exhausti
 
 ### A-01 — P1 — Refresh all finishes before the backend refresh job
 
+Status: resolved and verified in Android `1.0.5 (6)` on 2026-07-15.
+
 Reproduction:
 
 1. Open Subscriptions and press the refresh-all header action.
