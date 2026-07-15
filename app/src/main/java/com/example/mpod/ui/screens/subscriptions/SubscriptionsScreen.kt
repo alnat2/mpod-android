@@ -180,7 +180,9 @@ fun SubscriptionsScreen(
                         subtitle = podcastCountLabel(state.podcasts.size),
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
+                        isRefreshing = state.isRefreshingAll,
                         viewActionDescription = "Show all",
+                        viewIconRes = visibilityIconRes(SubscriptionVisibility.Unlistened),
                         onViewClick = toggleVisibility
                     )
                     AllCaughtUpState(
@@ -200,11 +202,13 @@ fun SubscriptionsScreen(
                         },
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
+                        isRefreshing = state.isRefreshingAll,
                         viewActionDescription = if (visibility == SubscriptionVisibility.All) {
                             "Show unlistened"
                         } else {
                             "Show all"
                         },
+                        viewIconRes = visibilityIconRes(visibility),
                         onViewClick = toggleVisibility
                     )
 
@@ -227,7 +231,7 @@ fun SubscriptionsScreen(
                             imageUrl = podcast.imageUrl,
                             selected = it == pagerState.currentPage,
                             onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
-                            isRefreshing = podcast.id in state.refreshingPodcastIds,
+                            isRefreshing = state.isRefreshingAll || podcast.id in state.refreshingPodcastIds,
                             isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
                             isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
                             unsubscribeEnabled = state.pendingUnsubscribe == null,
@@ -552,6 +556,14 @@ private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {
 internal enum class SubscriptionVisibility {
     Unlistened,
     All
+}
+
+internal fun visibilityIconRes(visibility: SubscriptionVisibility): Int {
+    return if (visibility == SubscriptionVisibility.All) {
+        R.drawable.ic_view_off
+    } else {
+        R.drawable.ic_view
+    }
 }
 
 internal fun List<SubscriptionPodcastUi>.visibleFor(

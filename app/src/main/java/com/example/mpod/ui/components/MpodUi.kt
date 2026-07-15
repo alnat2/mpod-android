@@ -1,5 +1,10 @@
 package com.example.mpod.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,11 +33,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -57,7 +64,9 @@ fun PageHeader(
     subtitle: String? = null,
     showActions: Boolean = false,
     onRefreshClick: (() -> Unit)? = null,
+    isRefreshing: Boolean = false,
     viewActionDescription: String = "View",
+    viewIconRes: Int = R.drawable.ic_view,
     onViewClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -95,13 +104,14 @@ fun PageHeader(
                 SquareIconButton(
                     iconRes = R.drawable.ic_refresh_dot,
                     contentDescription = "Refresh",
+                    iconRotating = isRefreshing,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     elevation = 0.dp,
                     onClick = onRefreshClick
                 )
                 SquareIconButton(
-                    iconRes = R.drawable.ic_view,
+                    iconRes = viewIconRes,
                     contentDescription = viewActionDescription,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -122,11 +132,13 @@ fun SquareIconButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     size: Dp = 40.dp,
     iconSize: Dp = 16.dp,
+    iconRotating: Boolean = false,
     radius: Dp = 8.dp,
     border: BorderStroke? = null,
     elevation: Dp = 1.dp,
     onClick: (() -> Unit)? = null
 ) {
+    val iconRotation = rotatingIconDegrees(iconRotating)
     val clickModifier = if (onClick == null) {
         Modifier
     } else {
@@ -149,7 +161,9 @@ fun SquareIconButton(
         Icon(
             painter = painterResource(id = iconRes),
             contentDescription = contentDescription,
-            modifier = Modifier.size(iconSize),
+            modifier = Modifier
+                .size(iconSize)
+                .rotate(iconRotation),
             tint = contentColor
         )
     }
@@ -164,12 +178,14 @@ fun MpodButton(
     height: Dp = 32.dp,
     radius: Dp = 8.dp,
     iconRes: Int? = null,
+    iconRotating: Boolean = false,
     containerColor: Color? = null,
     contentColor: Color? = null,
     elevation: Dp = 1.dp,
     enabled: Boolean = true,
     onClick: () -> Unit = {}
 ) {
+    val iconRotation = rotatingIconDegrees(iconRotating)
     val background = containerColor ?: if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val foreground = contentColor ?: if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
     Box(
@@ -192,7 +208,9 @@ fun MpodButton(
                 Icon(
                     painter = painterResource(id = iconRes),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(iconRotation),
                     tint = foreground
                 )
             }
@@ -208,6 +226,21 @@ fun MpodButton(
             )
         }
     }
+}
+
+@Composable
+private fun rotatingIconDegrees(rotating: Boolean): Float {
+    if (!rotating) return 0f
+    val transition = rememberInfiniteTransition(label = "refresh_icon_rotation")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing)
+        ),
+        label = "refresh_icon_degrees"
+    )
+    return rotation
 }
 
 @Composable

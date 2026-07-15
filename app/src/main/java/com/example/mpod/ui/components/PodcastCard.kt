@@ -3,6 +3,7 @@ package com.example.mpod.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,10 +11,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -137,6 +142,7 @@ fun PodcastCard(
                 primary = false,
                 outlined = true,
                 iconRes = R.drawable.ic_refresh_dot,
+                iconRotating = isRefreshing,
                 containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
                 height = 32.dp,
@@ -168,6 +174,7 @@ private fun PodcastArtwork(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var imageLoaded by remember(imageUrl) { mutableStateOf(false) }
     val imageRequest = remember(context, imageUrl) {
         imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
             ImageRequest.Builder(context)
@@ -186,28 +193,32 @@ private fun PodcastArtwork(
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center
     ) {
-        PodcastArtworkFallback()
+        if (!imageLoaded) {
+            PodcastArtworkFallback(title = title)
+        }
         if (imageRequest != null) {
             AsyncImage(
                 model = imageRequest,
-                contentDescription = "$title cover",
+                contentDescription = if (imageLoaded) "$title cover" else null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                onLoading = { imageLoaded = false },
+                onSuccess = { imageLoaded = true },
+                onError = { imageLoaded = false },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(if (imageLoaded) 1f else 0f)
             )
         }
     }
 }
 
 @Composable
-private fun PodcastArtworkFallback() {
-    Text(
-        text = "THE\nREAL\nTALK",
-        fontSize = 12.sp,
-        lineHeight = 14.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onPrimary,
-        maxLines = 3,
-        modifier = Modifier.padding(8.dp)
+private fun PodcastArtworkFallback(title: String) {
+    Image(
+        painter = painterResource(R.drawable.podcast_fallback),
+        contentDescription = "$title fallback cover",
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.fillMaxSize()
     )
 }
 

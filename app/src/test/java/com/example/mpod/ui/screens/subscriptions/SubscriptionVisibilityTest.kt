@@ -1,10 +1,17 @@
 package com.example.mpod.ui.screens.subscriptions
 
+import com.example.mpod.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
 class SubscriptionVisibilityTest {
+    @Test
+    fun visibilityModeUsesMatchingViewIcon() {
+        assertEquals(R.drawable.ic_view, visibilityIconRes(SubscriptionVisibility.Unlistened))
+        assertEquals(R.drawable.ic_view_off, visibilityIconRes(SubscriptionVisibility.All))
+    }
+
     @Test
     fun unlistenedVisibilityHidesCaughtUpPodcastsAndListenedEpisodes() {
         val activePodcast = podcast(

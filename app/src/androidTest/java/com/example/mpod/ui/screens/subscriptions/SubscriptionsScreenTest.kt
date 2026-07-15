@@ -30,6 +30,7 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithText("First episode").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("First podcast fallback cover").assertIsDisplayed()
 
         composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
         composeRule.waitForIdle()
@@ -92,6 +93,47 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithText("Add to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
+    }
+
+    @Test
+    fun visibilityActionChangesFromShowAllToShowUnlistened() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(state = populatedState())
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Show all").performClick()
+        composeRule.onNodeWithContentDescription("Show unlistened").assertIsDisplayed()
+    }
+
+    @Test
+    fun globalRefreshShowsRefreshingStateOnPodcastCard() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = populatedState().copy(isRefreshingAll = true)
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Refreshing").assertIsDisplayed()
+    }
+
+    @Test
+    fun podcastRefreshShowsRefreshingStateOnlyForSelectedPodcast() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = populatedState().copy(refreshingPodcastIds = setOf(1))
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Refreshing").assertIsDisplayed()
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Refresh").assertIsDisplayed()
     }
 
     private fun populatedState(): SubscriptionsUiState {

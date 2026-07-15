@@ -61,47 +61,55 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     fun refreshAll() {
+        if (_state.value.isRefreshingAll || _state.value.refreshingPodcastIds.isNotEmpty()) return
         viewModelScope.launch {
             _state.value = _state.value.copy(isRefreshingAll = true, actionErrorMessage = null)
-            val response = runCatching { api.refreshAllPodcasts() }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
-                    _state.value.copy(
-                        isRefreshingAll = false,
-                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+            try {
+                val response = runCatching { api.refreshAllPodcasts() }.getOrNull()
+                if (response?.isSuccessful == true) {
+                    val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                        _state.value.copy(
+                            actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                        )
+                    }
+                    _state.value = nextState.withTransientStateFrom(_state.value)
+                } else {
+                    _state.value = _state.value.copy(
+                        actionErrorMessage = response.errorMessage("Could not refresh subscriptions.")
                     )
                 }
-                _state.value = nextState.withTransientStateFrom(_state.value)
-            } else {
-                _state.value = _state.value.copy(
-                    isRefreshingAll = false,
-                    actionErrorMessage = response.errorMessage("Could not refresh subscriptions.")
-                )
+            } finally {
+                _state.value = _state.value.copy(isRefreshingAll = false)
             }
         }
     }
 
     fun refreshPodcast(podcastId: Int) {
+        if (_state.value.isRefreshingAll || podcastId in _state.value.refreshingPodcastIds) return
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
                 actionErrorMessage = null
             )
-            val response = runCatching { api.refreshPodcast(podcastId) }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
-                    _state.value.copy(
-                        refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
-                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
+            try {
+                val response = runCatching { api.refreshPodcast(podcastId) }.getOrNull()
+                if (response?.isSuccessful == true) {
+                    val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
+                        _state.value.copy(
+                            actionErrorMessage = error.message ?: "Could not reload subscriptions."
+                        )
+                    }
+                    _state.value = nextState.withTransientStateFrom(_state.value)
+                } else {
+                    val message = response.errorMessage("Could not refresh this podcast.")
+                    _state.value = _state.value.copy(
+                        actionErrorMessage = message,
+                        podcasts = _state.value.podcasts.withPodcastError(podcastId, message)
                     )
                 }
-                _state.value = nextState.withTransientStateFrom(_state.value)
-            } else {
-                val message = response.errorMessage("Could not refresh this podcast.")
+            } finally {
                 _state.value = _state.value.copy(
-                    refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId,
-                    actionErrorMessage = message,
-                    podcasts = _state.value.podcasts.withPodcastError(podcastId, message)
+                    refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId
                 )
             }
         }
