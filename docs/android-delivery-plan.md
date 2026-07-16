@@ -70,7 +70,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 |---|---|---|---|
 | Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery exercised on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
 | Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
-| Initial setup and login | Implemented | Connected to real backend and manually exercised | Dedicated UI and API integration matrix, validation and error-state acceptance |
+| Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
 | Playback service | Verified | Queue reconciliation and durable-mutation unit tests; Pixel 9 offline seek/active/speed recovery across process stop | Expanded Media3 interruption, completion/auto-next, audio-network-loss, and OS process-death matrix |
@@ -78,19 +78,19 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Queue reorder | Implemented | Pure reorder unit tests and manual checks | Backend failure rollback and gesture instrumentation |
 | Playback speed | Verified | Durable backend sync tests plus Pixel 9 offline/process-stop/reconnect restoration to 2.0x | Cross-device conflict and full speed-option matrix |
 | Subscriptions carousel/filter | Verified | Compose UI tests and real backend checks | Rotation/process-recreation behavior |
-| Refresh one/all | Verified | Refresh-all accepted/running/completed flow checked on the real test backend; polling unit tests and UI state tests; per-podcast real checks from accepted baseline | Real backend failed-job scenario and long-running/stuck-job policy |
-| Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum and real failed-image case | Success/loading/cache matrix across multiple hosts |
+| Refresh one/all | Verified | Refresh-all completion plus per-podcast success, feed failure, visible error, and Try again recovery checked on the real test backend; polling unit and UI-state tests | Long-running/stuck-job lifecycle policy in Stage 5 |
+| Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum, real missing-image fallback, and successful Android decode/render from a fixture image URL | Cache and lifecycle behavior in Stage 5 |
 | Episode playlist actions | Implemented | Add/remove callbacks and backend paths exist | Full success/failure reconciliation instrumentation |
 | Show notes | Verified | Backend contract tests, UI test, real Planet Money notes and scrolling | Link handling decision and accessibility review |
 | Mark all listened | Verified | Single backend-owned atomic endpoint; unit/UI contract coverage; real Pixel 9 one-episode fixture verified listened/playlist/active effects and idempotent repeat | Release-candidate smoke check |
 | Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
-| Podcast unsubscribe/undo | Implemented | Countdown and optimistic-state unit coverage | End-to-end 15-second commit/cancel and process/lifecycle behavior |
-| Add RSS feed | Implemented | Real success/duplicate checks from earlier stage | Automated UI/API integration and malformed-feed cases |
+| Podcast unsubscribe/undo | Verified | Countdown/unit coverage plus real Undo preserving backend state and final 15-second commit removing only the selected podcast | Background/process lifecycle behavior in Stage 5 |
+| Add RSS feed | Verified | API/Compose automation plus real valid, duplicate, invalid-scheme, and unreachable-feed checks | Slow-response lifecycle behavior in Stage 5 |
 | OPML import/export | Implemented | Android document intents and backend calls exist; earlier manual checks | Repeatable fixture-based instrumentation and permission/error cases |
 | Daily refresh time | Verified | Material TimePicker unit/UI/manual checks; confirmed save survives failed status reload | Full API fixture integration and 12/24-hour device matrix |
 | SOCKS5 switch/status | Implemented | Real backend status displayed; confirmed switch value survives failed status reload | Full failure/running/off API fixture matrix and acceptance |
 | Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
-| Logout | Implemented | Backend response now controls the launch state; failed/unknown logout no longer claims the user is logged out | Expired-cookie and device-level success/failure instrumentation |
+| Logout | Verified | Backend response controls launch state; real logout cleared persisted cookies and a server-invalidated stored cookie resolved to Login | Final release-candidate smoke check |
 | Empty/loading/error states | Implemented | States exist across main screens | Complete screenshot and interaction matrix |
 
 ## Test baseline
@@ -114,7 +114,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 - CI enforces unit tests, lint, and debug app/test APK assembly on every push and pull request. Connected Android 14 tests run for pull requests and manual workflow dispatch. The first upstream push run completed successfully on commit `1da88a1` (GitHub Actions run `29487361492`).
 - ViewModels and Retrofit failure/retry paths have little direct automated coverage.
 - PlaybackService now has durable-sync unit coverage and a connected persistence check, but still lacks a complete automated Media3 device matrix for interruptions, completion/auto-next, and audio-network loss.
-- Setup/login/logout, RSS add, OPML, download, unsubscribe, and Settings backend saves lack complete end-to-end automation.
+- OPML, downloads, and Settings backend saves still lack complete end-to-end evidence; their focused checks remain in Stage 4.
 - Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
 - The physical-phone pass is manual and does not yet use a written repeatable release checklist.
@@ -292,6 +292,8 @@ Progress:
 - Stage 4.1 session/startup completed on 2026-07-16. The Pixel 9 was exercised against the real test backend through valid-session cold restore, authoritative logout with an empty persisted cookie store, rejected credentials with the backend error, successful login, process restart, offline cold start with the unavailable state, network restoration plus Retry directly to Subscriptions, and a server-invalidated previously stored cookie resolving to Login rather than the offline state. The test session was restored after the check and the crash buffer was empty.
 - Initial setup was not destructively recreated on the shared test backend. The backend's isolated router tests cover `setupRequired → register → authenticated` and rejection of a second setup; Android API-contract and Compose tests cover the corresponding request and credential dispatch.
 - The first full connected gate exposed seven stale selectors left behind by the earlier accessibility-label change. They were updated to target the current descriptive player and episode actions. The final gate passes with 88 unit tests, lint, both debug APK assemblies, and 38/38 connected tests.
+- Stage 4.2 subscriptions/RSS completed on 2026-07-16 against the real test backend and a temporary local RSS fixture. Android accepted a valid feed, rejected the duplicate, rejected an `ftp` URL before dispatch, and surfaced `Failed to fetch feed` for an unreachable HTTP feed. Refresh-all completed; individual refresh was verified through success, a deliberately unavailable feed, visible podcast/banner error, and successful `Try again` recovery. Show-all/unlistened toggled correctly. A missing image rendered the approved fallback, while a valid local PNG reached the ordinary loaded-cover state.
+- Unsubscribe was verified in both authoritative outcomes: Undo inside the countdown preserved the fixture in UI and backend, while a second attempt without Undo removed only that fixture after the 15-second window. All temporary podcasts and the fixture server were removed after the check. No application defect or production-code change was required; the existing API-contract, ViewModel, and connected UI coverage remains the repeatable regression evidence for these paths.
 
 For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
 
