@@ -30,7 +30,6 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Chart5
 )
 
-// For now, use light scheme for both to exactly match mockups
 private val DarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
     onPrimary = DarkPrimaryForeground,
