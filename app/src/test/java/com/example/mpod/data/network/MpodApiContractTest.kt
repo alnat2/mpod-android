@@ -2,6 +2,9 @@ package com.example.mpod.data.network
 
 import com.example.mpod.data.network.model.CreatePodcastRequest
 import com.example.mpod.data.network.model.LoginRequest
+import com.example.mpod.data.network.model.EpisodeListenedRequest
+import com.example.mpod.data.network.model.PlaylistAddRequest
+import com.example.mpod.data.network.model.PlaylistReorderRequest
 import com.example.mpod.data.network.model.SettingsUpdateRequest
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -103,6 +106,60 @@ class MpodApiContractTest {
         api.getJobsStatus()
 
         assertRequest("GET", "/api/jobs/status")
+    }
+
+    @Test
+    fun `subscription refresh unsubscribe and mark all use podcast scoped endpoints`() = runBlocking {
+        server.enqueue(success())
+        server.enqueue(success())
+        server.enqueue(success())
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setBody("""{"success":true,"markedEpisodes":3}""")
+        )
+
+        api.getPodcastEpisodes(42)
+        api.refreshPodcast(42)
+        api.removePodcast(42)
+        val result = api.markAllListened(42)
+
+        assertRequest("GET", "/api/podcasts/42/episodes")
+        assertRequest("POST", "/api/podcasts/42/refresh")
+        assertRequest("DELETE", "/api/podcasts/42")
+        assertRequest("POST", "/api/podcasts/42/mark-all-listened")
+        assertEquals(3, result.body()?.markedEpisodes)
+    }
+
+    @Test
+    fun `playlist add remove reorder and reads use their exact contracts`() = runBlocking {
+        repeat(4) { server.enqueue(success()) }
+
+        api.getPlaylist()
+        api.addToPlaylist(PlaylistAddRequest(episodeId = 7))
+        api.removeFromPlaylist(7)
+        api.reorderPlaylist(PlaylistReorderRequest(listOf(9, 7, 3)))
+
+        assertRequest("GET", "/api/playlist")
+        assertJsonRequest("POST", "/api/playlist", "episodeId" to 7)
+        assertRequest("DELETE", "/api/playlist/7")
+        val reorder = server.takeRequest()
+        assertEquals("PATCH", reorder.method)
+        assertEquals("/api/playlist/reorder", reorder.path)
+        assertEquals(listOf(9, 7, 3), JsonParser.parseString(reorder.body.readUtf8())
+            .asJsonObject["episodeIds"].asJsonArray.map { it.asInt })
+    }
+
+    @Test
+    fun `episode listened state and download use episode scoped endpoints`() = runBlocking {
+        repeat(3) { server.enqueue(success()) }
+
+        api.getEpisode(7)
+        api.setEpisodeListened(7, EpisodeListenedRequest(isListened = true))
+        api.downloadEpisode(7)
+
+        assertRequest("GET", "/api/episodes/7")
+        assertJsonRequest("PATCH", "/api/episodes/7", "isListened" to true)
+        assertRequest("POST", "/api/episodes/7/download")
     }
 
     private fun success() = MockResponse().setResponseCode(200).setBody("{}")
