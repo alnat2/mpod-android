@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 2.5 / A-05)
+Last updated: 2026-07-16 (Stage 2 complete)
 
-Current Android baseline: `1.0.9 (10)`, Stage 2.5 A-05 scoped commit
+Current Android baseline: `1.0.10 (11)`, Stage 2 completed
 
 ## Purpose
 
@@ -80,7 +80,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum and real failed-image case | Success/loading/cache matrix across multiple hosts |
 | Episode playlist actions | Implemented | Add/remove callbacks and backend paths exist | Full success/failure reconciliation instrumentation |
 | Show notes | Verified | Backend contract tests, UI test, real Planet Money notes and scrolling | Link handling decision and accessibility review |
-| Mark all listened | Implemented | Unit/UI dispatch coverage and real fix from prior stage; immediate execution confirmed | Partial-failure integration coverage |
+| Mark all listened | Verified | Single backend-owned atomic endpoint; unit/UI contract coverage; real Pixel 9 one-episode fixture verified listened/playlist/active effects and idempotent repeat | Release-candidate smoke check |
 | Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
 | Podcast unsubscribe/undo | Implemented | Countdown and optimistic-state unit coverage | End-to-end 15-second commit/cancel and process/lifecycle behavior |
 | Add RSS feed | Implemented | Real success/duplicate checks from earlier stage | Automated UI/API integration and malformed-feed cases |
@@ -95,7 +95,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 61 local unit tests.
+- 66 local unit tests.
 - 17 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
@@ -222,7 +222,10 @@ Progress:
 - Evidence: 59 unit tests, lint/build gate, 17/17 connected Pixel 9 tests, plus real test-backend offline/process-stop/reconnect checks for seek progress, speed, and active playback. Each mutation existed on disk before process stop, cleared after successful retry, restored the confirmed UI state without autoplay, and produced no crash. Completion retry/fallback is unit-covered; the expanded Media3 completion/auto-next device matrix remains Stage 3 work.
 - Stage 2.5 / A-05 completed in test build `1.0.9 (10)`: Settings retains the backend-confirmed refresh time or proxy value when the follow-up Settings/Scheduler/Proxy reload fails, clears the saving state, and reports that the save succeeded but status refresh failed. Follow-up status endpoints now require successful HTTP responses instead of silently treating failures as empty status.
 - Evidence: 61 unit tests including confirmed-save/reload-failure and successful-reload paths, lint/build gate, and 17/17 connected Pixel 9 regression tests.
-- The product owner instructed Android to finish the remaining Stage 2 work without intermediate confirmation; A-06 follows in its own scoped commit.
+- Stage 2.6 / A-06 completed in test build `1.0.10 (11)`: Mark all listened now sends one `POST /api/podcasts/{podcastId}/mark-all-listened`, accepts the backend-owned `markedEpisodes` result, invalidates playback only after success, reloads authoritative subscriptions, and restores only the target optimistic podcast on failure. The former concurrent per-episode PATCH batching was removed.
+- Evidence: 66 unit tests covering success, idempotent zero, backend error, transport failure, and scoped rollback; lint/build gate; 17/17 connected Pixel 9 tests; and a real temporary one-episode RSS fixture. Android marked the episode listened, backend removed it from playlist and cleared it from active playback, a repeated request returned `markedEpisodes: 0`, Planet Money state remained intact, and the fixture was removed after verification.
+
+Stage 2 exit criterion: completed on 2026-07-16. All audited Stage 2 defects A-01 through A-06 are resolved and verified; no P0/P1 functional defect from the agreed Stage 1 backlog remains open. Physical-phone final validation remains deferred to the final release stage by product-owner decision.
 
 ### Stage 3 — Automated regression coverage
 

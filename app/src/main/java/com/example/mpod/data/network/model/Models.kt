@@ -38,6 +38,11 @@ data class PodcastsResponse(
     @SerializedName("podcasts") val podcasts: List<PodcastDto> = emptyList()
 )
 
+data class MarkAllListenedResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("markedEpisodes") val markedEpisodes: Int
+)
+
 data class PodcastDto(
     @SerializedName("id") val id: Int,
     @SerializedName("title") val title: String?,

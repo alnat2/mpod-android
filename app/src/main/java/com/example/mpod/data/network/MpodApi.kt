@@ -5,6 +5,7 @@ import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
+import com.example.mpod.data.network.model.MarkAllListenedResponse
 import com.example.mpod.data.network.model.ActivePlaybackRequest
 import com.example.mpod.data.network.model.ActivePlaybackResponse
 import com.example.mpod.data.network.model.PlaybackQueueResponse
@@ -64,6 +65,11 @@ interface MpodApi {
 
     @POST("api/podcasts/{podcastId}/refresh")
     suspend fun refreshPodcast(@Path("podcastId") podcastId: Int): Response<Unit>
+
+    @POST("api/podcasts/{podcastId}/mark-all-listened")
+    suspend fun markAllListened(
+        @Path("podcastId") podcastId: Int
+    ): Response<MarkAllListenedResponse>
 
     @DELETE("api/podcasts/{podcastId}")
     suspend fun removePodcast(@Path("podcastId") podcastId: Int): Response<Unit>

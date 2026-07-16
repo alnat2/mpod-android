@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
+import com.example.mpod.data.network.model.MarkAllListenedResponse
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PodcastDto
 import com.example.mpod.data.network.model.SchedulerStatusDto
@@ -16,9 +17,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -204,34 +202,40 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun markAllListened(podcastId: Int) {
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
-        val episodeIds = podcast.episodes.filterNot { it.isListened }.map { it.id }
-        if (episodeIds.isEmpty()) return
+        if (podcast.unlistenedEpisodeCount == 0) return
         if (podcastId in _state.value.markingAllListenedPodcastIds) return
 
         viewModelScope.launch {
+            val previousPodcast = podcast
             _state.value = _state.value.copy(
                 podcasts = _state.value.podcasts.markAllListenedOptimistically(podcastId),
                 markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds + podcastId,
                 actionErrorMessage = null
             )
 
-            val failure = runCatching { markEpisodesListened(episodeIds) }.exceptionOrNull()
-
-            _state.value = _state.value.copy(
-                markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds - podcastId
-            )
-            if (failure == null) queueInvalidator.invalidate()
-
-            val nextState = runCatching { loadSubscriptionsState() }.getOrElse { reloadError ->
-                _state.value.copy(
-                    actionErrorMessage = reloadError.message ?: "Could not reload subscriptions."
-                )
-            }.let { loaded ->
-                if (failure == null) loaded else loaded.copy(
-                    actionErrorMessage = failure.message ?: "Could not mark all episodes as listened."
-                )
+            when (val outcome = executeMarkAllListened { api.markAllListened(podcastId) }) {
+                is MarkAllListenedOutcome.Success -> {
+                    queueInvalidator.invalidate()
+                    val nextState = runCatching { loadSubscriptionsState() }.getOrElse { reloadError ->
+                        _state.value.copy(
+                            actionErrorMessage = reloadError.message
+                                ?: "Episodes were marked listened, but subscriptions could not be reloaded."
+                        )
+                    }
+                    _state.value = nextState.withTransientStateFrom(_state.value).copy(
+                        markingAllListenedPodcastIds =
+                            _state.value.markingAllListenedPodcastIds - podcastId
+                    )
+                }
+                is MarkAllListenedOutcome.Failed -> {
+                    _state.value = _state.value.copy(
+                        podcasts = _state.value.podcasts.restorePodcast(previousPodcast),
+                        markingAllListenedPodcastIds =
+                            _state.value.markingAllListenedPodcastIds - podcastId,
+                        actionErrorMessage = outcome.message
+                    )
+                }
             }
-            _state.value = nextState.withTransientStateFrom(_state.value)
         }
     }
 
@@ -366,29 +370,6 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun markEpisodesListened(episodeIds: List<Int>) {
-        episodeIds.chunked(MARK_ALL_CONCURRENCY).forEach { episodeIdBatch ->
-            coroutineScope {
-                episodeIdBatch.map { episodeId ->
-                    async {
-                        val response = api.setEpisodeListened(
-                            episodeId,
-                            EpisodeListenedRequest(isListened = true)
-                        )
-                        if (!response.isSuccessful) {
-                            throw IllegalStateException(
-                                apiErrorMessage(
-                                    response.errorBody()?.string(),
-                                    "Could not mark all episodes as listened."
-                                )
-                            )
-                        }
-                    }
-                }.awaitAll()
-            }
-        }
-    }
-
 
     private suspend fun loadSubscriptionsState(): SubscriptionsUiState {
         val podcasts = api.getPodcasts().requireBody("Could not load podcasts.").podcasts
@@ -512,7 +493,6 @@ data class PendingUnsubscribeUi(
 private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
 private const val UNSUBSCRIBE_WINDOW_SECONDS = 15
 private const val UNSUBSCRIBE_TICK_MS = 1_000L
-private const val MARK_ALL_CONCURRENCY = 8
 private const val REFRESH_ALL_STATUS_POLL_MS = 3_000L
 
 internal sealed interface RefreshAllCompletion {
@@ -572,6 +552,37 @@ internal fun List<SubscriptionPodcastUi>.markAllListenedOptimistically(
                     inPlaylist = false
                 )
             }
+        )
+    }
+}
+
+internal fun List<SubscriptionPodcastUi>.restorePodcast(
+    previousPodcast: SubscriptionPodcastUi
+): List<SubscriptionPodcastUi> {
+    return map { podcast ->
+        if (podcast.id == previousPodcast.id) previousPodcast else podcast
+    }
+}
+
+internal sealed interface MarkAllListenedOutcome {
+    data class Success(val markedEpisodes: Int) : MarkAllListenedOutcome
+    data class Failed(val message: String) : MarkAllListenedOutcome
+}
+
+internal suspend fun executeMarkAllListened(
+    request: suspend () -> Response<MarkAllListenedResponse>
+): MarkAllListenedOutcome {
+    val response = runCatching { request() }.getOrNull()
+        ?: return MarkAllListenedOutcome.Failed("Could not reach mpod backend.")
+    val body = response.body()
+    return if (response.isSuccessful && body?.success == true) {
+        MarkAllListenedOutcome.Success(body.markedEpisodes)
+    } else {
+        MarkAllListenedOutcome.Failed(
+            apiErrorMessage(
+                response.errorBody()?.string(),
+                "Could not mark all episodes as listened."
+            )
         )
     }
 }

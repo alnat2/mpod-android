@@ -179,6 +179,8 @@ Resolution evidence: Android applies the successful PATCH response as confirmed 
 
 ### A-06 — P2 — Mark all listened is non-atomic and can partially complete
 
+Status: resolved and verified in Android `1.0.10 (11)` on 2026-07-16.
+
 Reproduction:
 
 1. Run Mark all listened on a podcast with several unlistened episodes.
@@ -210,6 +212,8 @@ Success response:
   "markedEpisodes": 12
 }
 ```
+
+Resolution evidence: Android now calls the backend-owned endpoint exactly once, treats `markedEpisodes: 0` as idempotent success, invalidates playback only after success, reloads authoritative state, and restores only the affected optimistic podcast on failure. The concurrent per-episode PATCH implementation was removed. Unit tests cover success count, zero-count repeat, `PODCAST_NOT_FOUND`, transport failure, and scoped rollback. A Pixel 9 real-backend fixture verified listened state, playlist removal, active-playback clearing, repeat safety, and cleanup without changing the existing Planet Money state.
 
 ### A-07 — P2 — OPML import reads the whole selected file into memory without a limit
 
@@ -280,15 +284,15 @@ These are not Stage 2 functional fixes but must block a production APK:
 
 These items remain Stage 6 work unless the product owner changes their priority.
 
-## Proposed execution order
+## Execution status
 
-1. Stage 2A: A-01 refresh-job correctness and its integration tests.
-2. Stage 2B: A-02 auth/offline state and logout correctness after product wording is confirmed.
-3. Stage 2C: A-03 session backup protection.
-4. Stage 2D: A-04 playback synchronization/retry design and device-level tests.
-5. Stage 2E: A-05 and A-06 settings/mark-all consistency; A-06 may require backend work.
-6. Stage 3: A-07 input hardening, A-08 CI, and the complete critical regression matrix.
-7. Opportunistic cleanup: A-09 and A-10 only when adjacent code is changed.
+1. Stage 2A / A-01 refresh-job correctness: completed.
+2. Stage 2B / A-02 auth/offline state and logout correctness: completed.
+3. Stage 2C / A-03 session backup protection: completed.
+4. Stage 2D / A-04 playback synchronization and durable retry: completed.
+5. Stage 2E / A-05 and A-06 settings/mark-all consistency: completed.
+6. Stage 3 remains: A-07 input hardening, A-08 CI, and the complete critical regression matrix.
+7. Opportunistic cleanup remains: A-09 and A-10 only when adjacent code is changed.
 
 ## Accepted implementation decisions
 
@@ -298,4 +302,4 @@ The product owner accepted the prioritized backlog and confirmed:
 2. Mark all listened uses the accepted backend-owned contract above, with an atomic DB transaction and explicitly non-atomic filesystem cleanup.
 3. OPML import is limited to 5 MB on both Android and backend, with the accepted `OPML_TOO_LARGE` error contract.
 
-Stage 1 is complete. Stage 2 must not start without a separate product-owner instruction.
+Stage 1 and Stage 2 are complete. Stage 3 is the next planned stage.
