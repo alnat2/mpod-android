@@ -35,13 +35,7 @@ class AppLaunchViewModel @Inject constructor(
     fun refreshSession() {
         viewModelScope.launch {
             _state.value = AppLaunchState.Loading
-            val nextState = runCatching {
-                val response = api.getSession()
-                resolveLaunchState(response.isSuccessful, response.body())
-            }.getOrElse {
-                AppLaunchState.Unauthenticated
-            }
-            _state.value = nextState
+            _state.value = loadLaunchState(api::getSession)
         }
     }
 
@@ -86,8 +80,12 @@ class AppLaunchViewModel @Inject constructor(
             context.stopService(Intent(context, PlaybackService::class.java))
             _state.value = AppLaunchState.Loading
             _authUiState.value = AuthUiState()
-            runCatching { api.logout() }
-            refreshSession()
+            val response = runCatching { api.logout() }.getOrNull()
+            when {
+                response?.isSuccessful == true -> refreshSession()
+                response?.code() == 401 -> _state.value = AppLaunchState.Unauthenticated
+                else -> _state.value = AppLaunchState.BackendUnavailable
+            }
         }
     }
 
@@ -120,19 +118,34 @@ data class AuthUiState(
 
 sealed interface AppLaunchState {
     data object Loading : AppLaunchState
+    data object BackendUnavailable : AppLaunchState
     data object SetupRequired : AppLaunchState
     data object Unauthenticated : AppLaunchState
     data object Authenticated : AppLaunchState
 }
 
 internal fun resolveLaunchState(
-    responseSuccessful: Boolean,
+    responseCode: Int?,
     session: com.example.mpod.data.network.model.SessionDto?
 ): AppLaunchState {
     return when {
-        !responseSuccessful || session == null -> AppLaunchState.Unauthenticated
+        responseCode == 401 -> AppLaunchState.Unauthenticated
+        responseCode == null || responseCode !in 200..299 || session == null -> {
+            AppLaunchState.BackendUnavailable
+        }
         session.setupRequired -> AppLaunchState.SetupRequired
         session.authenticated -> AppLaunchState.Authenticated
         else -> AppLaunchState.Unauthenticated
+    }
+}
+
+internal suspend fun loadLaunchState(
+    loadSession: suspend () -> Response<com.example.mpod.data.network.model.SessionDto>
+): AppLaunchState {
+    return runCatching {
+        val response = loadSession()
+        resolveLaunchState(response.code(), response.body())
+    }.getOrElse {
+        AppLaunchState.BackendUnavailable
     }
 }

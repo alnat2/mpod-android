@@ -1,14 +1,17 @@
 package com.example.mpod.ui.navigation
 
 import com.example.mpod.data.network.model.SessionDto
+import kotlinx.coroutines.runBlocking
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import retrofit2.Response
 
 class AppLaunchStateTest {
     @Test
     fun restoresAuthenticatedSession() {
         val state = resolveLaunchState(
-            responseSuccessful = true,
+            responseCode = 200,
             session = SessionDto(authenticated = true, setupRequired = false, user = null)
         )
 
@@ -18,7 +21,7 @@ class AppLaunchStateTest {
     @Test
     fun setupRequiredWinsBeforeAuthentication() {
         val state = resolveLaunchState(
-            responseSuccessful = true,
+            responseCode = 200,
             session = SessionDto(authenticated = true, setupRequired = true, user = null)
         )
 
@@ -26,17 +29,62 @@ class AppLaunchStateTest {
     }
 
     @Test
-    fun failedOrEmptySessionFallsBackToUnauthenticated() {
+    fun unauthorizedSessionOpensLogin() {
         assertEquals(
             AppLaunchState.Unauthenticated,
-            resolveLaunchState(responseSuccessful = false, session = null)
+            resolveLaunchState(responseCode = 401, session = null)
         )
+    }
+
+    @Test
+    fun backendFailureOrEmptySuccessfulResponseIsUnavailable() {
+        assertEquals(
+            AppLaunchState.BackendUnavailable,
+            resolveLaunchState(responseCode = 503, session = null)
+        )
+        assertEquals(
+            AppLaunchState.BackendUnavailable,
+            resolveLaunchState(responseCode = 200, session = null)
+        )
+    }
+
+    @Test
+    fun successfulUnauthenticatedSessionOpensLogin() {
         assertEquals(
             AppLaunchState.Unauthenticated,
             resolveLaunchState(
-                responseSuccessful = true,
+                responseCode = 200,
                 session = SessionDto(authenticated = false, setupRequired = false, user = null)
             )
         )
+    }
+
+    @Test
+    fun transportFailureIsUnavailableAndRetryCanRecover() = runBlocking {
+        var calls = 0
+
+        val first = loadLaunchState {
+            calls += 1
+            error("Backend is offline")
+        }
+        val second = loadLaunchState {
+            calls += 1
+            Response.success(
+                SessionDto(authenticated = true, setupRequired = false, user = null)
+            )
+        }
+
+        assertEquals(AppLaunchState.BackendUnavailable, first)
+        assertEquals(AppLaunchState.Authenticated, second)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun serverFailureIsUnavailable() = runBlocking {
+        val state = loadLaunchState {
+            Response.error(503, "Backend unavailable".toResponseBody())
+        }
+
+        assertEquals(AppLaunchState.BackendUnavailable, state)
     }
 }

@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-15 (Stage 2.1)
+Last updated: 2026-07-16 (Stage 2.2)
 
-Current Android baseline: `1.0.5 (6)`, Stage 2.1 scoped commit
+Current Android baseline: `1.0.6 (7)`, Stage 2.2 scoped commit
 
 ## Purpose
 
@@ -66,7 +66,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
-| Startup/session restoration | Verified | Unit coverage for launch-state resolution; exercised with test account | Lifecycle, expired-session, and backend-unavailable instrumentation coverage |
+| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery exercised on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
 | Initial setup and login | Implemented | Connected to real backend and manually exercised | Dedicated UI and API integration matrix, validation and error-state acceptance |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
@@ -87,15 +87,15 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Daily refresh time | Verified | Material TimePicker unit/UI/manual checks | Save/reload backend integration test and 12/24-hour device matrix |
 | SOCKS5 switch/status | Implemented | Real backend status displayed | Failure/running/off state matrix and acceptance |
 | Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
-| Logout | Implemented | Backend call and playback service stop exist | Expired-cookie and failure-path instrumentation |
+| Logout | Implemented | Backend response now controls the launch state; failed/unknown logout no longer claims the user is logged out | Expired-cookie and device-level success/failure instrumentation |
 | Empty/loading/error states | Implemented | States exist across main screens | Complete screenshot and interaction matrix |
 
 ## Test baseline
 
 Current automated suite:
 
-- 47 local unit tests.
-- 13 connected Android/Compose UI tests.
+- 51 local unit tests.
+- 14 connected Android/Compose UI tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -112,7 +112,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 - ViewModels and Retrofit failure/retry paths have little direct automated coverage.
 - PlaybackService lacks device-level automated coverage.
 - Setup/login/logout, RSS add, OPML, download, unsubscribe, and Settings backend saves lack complete end-to-end automation.
-- Process death, rotation, background/foreground, expired session, offline recovery, slow network, and timeout scenarios are not systematically covered.
+- Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
 - The physical-phone pass is manual and does not yet use a written repeatable release checklist.
 
@@ -212,7 +212,9 @@ Progress:
 
 - Stage 2.1 completed in test build `1.0.5 (6)`: A-01 Refresh all now polls `GET /api/jobs/status` every three seconds, keeps the refreshing state active through the backend job, reloads subscriptions only after completion, and displays backend `lastError` on failure. Temporary status-request failures are retried, matching the established web behavior.
 - Evidence: 47 unit tests, lint/build gate, 13/13 connected Pixel 9 tests, real test-backend `running → completed` check, empty crash log, and installation on the physical phone.
-- Remaining Stage 2 work must not start until the product owner accepts Stage 2.1.
+- Stage 2.2 completed in test build `1.0.6 (7)`: A-02 no longer maps an unavailable backend to Login. Cold start and failed logout use a dedicated web-aligned `mpod is not reachable` state with `Retry`; HTTP 401 remains the explicit unauthenticated outcome.
+- Evidence: 51 unit tests, lint/build gate, 14/14 connected Pixel 9 tests, package-isolated offline cold start with a valid stored session, successful Retry restoration directly to Subscriptions, and an empty AndroidRuntime crash log.
+- Remaining Stage 2 work must not start until the product owner accepts Stage 2.2.
 
 ### Stage 3 — Automated regression coverage
 

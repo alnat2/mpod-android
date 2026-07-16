@@ -100,6 +100,8 @@ Missing test: fake/fixture backend integration covering accepted → running →
 
 ### A-02 — P1 — Backend outage is treated as unauthenticated state
 
+Status: resolved and verified in Android `1.0.6 (7)` on 2026-07-16.
+
 Reproduction:
 
 1. Keep a valid stored session, make the backend unreachable, then cold-start the app.
@@ -114,6 +116,8 @@ Affected code: `AppLaunchViewModel.kt:35-44` and `84-91`.
 Missing test: valid-cookie + offline startup, 401 versus timeout, logout 200 versus timeout/500, reconnect, and expired-session scenarios.
 
 Confirmed decision: show a dedicated unavailable-backend state with a `Retry` action. Do not substitute cached read-only content for this state in the current scope.
+
+Resolution evidence: session response handling now distinguishes HTTP 401 from transport/server failures; failed or ambiguous logout no longer opens Login. The full local gate passed with 51 unit tests, the Pixel 9 connected suite passed 14/14, and a valid stored session was manually cold-started offline, shown the dedicated state, then restored by Retry directly to Subscriptions without new credentials.
 
 ### A-03 — P1 — Session cookie is eligible for Android backup/transfer
 

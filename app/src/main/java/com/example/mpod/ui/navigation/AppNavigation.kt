@@ -31,6 +31,7 @@ import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.MpodLogo
 import com.example.mpod.ui.screens.home.HomeRoute
+import com.example.mpod.ui.screens.auth.BackendUnavailableScreen
 import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 import com.example.mpod.ui.theme.ThemeMode
@@ -45,9 +46,15 @@ fun AppNavigation(
     val authUiState by launchViewModel.authUiState.collectAsState()
     val startDestination = when (launchState) {
         AppLaunchState.Loading -> null
+        AppLaunchState.BackendUnavailable -> null
         AppLaunchState.SetupRequired -> Screen.Setup.route
         AppLaunchState.Unauthenticated -> Screen.Login.route
         AppLaunchState.Authenticated -> Screen.Subscriptions.route
+    }
+
+    if (launchState == AppLaunchState.BackendUnavailable) {
+        BackendUnavailableScreen(onRetry = launchViewModel::refreshSession)
+        return
     }
 
     if (startDestination == null) {

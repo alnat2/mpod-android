@@ -38,6 +38,30 @@ fun AuthShellMobile(
     errorMessage: String? = null,
     onSubmit: () -> Unit = {}
 ) {
+    AuthShellFrameMobile(
+        hero = hero,
+        modifier = modifier
+    ) {
+        AuthCardMobile(
+            title = cardTitle,
+            submitLabel = submitLabel,
+            username = username,
+            onUsernameChange = onUsernameChange,
+            password = password,
+            onPasswordChange = onPasswordChange,
+            isSubmitting = isSubmitting,
+            errorMessage = errorMessage,
+            onSubmit = onSubmit
+        )
+    }
+}
+
+@Composable
+fun AuthShellFrameMobile(
+    hero: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -64,17 +88,7 @@ fun AuthShellMobile(
             )
         }
 
-        AuthCardMobile(
-            title = cardTitle,
-            submitLabel = submitLabel,
-            username = username,
-            onUsernameChange = onUsernameChange,
-            password = password,
-            onPasswordChange = onPasswordChange,
-            isSubmitting = isSubmitting,
-            errorMessage = errorMessage,
-            onSubmit = onSubmit
-        )
+        content()
     }
 }
 
