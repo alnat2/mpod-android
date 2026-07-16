@@ -10,21 +10,33 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.prod.mpod.test"
+        applicationId = "com.prod.mpod"
         minSdk = 34
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.0.11"
+        val ciVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 12
+        val ciVersionName = project.findProperty("versionName")?.toString() ?: "1.0.11"
+
+        versionCode = ciVersionCode
+        versionName = ciVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("customRelease") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("customRelease")
         }
     }
     compileOptions {
