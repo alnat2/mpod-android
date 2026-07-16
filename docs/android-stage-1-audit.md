@@ -121,6 +121,8 @@ Resolution evidence: session response handling now distinguishes HTTP 401 from t
 
 ### A-03 — P1 — Session cookie is eligible for Android backup/transfer
 
+Status: resolved and verified in Android `1.0.7 (8)` on 2026-07-16.
+
 Reproduction:
 
 1. Log in so `PersistentCookieJar` writes `CookiePrefs`.
@@ -133,6 +135,8 @@ Actual: `allowBackup=true`; both XML files are untouched sample templates with n
 Affected code: `AndroidManifest.xml:9-17`, `res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml`, `PersistentCookieJar.kt:12-57`.
 
 Missing test/check: backup-rule validation plus clean-install/device-transfer session behavior.
+
+Resolution evidence: `CookiePrefs.xml` is excluded from legacy backup, Android cloud backup, and device transfer while backup remains enabled for non-sensitive preferences. Two connected tests parse the packaged XML resources and require every exclusion. The complete 16/16 Pixel 9 suite passed; after clearing app data, the app opened Login and contained only the appearance preference file, with no session cookie file or restored authentication.
 
 ### A-04 — P1 — Playback synchronization failures are silent and important writes are not retried
 

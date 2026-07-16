@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 2.2)
+Last updated: 2026-07-16 (Stage 2.3)
 
-Current Android baseline: `1.0.6 (7)`, Stage 2.2 scoped commit
+Current Android baseline: `1.0.7 (8)`, Stage 2.3 scoped commit
 
 ## Purpose
 
@@ -67,6 +67,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
 | Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery exercised on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
+| Session backup/transfer | Verified | CookiePrefs excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
 | Initial setup and login | Implemented | Connected to real backend and manually exercised | Dedicated UI and API integration matrix, validation and error-state acceptance |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
@@ -95,7 +96,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 Current automated suite:
 
 - 51 local unit tests.
-- 14 connected Android/Compose UI tests.
+- 16 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -214,7 +215,9 @@ Progress:
 - Evidence: 47 unit tests, lint/build gate, 13/13 connected Pixel 9 tests, real test-backend `running → completed` check, empty crash log, and installation on the physical phone.
 - Stage 2.2 completed in test build `1.0.6 (7)`: A-02 no longer maps an unavailable backend to Login. Cold start and failed logout use a dedicated web-aligned `mpod is not reachable` state with `Retry`; HTTP 401 remains the explicit unauthenticated outcome.
 - Evidence: 51 unit tests, lint/build gate, 14/14 connected Pixel 9 tests, package-isolated offline cold start with a valid stored session, successful Retry restoration directly to Subscriptions, and an empty AndroidRuntime crash log.
-- Remaining Stage 2 work must not start until the product owner accepts Stage 2.2.
+- Stage 2.3 completed in test build `1.0.7 (8)`: A-03 keeps backup enabled for non-sensitive preferences while excluding `CookiePrefs.xml` from legacy backup, cloud backup, and device transfer.
+- Evidence: 51 unit tests, lint/build gate, 16/16 connected Pixel 9 tests including direct parsing of both packaged backup-rule resources, cleared app-data launch to Login with no `CookiePrefs.xml`, and an empty crash buffer. Physical-phone validation remains intentionally deferred to the final stage by product-owner decision.
+- Remaining Stage 2 work must not start until the product owner accepts Stage 2.3.
 
 ### Stage 3 — Automated regression coverage
 
