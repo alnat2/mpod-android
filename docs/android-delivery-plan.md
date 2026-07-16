@@ -73,10 +73,10 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
-| Playback service | Verified | Queue reconciliation and durable-mutation unit tests; Pixel 9 offline seek/active/speed recovery across process stop | Expanded Media3 interruption, completion/auto-next, audio-network-loss, and OS process-death matrix |
-| Active episode restore | Verified | Backend integration and queue reconciliation tests | Full device restart scenario in release checklist |
+| Playback service | Verified | Queue/retry automation plus real local audio play, pause, progress, seek, natural completion, auto-next, and paused completion-window reconciliation on Pixel 9 | Audio focus/route/network and service/process reliability matrix in Stage 5 |
+| Active episode restore | Verified | Backend integration, queue reconciliation tests, and real force-stop restore at saved position without autoplay | Physical-device restart smoke check in Stage 6 |
 | Queue reorder | Verified | Pure reorder tests plus real long-press drag with authoritative backend order and offline rollback on Pixel 9 | Background/process lifecycle behavior in Stage 5 |
-| Playback speed | Verified | Durable backend sync tests plus Pixel 9 offline/process-stop/reconnect restoration to 2.0x | Cross-device conflict and full speed-option matrix |
+| Playback speed | Verified | All supported labels unit-tested; real 0.5x/1x/2x backend restore plus earlier offline/process-stop/reconnect restoration | Cross-device conflict behavior in Stage 5 |
 | Subscriptions carousel/filter | Verified | Compose UI tests and real backend checks | Rotation/process-recreation behavior |
 | Refresh one/all | Verified | Refresh-all completion plus per-podcast success, feed failure, visible error, and Try again recovery checked on the real test backend; polling unit and UI-state tests | Long-running/stuck-job lifecycle policy in Stage 5 |
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum, real missing-image fallback, and successful Android decode/render from a fixture image URL | Cache and lifecycle behavior in Stage 5 |
@@ -97,7 +97,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 88 local unit tests.
+- 91 local unit tests.
 - 38 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
@@ -113,7 +113,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 
 - CI enforces unit tests, lint, and debug app/test APK assembly on every push and pull request. Connected Android 14 tests run for pull requests and manual workflow dispatch. The first upstream push run completed successfully on commit `1da88a1` (GitHub Actions run `29487361492`).
 - ViewModels and Retrofit failure/retry paths have little direct automated coverage.
-- PlaybackService now has durable-sync unit coverage and a connected persistence check, but still lacks a complete automated Media3 device matrix for interruptions, completion/auto-next, and audio-network loss.
+- PlaybackService has durable-sync automation and real completion/auto-next evidence, but still lacks the Stage 5 Media3 reliability matrix for audio focus, route changes, audio-network loss, and service/process termination.
 - OPML, downloads, and Settings backend saves still lack complete end-to-end evidence; their focused checks remain in Stage 4.
 - Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
@@ -296,6 +296,9 @@ Progress:
 - Unsubscribe was verified in both authoritative outcomes: Undo inside the countdown preserved the fixture in UI and backend, while a second attempt without Undo removed only that fixture after the 15-second window. All temporary podcasts and the fixture server were removed after the check. No application defect or production-code change was required; the existing API-contract, ViewModel, and connected UI coverage remains the repeatable regression evidence for these paths.
 - Stage 4.3 episodes/playlist completed on 2026-07-16 with a temporary three-episode podcast while preserving the user's Planet Money state. Show notes rendered the RSS description. UI actions added three episodes and backend returned the exact queue order; listened/unlistened transitions were authoritative, marking listened removed the affected playlist row, and returning it to unlistened did not silently re-add it. Home removal deleted only the selected row. A real long-press drag changed backend order, while the same drag offline restored the prior UI order and showed `Could not reorder playlist.` An offline Add to playlist likewise restored `3 / 0 episodes`, showed the scoped error, and left backend unchanged.
 - Mark all listened set all three fixture episodes listened, removed the remaining fixture playlist row, and left the unrelated active episode and original playlist `[9, 1]` intact. The fixture podcast and server were removed afterward. No application-code change was required, so the accepted 88-unit/lint/assemble/38-connected gate from Stage 4.1 is reused under the risk-based regression policy rather than rerun for a documentation-only commit.
+- Stage 4.4 playback completed on 2026-07-16 with authenticated local MP3 fixtures. A force-stop restored backend active episode A at `0:00` with `Play`, proving no autoplay. Play/Pause states and progress were real; a 30-second episode paused at 3 seconds persisted `positionSeconds: 3` while remaining active and unlistened. Rewind updated the local player to zero while the backend correctly retained 3 under its documented rule that backward changes under 30 seconds are ignored. Forward 15 reached the exact completion boundary, removed the finished episode, selected the eligible backend fallback at zero, and did not autoplay. Speed restoration was exercised at 0.5x, 1x, and the original 2x.
+- Natural completion of a 4-second A transitioned automatically to the queued 30-second B, which was observed playing at `0:02 / 0:28` with `Pause`. This exposed and fixed a real protocol mismatch: a pause or seek inside the backend's 15-second completion window removed/cleared the episode server-side while Android kept showing it. PlaybackService now recognizes the same boundary and, after a successful paused update, reconciles to the backend/local next target without autoplay. Three unit tests protect the exact boundary, paused reconciliation, and non-hijacking of continuing/newer playback.
+- The durable failed-write/process-stop recovery evidence from Stage 2.4 remains applicable because this change did not alter the persistent retry store or transport; its retry/coalescing tests passed in the full gate. All temporary podcasts/media were removed and backend state was restored to active `9`, playlist `[9, 1]`, speed `Speed 2x`. Final evidence: 91 unit tests, lint, both debug APK assemblies, and 38/38 connected Pixel 9 tests.
 
 For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
 

@@ -1,6 +1,7 @@
 package com.example.mpod.playback
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -64,6 +65,47 @@ class PlaybackServiceDecisionsTest {
                 completedEpisodeId = 7,
                 currentEpisodeId = 7,
                 backendNextEpisodeId = null
+            )
+        )
+    }
+
+    @Test
+    fun `backend completion window starts exactly fifteen seconds before duration`() {
+        assertEquals(false, countsAsBackendCompletion(positionSeconds = 84, durationSeconds = 100))
+        assertEquals(true, countsAsBackendCompletion(positionSeconds = 85, durationSeconds = 100))
+        assertEquals(true, countsAsBackendCompletion(positionSeconds = 4, durationSeconds = 6))
+        assertEquals(false, countsAsBackendCompletion(positionSeconds = 4, durationSeconds = 0))
+    }
+
+    @Test
+    fun `paused threshold completion requires queue reconciliation`() {
+        assertEquals(
+            true,
+            shouldReconcilePausedThresholdCompletion(
+                completedByPosition = true,
+                isPlaying = false,
+                completedEpisodeId = 7,
+                currentEpisodeId = 7
+            )
+        )
+    }
+
+    @Test
+    fun `threshold completion does not hijack continuing or newer playback`() {
+        assertFalse(
+            shouldReconcilePausedThresholdCompletion(
+                completedByPosition = true,
+                isPlaying = true,
+                completedEpisodeId = 7,
+                currentEpisodeId = 7
+            )
+        )
+        assertFalse(
+            shouldReconcilePausedThresholdCompletion(
+                completedByPosition = true,
+                isPlaying = false,
+                completedEpisodeId = 7,
+                currentEpisodeId = 9
             )
         )
     }

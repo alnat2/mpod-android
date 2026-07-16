@@ -308,9 +308,21 @@ class PlaybackService : MediaSessionService() {
         durationSeconds: Int,
         didSeek: Boolean = false
     ) {
-        playbackSyncManager.submitPlayback(
+        val response = playbackSyncManager.submitPlayback(
             playbackRequest(episodeId, positionSeconds, durationSeconds, didSeek = didSeek)
         )
+        val shouldReconcileCompletion = shouldReconcilePausedThresholdCompletion(
+            completedByPosition = countsAsBackendCompletion(positionSeconds, durationSeconds),
+            isPlaying = player.isPlaying,
+            completedEpisodeId = episodeId,
+            currentEpisodeId = currentEpisodeId()
+        )
+        if (response != null && shouldReconcileCompletion) {
+            reconcileQueueWithBackend(
+                preferredEpisodeId = response.nextEpisodeId ?: episodeAfter(episodeId),
+                forcePlayPreferred = false
+            )
+        }
     }
 
     private suspend fun completeEpisode(episodeId: Int): PlaybackUpdateResponse? {
@@ -379,6 +391,17 @@ class PlaybackService : MediaSessionService() {
             ?: 0
     }
 
+    private fun episodeAfter(episodeId: Int): Int? {
+        val currentIndex = (0 until player.mediaItemCount)
+            .firstOrNull { player.getMediaItemAt(it).mediaId == episodeId.toString() }
+            ?: return null
+        return (currentIndex + 1)
+            .takeIf { it < player.mediaItemCount }
+            ?.let(player::getMediaItemAt)
+            ?.mediaId
+            ?.toIntOrNull()
+    }
+
     private fun PlaybackQueueEpisodeDto.toMediaItem(): MediaItem {
         val extras = android.os.Bundle().apply {
             putInt(EXTRA_DURATION_SECONDS, duration?.roundToInt() ?: 0)
@@ -417,6 +440,21 @@ internal fun resolveRetriedCompletionNextEpisode(
         playbackEnded && currentEpisodeId == completedEpisodeId
     }
 }
+
+internal fun countsAsBackendCompletion(
+    positionSeconds: Int,
+    durationSeconds: Int
+): Boolean {
+    if (durationSeconds <= 0) return false
+    return positionSeconds.coerceAtLeast(0) >= durationSeconds - 15
+}
+
+internal fun shouldReconcilePausedThresholdCompletion(
+    completedByPosition: Boolean,
+    isPlaying: Boolean,
+    completedEpisodeId: Int,
+    currentEpisodeId: Int?
+): Boolean = completedByPosition && !isPlaying && currentEpisodeId == completedEpisodeId
 
 internal fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
     "Speed 0.5x" -> 0.5f
