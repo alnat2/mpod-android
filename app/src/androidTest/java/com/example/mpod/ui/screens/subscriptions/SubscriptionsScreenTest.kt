@@ -90,7 +90,7 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Add to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
@@ -104,7 +104,7 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Show notes").performClick()
 
         composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
@@ -167,9 +167,9 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Download").performClick()
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Mark as listened").performClick()
 
         composeRule.runOnIdle {
@@ -198,9 +198,9 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Show all").performClick()
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Remove from playlist").performClick()
-        composeRule.onNodeWithContentDescription("Options").performClick()
+        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
         composeRule.onNodeWithText("Mark as unlistened").performClick()
 
         composeRule.runOnIdle {

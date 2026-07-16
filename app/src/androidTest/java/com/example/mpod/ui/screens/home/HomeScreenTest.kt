@@ -30,7 +30,7 @@ class HomeScreenTest {
 
         composeRule.onAllNodesWithContentDescription("Refresh").assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription("View").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription("Options")[0]
+        composeRule.onNodeWithContentDescription("Options for Why store loyalty cards became a UX minefield")
             .performScrollTo()
             .performClick()
 
@@ -61,11 +61,11 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Play").performClick()
-        composeRule.onNodeWithContentDescription("Rewind 10s").performClick()
-        composeRule.onNodeWithContentDescription("Forward 15s").performClick()
+        composeRule.onNodeWithContentDescription("Rewind 10 seconds").performClick()
+        composeRule.onNodeWithContentDescription("Forward 15 seconds").performClick()
         composeRule.onNodeWithText("1.5").performClick()
         composeRule.onNodeWithText("2.0x").performClick()
-        composeRule.onNodeWithContentDescription("Notes").performClick()
+        composeRule.onNodeWithContentDescription("Show notes").performClick()
 
         composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
         composeRule.runOnIdle {
@@ -84,7 +84,7 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onAllNodesWithContentDescription("Options")[0].performClick()
+        composeRule.onNodeWithContentDescription("Options for Why store loyalty cards became a UX minefield").performClick()
         composeRule.onNodeWithTag("home_episode_playlist_action").performClick()
 
         composeRule.runOnIdle { assertEquals(1, removedEpisodeId) }

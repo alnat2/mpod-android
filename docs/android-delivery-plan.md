@@ -97,8 +97,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 85 local unit tests.
-- 35 connected Android/Compose UI/configuration tests.
+- 88 local unit tests.
+- 38 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -286,6 +286,12 @@ Required scope:
 6. **Import/export** — real OPML import/export through Android document providers, exact exported contents, cancel/error/oversize cases.
 7. **Settings** — refresh time save, proxy on/off/running/error, theme persistence, and logout using authoritative backend results.
 8. **Application states** — usable loading, empty, disabled, retry, and backend-error behavior for every core screen. A visual defect is fixed here only when it prevents or misrepresents a core action.
+
+Progress:
+
+- Stage 4.1 session/startup completed on 2026-07-16. The Pixel 9 was exercised against the real test backend through valid-session cold restore, authoritative logout with an empty persisted cookie store, rejected credentials with the backend error, successful login, process restart, offline cold start with the unavailable state, network restoration plus Retry directly to Subscriptions, and a server-invalidated previously stored cookie resolving to Login rather than the offline state. The test session was restored after the check and the crash buffer was empty.
+- Initial setup was not destructively recreated on the shared test backend. The backend's isolated router tests cover `setupRequired → register → authenticated` and rejection of a second setup; Android API-contract and Compose tests cover the corresponding request and credential dispatch.
+- The first full connected gate exposed seven stale selectors left behind by the earlier accessibility-label change. They were updated to target the current descriptive player and episode actions. The final gate passes with 88 unit tests, lint, both debug APK assemblies, and 38/38 connected tests.
 
 For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
 
