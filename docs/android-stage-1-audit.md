@@ -217,6 +217,8 @@ Resolution evidence: Android now calls the backend-owned endpoint exactly once, 
 
 ### A-07 — P2 — OPML import reads the whole selected file into memory without a limit
 
+Status: resolved in Stage 3.1; final Stage 3 verification pending.
+
 Reproduction:
 
 1. Select a very large document from the system picker.
@@ -240,6 +242,8 @@ Confirmed decision: Android and backend must both enforce a 5 MB (`5,000,000` by
   }
 }
 ```
+
+Resolution evidence: Android now uses a streaming multipart request body. A known provider size above the limit is rejected before opening the stream; unknown or incorrect metadata is guarded by a byte counter during upload. Exact-limit, both over-limit paths, provider-open failure, and provider-read failure are unit-covered. The user receives a specific 5 MB validation message or a selected-file read error instead of a misleading backend-connectivity error.
 
 ### A-08 — P2 — No CI enforces the existing test gate
 

@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 2 complete)
+Last updated: 2026-07-16 (Stage 3 in progress)
 
-Current Android baseline: `1.0.10 (11)`, Stage 2 completed
+Current Android baseline: `1.0.10 (11)`, Stage 3 in progress
 
 ## Purpose
 
@@ -242,6 +242,10 @@ Minimum critical flows:
 - Settings save/reload, proxy states, themes.
 
 Also add CI for unit tests, lint, and debug assembly. Connected tests may use a separate emulator job if runtime constraints require it.
+
+Progress:
+
+- Stage 3.1 / A-07 implemented: OPML imports no longer allocate the selected document with `readBytes()`. Android rejects known files over `5,000,000` bytes before the request, enforces the same limit while streaming when provider metadata is absent or incorrect, and distinguishes size and provider-read failures in the UI. Unit coverage includes the exact limit, known and streaming over-limit paths, provider-open failure, and provider-read failure. Final Stage 3 gate and emulator fixture verification remain pending.
 
 Exit criterion: the agreed critical matrix is automated or explicitly documented as a manual release check.
 

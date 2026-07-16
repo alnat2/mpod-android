@@ -6,6 +6,9 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
+import com.example.mpod.data.network.LimitedContentRequestBody
+import com.example.mpod.data.network.OpmlReadException
+import com.example.mpod.data.network.OpmlTooLargeException
 import com.example.mpod.data.network.model.CreatePodcastRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,7 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.Response
 import java.net.URI
@@ -67,41 +69,75 @@ class AddPodcastViewModel @Inject constructor(
 
         viewModelScope.launch {
             _state.value = AddPodcastUiState(isSubmitting = true)
-            val response = runCatching {
+            val result = runCatching {
                 val filePart = withContext(Dispatchers.IO) {
                     uri.toMultipartPart()
                 }
                 api.importOpml(filePart)
-            }.getOrNull()
+            }
+            val response = result.getOrNull()
 
             if (response?.isSuccessful == true) {
                 _state.value = AddPodcastUiState()
                 onSuccess()
             } else {
                 _state.value = AddPodcastUiState(
-                    errorMessage = addPodcastErrorMessage(response, "Could not import this OPML file.")
+                    errorMessage = importOpmlErrorMessage(response, result.exceptionOrNull())
                 )
             }
         }
     }
 
     private fun Uri.toMultipartPart(): MultipartBody.Part {
-        val resolver = context.contentResolver
-        val mimeType = resolver.getType(this)?.toMediaTypeOrNull()
-        val fileName = resolver.queryDisplayName(this) ?: "subscriptions.opml"
-        val bytes = resolver.openInputStream(this)?.use { it.readBytes() }
-            ?: error("Could not read selected OPML file.")
-        return MultipartBody.Part.createFormData(
-            name = "file",
-            filename = fileName,
-            body = bytes.toRequestBody(mimeType)
-        )
+        return try {
+            val resolver = context.contentResolver
+            val mimeType = resolver.getType(this)?.toMediaTypeOrNull()
+            val metadata = resolver.queryMetadata(this)
+            val requestBody = LimitedContentRequestBody(
+                mediaType = mimeType,
+                knownLength = metadata.size,
+                openStream = {
+                    resolver.openInputStream(this)
+                        ?: throw OpmlReadException()
+                }
+            )
+            MultipartBody.Part.createFormData(
+                name = "file",
+                filename = metadata.displayName ?: "subscriptions.opml",
+                body = requestBody
+            )
+        } catch (error: OpmlTooLargeException) {
+            throw error
+        } catch (error: OpmlReadException) {
+            throw error
+        } catch (error: Exception) {
+            throw OpmlReadException(error)
+        }
     }
 
-    private fun android.content.ContentResolver.queryDisplayName(uri: Uri): String? {
-        return query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (columnIndex >= 0 && cursor.moveToFirst()) cursor.getString(columnIndex) else null
+    private fun android.content.ContentResolver.queryMetadata(uri: Uri): OpmlMetadata {
+        return query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use OpmlMetadata()
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            OpmlMetadata(
+                displayName = nameIndex.takeIf { it >= 0 }?.let(cursor::getString),
+                size = sizeIndex.takeIf { it >= 0 && !cursor.isNull(it) }?.let(cursor::getLong)
+            )
+        } ?: OpmlMetadata()
+    }
+
+    private fun importOpmlErrorMessage(response: Response<*>?, error: Throwable?): String {
+        return when {
+            error.hasCause<OpmlTooLargeException>() -> "OPML file is too large. Maximum size is 5 MB."
+            error.hasCause<OpmlReadException>() -> "Could not read selected OPML file."
+            else -> addPodcastErrorMessage(response, "Could not import this OPML file.")
         }
     }
 
@@ -124,6 +160,20 @@ class AddPodcastViewModel @Inject constructor(
         val uri = URI(this)
         uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
     }.getOrDefault(false)
+}
+
+private data class OpmlMetadata(
+    val displayName: String? = null,
+    val size: Long? = null
+)
+
+private inline fun <reified T : Throwable> Throwable?.hasCause(): Boolean {
+    var current = this
+    while (current != null) {
+        if (current is T) return true
+        current = current.cause
+    }
+    return false
 }
 
 data class AddPodcastUiState(
