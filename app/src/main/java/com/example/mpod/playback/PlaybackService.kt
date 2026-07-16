@@ -82,7 +82,7 @@ class PlaybackService : MediaSessionService() {
             onRetriedCompletion = ::handleRetriedCompletion
         )
         val pendingSpeed = playbackSyncManager.pendingSnapshot().speedLabel
-        pendingSpeed?.toPlaybackSpeedOrNull()?.let { speed ->
+        pendingSpeed.toPlaybackSpeedOrNull()?.let { speed ->
             applyingServerSpeed = true
             player.playbackParameters = PlaybackParameters(speed)
             applyingServerSpeed = false
@@ -329,9 +329,13 @@ class PlaybackService : MediaSessionService() {
         request: PlaybackUpdateRequest,
         response: PlaybackUpdateResponse
     ) {
-        val canResumeFallback = player.playbackState == Player.STATE_ENDED &&
-            currentEpisodeId() == request.episodeId
-        val fallbackEpisodeId = response.nextEpisodeId.takeIf { canResumeFallback }
+        val playbackEnded = player.playbackState == Player.STATE_ENDED
+        val fallbackEpisodeId = resolveRetriedCompletionNextEpisode(
+            playbackEnded = playbackEnded,
+            completedEpisodeId = request.episodeId,
+            currentEpisodeId = currentEpisodeId(),
+            backendNextEpisodeId = response.nextEpisodeId
+        )
         if (fallbackEpisodeId != null) {
             reconcileQueueWithBackend(
                 preferredEpisodeId = fallbackEpisodeId,
@@ -398,27 +402,38 @@ class PlaybackService : MediaSessionService() {
         return mapOf("Cookie" to cookies.joinToString("; ") { "${it.name}=${it.value}" })
     }
 
-    private fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
-        "Speed 0.5x" -> 0.5f
-        "Speed 0.75x" -> 0.75f
-        "Speed 1x" -> 1f
-        "Speed 1.3x" -> 1.3f
-        "Speed 1.5x" -> 1.5f
-        "Speed 2x" -> 2f
-        else -> null
-    }
-
-    private fun Float.toPlaybackSpeedLabel(): String? = when {
-        this == 0.5f -> "Speed 0.5x"
-        this == 0.75f -> "Speed 0.75x"
-        this == 1f -> "Speed 1x"
-        this == 1.3f -> "Speed 1.3x"
-        this == 1.5f -> "Speed 1.5x"
-        this == 2f -> "Speed 2x"
-        else -> null
-    }
-
     companion object {
         const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
     }
+}
+
+internal fun resolveRetriedCompletionNextEpisode(
+    playbackEnded: Boolean,
+    completedEpisodeId: Int,
+    currentEpisodeId: Int?,
+    backendNextEpisodeId: Int?
+): Int? {
+    return backendNextEpisodeId.takeIf {
+        playbackEnded && currentEpisodeId == completedEpisodeId
+    }
+}
+
+internal fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
+    "Speed 0.5x" -> 0.5f
+    "Speed 0.75x" -> 0.75f
+    "Speed 1x" -> 1f
+    "Speed 1.3x" -> 1.3f
+    "Speed 1.5x" -> 1.5f
+    "Speed 2x" -> 2f
+    else -> null
+}
+
+internal fun Float.toPlaybackSpeedLabel(): String? = when (this) {
+    0.5f -> "Speed 0.5x"
+    0.75f -> "Speed 0.75x"
+    1f -> "Speed 1x"
+    1.3f -> "Speed 1.3x"
+    1.5f -> "Speed 1.5x"
+    2f -> "Speed 2x"
+    else -> null
 }

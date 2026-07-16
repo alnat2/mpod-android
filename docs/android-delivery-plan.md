@@ -95,7 +95,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 78 local unit tests.
+- 86 local unit tests.
 - 36 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
@@ -249,6 +249,7 @@ Progress:
 - Stage 3.2 / A-08 implemented: GitHub Actions runs unit tests, Android lint, debug APK assembly, and Android-test APK assembly on every push and pull request. Pull requests and manual dispatch additionally run the connected suite on an Android 14 Google APIs emulator. Reports are retained as workflow artifacts. Local workflow structure and commands are verified; the first upstream workflow execution remains pending.
 - Stage 3.3 completed: repeatable API-contract coverage now pins session/login/register/logout, RSS add, streaming OPML import/export, Settings PATCH fields, proxy status, and scheduler status endpoints. Connected Compose coverage verifies login/setup credential dispatch, authentication loading/error UI, RSS validation and trimming, OPML mode/error/loading actions, Settings refresh save, proxy, export, logout, loading, and backend-error states. The Pixel 9 connected suite passes 27/27 tests.
 - Stage 3.4 completed: API-contract tests pin podcast refresh/unsubscribe/mark-all, playlist read/add/remove/reorder, and episode read/listened/download requests. Connected UI coverage now dispatches Home playback/seek/speed/notes and playlist removal; Subscriptions add/remove playlist, listened/unlistened, download, unsubscribe/Undo, load retry, download-error dismissal, and both empty-library add paths. The Pixel 9 connected suite passes 36/36 tests. Backend filesystem download lifecycle and long-press queue dragging remain explicit manual release checks.
+- Stage 3.5 implemented: playback contract coverage pins queue load, active episode, progress, seek, completion, and speed writes. Unit coverage now includes every supported playback speed, invalid-speed rejection, initial and changed queue reconciliation, completion fallback, missing fallback behavior, delayed-completion auto-next, and protection against a late retry hijacking newer playback. Real audio focus, noisy-route handling, Bluetooth/headset interruption, audio-network loss, and OS service/process termination remain device-only release checks. Final Stage 3 gate remains pending.
 
 Exit criterion: the agreed critical matrix is automated or explicitly documented as a manual release check.
 

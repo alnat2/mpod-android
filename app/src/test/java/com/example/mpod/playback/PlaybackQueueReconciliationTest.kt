@@ -97,6 +97,38 @@ class PlaybackQueueReconciliationTest {
         assertFalse(target?.playWhenReady == true)
     }
 
+    @Test
+    fun missingBackendActiveFallsBackToFirstQueueItemWithoutAutoplay() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(1 to 4_000, 2 to 8_000),
+            backendActiveEpisodeId = 99,
+            currentEpisodeId = null,
+            currentPositionMs = 0,
+            currentPlayWhenReady = false
+        )
+
+        assertEquals(1, target?.episodeId)
+        assertEquals(4_000L, target?.positionMs)
+        assertFalse(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun preferredEpisodeMissingAfterCompletionFallsBackWithoutAutoplay() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 12_000, 3 to 8_000),
+            backendActiveEpisodeId = 2,
+            currentEpisodeId = 1,
+            currentPositionMs = 45_000,
+            currentPlayWhenReady = false,
+            preferredEpisodeId = 99,
+            forcePlayPreferred = true
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(12_000L, target?.positionMs)
+        assertFalse(target?.playWhenReady == true)
+    }
+
     private fun queue(vararg entries: Pair<Int, Int>): List<QueueEpisodeState> {
         return entries.map { (episodeId, positionMs) ->
             QueueEpisodeState(episodeId = episodeId, savedPositionMs = positionMs.toLong())

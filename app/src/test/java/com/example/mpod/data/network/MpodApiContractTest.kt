@@ -5,6 +5,8 @@ import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.PlaylistAddRequest
 import com.example.mpod.data.network.model.PlaylistReorderRequest
+import com.example.mpod.data.network.model.ActivePlaybackRequest
+import com.example.mpod.data.network.model.PlaybackUpdateRequest
 import com.example.mpod.data.network.model.SettingsUpdateRequest
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -162,6 +164,23 @@ class MpodApiContractTest {
         assertRequest("POST", "/api/episodes/7/download")
     }
 
+    @Test
+    fun `playback queue active progress completion and speed use shared contracts`() = runBlocking {
+        repeat(5) { server.enqueue(success()) }
+
+        api.getPlaybackQueue()
+        api.setActivePlayback(ActivePlaybackRequest(episodeId = 7))
+        api.updatePlayback(playbackRequest(completed = false, didSeek = true))
+        api.updatePlayback(playbackRequest(completed = true, didSeek = false))
+        api.updateSettings(SettingsUpdateRequest(playbackSpeed = "Speed 1.5x"))
+
+        assertRequest("GET", "/api/playback/queue")
+        assertJsonRequest("PUT", "/api/playback/active", "episodeId" to 7)
+        assertPlaybackRequest(completed = false, didSeek = true)
+        assertPlaybackRequest(completed = true, didSeek = false)
+        assertJsonRequest("PATCH", "/api/settings", "playbackSpeed" to "Speed 1.5x")
+    }
+
     private fun success() = MockResponse().setResponseCode(200).setBody("{}")
 
     private fun assertRequest(method: String, path: String) {
@@ -181,5 +200,25 @@ class MpodApiContractTest {
         val json = JsonParser.parseString(request.body.readUtf8()).asJsonObject
         assertEquals(fields.map { it.first }.toSet(), json.keySet())
         fields.forEach { (name, value) -> assertEquals(value.toString(), json[name].asString) }
+    }
+
+    private fun playbackRequest(completed: Boolean, didSeek: Boolean) = PlaybackUpdateRequest(
+        episodeId = 7,
+        positionSeconds = if (completed) 120 else 42,
+        durationSeconds = 120,
+        completed = completed,
+        didSeek = didSeek,
+        clientUpdatedAt = "2026-07-16T12:00:00Z"
+    )
+
+    private fun assertPlaybackRequest(completed: Boolean, didSeek: Boolean) {
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertEquals("/api/playback", request.path)
+        val json = JsonParser.parseString(request.body.readUtf8()).asJsonObject
+        assertEquals(7, json["episodeId"].asInt)
+        assertEquals(120, json["durationSeconds"].asInt)
+        assertEquals(completed, json["completed"].asBoolean)
+        assertEquals(didSeek, json["didSeek"].asBoolean)
     }
 }
