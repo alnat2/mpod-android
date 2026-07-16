@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 3 complete)
+Last updated: 2026-07-16 (functional-first sequence approved after Stage 3)
 
-Current Android baseline: `1.0.11 (12)`, Stage 3 completed
+Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
 ## Purpose
 
@@ -41,6 +41,8 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Mark all listened | Executes immediately, without a confirmation dialog |
 | Subscription episode playback | No separate Play action exists for episodes outside the playlist |
 | Design | Android screens and mobile components in the mpod Figma file |
+
+Delivery order decision confirmed on 2026-07-16: a complete, reliable working application takes priority over visual polish and extended accessibility work. Figma fine-tuning, exhaustive font/display scaling, TalkBack review, and performance profiling do not block the working test build unless they make a core action unreadable, unreachable, or unusable.
 
 Figma references:
 
@@ -130,22 +132,22 @@ Quality checks should be proportional to regression risk so accepted work is not
 - Use the emulator for repeatable UI and lifecycle checks. Use the physical phone only for device-sensitive behavior, final stage acceptance, and release checks.
 - Record reused evidence and the reason a full manual re-test was not required; never claim a scenario was re-tested when it was only inherited from the accepted baseline.
 
-## Definition of done for every feature
+## Functional definition of done
 
 A feature may move to `Verified` only when all applicable items pass:
 
 1. Expected behavior is documented or explicitly confirmed.
-2. Implementation matches the relevant Figma state.
-3. Success, loading, empty, disabled, retry, and failure states are handled.
-4. Unit tests cover business/state transformations.
-5. Compose/UI tests cover user-visible dispatch and state changes.
-6. Real test-backend integration is checked when the feature uses the API.
-7. The complete local unit, lint, assemble, and connected-test suite passes.
-8. The changed flow is checked on the Pixel 9 emulator.
-9. Device-sensitive changes are checked on the physical Android phone.
-10. Version is bumped for an installable handoff build.
-11. Only scoped files are committed and pushed.
-12. The product owner receives the version, commit, checks performed, and known limitations, then accepts or rejects the stage.
+2. The complete user action reaches the expected authoritative backend/playback state, not merely a callback or mocked UI state.
+3. Success, loading, empty, disabled, retry, and failure states required by the flow are usable and truthful.
+4. Unit tests cover business/state transformations and Compose/UI tests cover user-visible dispatch and reconciliation.
+5. Real test-backend integration is checked when the feature uses the API.
+6. The complete local unit, lint, assemble, and connected-test suite passes.
+7. The changed flow is checked end-to-end on the Pixel 9 emulator.
+8. Device-sensitive behavior is checked on the physical Android phone before acceptance of the working test build.
+9. Version is bumped for an installable handoff build; only scoped files are committed and pushed.
+10. The product owner receives the version, commit, checks actually performed, and known limitations, then accepts or rejects the stage.
+
+Visual similarity alone, a Retrofit contract test alone, or a button callback test alone is not sufficient evidence that a feature works.
 
 ## Delivery stages
 
@@ -268,62 +270,64 @@ The manual column is the written release checklist for scenarios that depend on 
 
 - Stage 3.6 completed: the complete local gate and Pixel 9 connected suite pass after removing the unused Room stack and generated template tests (A-10). Test build `1.0.11 (12)` contains 85 product unit tests and 35 connected product tests. The first upstream CI quality gate also passes.
 
-Stage 3 exit criterion: completed on 2026-07-16. Every agreed critical flow has repeatable automated evidence and/or an explicit mandatory manual release check. Stage 4 is next; physical-phone validation remains intentionally assigned to device-sensitive and final release work.
+Stage 3 exit criterion: completed on 2026-07-16. Automated coverage protects the known contracts and state transformations, but it does not replace the end-to-end functional checks assigned to Stage 4.
 
-### Stage 4 — Figma parity and accessibility
+### Stage 4 — Complete the working application
 
-Goal: obtain screen-by-screen visual acceptance after functional behavior is stable.
+Goal: prove and fix every core user scenario end-to-end against the test backend before spending more time on polish.
 
-Scope:
+Required scope:
 
-- Android screens and mobile components only.
-- Light and dark themes.
-- Loading, empty, error, disabled, modal, menu, and long-content states.
-- Android 14 system bars, navigation inset, keyboard, font scaling, touch targets, TalkBack labels, and contrast.
+1. **Session and startup** — setup, login, valid-session restore, expired session, logout success/failure, unavailable backend, Retry, and process restart.
+2. **Subscriptions** — real RSS add including duplicate/invalid/unreachable feeds; refresh one/all through backend completion/failure; show-all/unlistened; artwork success/fallback; unsubscribe plus Undo and final backend state.
+3. **Episodes and playlist** — add/remove playlist, reorder with the real gesture and backend result, mark listened/unlistened, mark all listened including playlist/active cleanup, show notes, and truthful error rollback.
+4. **Playback** — active episode restore without autoplay, play/pause, seek, speed, progress persistence, completion and automatic next episode, queue reconciliation, and recovery after a failed write.
+5. **Downloads** — real download success/failure, server file state, playback from the downloaded episode, and cleanup after listened/removal lifecycle actions.
+6. **Import/export** — real OPML import/export through Android document providers, exact exported contents, cancel/error/oversize cases.
+7. **Settings** — refresh time save, proxy on/off/running/error, theme persistence, and logout using authoritative backend results.
+8. **Application states** — usable loading, empty, disabled, retry, and backend-error behavior for every core screen. A visual defect is fixed here only when it prevents or misrepresents a core action.
 
-Exit criterion: all MVP screens are accepted against Figma with no open P1 visual/accessibility defects.
+For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
 
-### Stage 5 — Reliability and performance
+Exit criterion: every visible core action has repeatable evidence of the expected final state; the complete regression gate passes; no open P0/P1 functional defect remains.
 
-Goal: make the app resilient to normal mobile lifecycle and network conditions.
+### Stage 5 — Mobile reliability gate
 
-Scope:
+Goal: ensure the functionally complete application keeps working under normal Android lifecycle and connectivity changes.
 
-- Rotation and process recreation.
-- Background/foreground and audio interruptions.
-- Offline, slow, timeout, retry, server restart, expired session.
-- Long podcast/episode/queue lists.
-- Startup, frame rendering, CPU, and memory evidence on emulator and phone.
+Required scope:
 
-Exit criterion: critical flows recover predictably and measured regressions are documented or fixed.
+- Rotation and process recreation during auth, playlist mutations, downloads, Settings saves, and playback.
+- Background/foreground during unsubscribe Undo, document-provider flows, downloads, and playback.
+- Offline, slow response, timeout, retry, backend restart, and expired session.
+- Audio focus, noisy route, Bluetooth/headset changes, audio-network loss, service/process termination, completion, and auto-next.
+- Long podcast, episode, and queue lists only to the point required to exclude broken actions, crashes, or unusable stalls.
 
-### Stage 6 — Pre-release packaging
+Exit criterion: core state is not corrupted or falsely reported, interrupted actions recover predictably, and no P0/P1 reliability defect remains.
 
-Goal: create the first production-configured release candidate.
+### Stage 6 — Working test build acceptance
 
-Scope:
+Goal: hand the product owner one current test APK that is demonstrably usable as the complete MVP.
 
-- Separate test and production build configuration.
-- Production application ID `com.prod.mpod`.
-- Production backend on port `5050`.
-- Release signing information supplied by the product owner.
-- Backup/data extraction, logging, network security, versioning, and APK upgrade behavior.
-- Clean-install and upgrade-install checks.
+Required scope:
 
-Exit criterion: signed pre-release APK passes the release checklist on the physical phone.
+- Bump the test APK version and install it on the physical Android 14+ phone.
+- Run the written core-flow checklist on the phone against port `5051`.
+- Check clean install and upgrade over the previous test APK without losing valid local state unexpectedly.
+- Record APK checksum, version, commit, backend environment, checks performed, and every known limitation.
 
-### Stage 7 — Release candidate acceptance
+Exit criterion: explicit product-owner acceptance of the test build as a working application.
 
-Goal: final product-owner acceptance.
+## Deferred until after the working test build
 
-Scope:
+These items remain useful, but are not allowed to displace functional work:
 
-- Full critical regression matrix.
-- No open P0/P1 issues.
-- Accepted list of deferred P2/P3 issues.
-- Final APK checksum, version, commit, environment, and test report.
+- Pixel-level Figma parity and cosmetic animation tuning.
+- Exhaustive TalkBack, font/display scaling, and non-blocking contrast polish.
+- Detailed CPU, memory, frame-time, and startup profiling unless a real functional slowdown or crash is observed.
+- Production variant on port `5050`, `com.prod.mpod`, release signing, and production release packaging.
 
-Exit criterion: explicit approval to treat the APK as the production release.
+After Stage 6 acceptance, these will be planned from the actual remaining defects instead of being treated as prerequisites for a working app.
 
 ## Priorities
 
@@ -336,7 +340,7 @@ Exit criterion: explicit approval to treat the APK as the production release.
 
 ## Deferred product-owner input
 
-There are no unanswered product questions blocking Stage 1. Release signing details are intentionally deferred and will be requested only when Stage 6 begins.
+There are no unanswered product questions blocking Stage 4. Release signing details are intentionally deferred until production packaging begins after acceptance of the working test build.
 
 ## Stage report template
 
