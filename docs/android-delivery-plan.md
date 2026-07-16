@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 2.4)
+Last updated: 2026-07-16 (Stage 2.5 / A-05)
 
-Current Android baseline: `1.0.8 (9)`, Stage 2.4 scoped commit
+Current Android baseline: `1.0.9 (10)`, Stage 2.5 A-05 scoped commit
 
 ## Purpose
 
@@ -85,8 +85,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Podcast unsubscribe/undo | Implemented | Countdown and optimistic-state unit coverage | End-to-end 15-second commit/cancel and process/lifecycle behavior |
 | Add RSS feed | Implemented | Real success/duplicate checks from earlier stage | Automated UI/API integration and malformed-feed cases |
 | OPML import/export | Implemented | Android document intents and backend calls exist; earlier manual checks | Repeatable fixture-based instrumentation and permission/error cases |
-| Daily refresh time | Verified | Material TimePicker unit/UI/manual checks | Save/reload backend integration test and 12/24-hour device matrix |
-| SOCKS5 switch/status | Implemented | Real backend status displayed | Failure/running/off state matrix and acceptance |
+| Daily refresh time | Verified | Material TimePicker unit/UI/manual checks; confirmed save survives failed status reload | Full API fixture integration and 12/24-hour device matrix |
+| SOCKS5 switch/status | Implemented | Real backend status displayed; confirmed switch value survives failed status reload | Full failure/running/off API fixture matrix and acceptance |
 | Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
 | Logout | Implemented | Backend response now controls the launch state; failed/unknown logout no longer claims the user is logged out | Expired-cookie and device-level success/failure instrumentation |
 | Empty/loading/error states | Implemented | States exist across main screens | Complete screenshot and interaction matrix |
@@ -95,7 +95,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 59 local unit tests.
+- 61 local unit tests.
 - 17 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
@@ -220,7 +220,9 @@ Progress:
 - Evidence: 51 unit tests, lint/build gate, 16/16 connected Pixel 9 tests including direct parsing of both packaged backup-rule resources, cleared app-data launch to Login with no `CookiePrefs.xml`, and an empty crash buffer. Physical-phone validation remains intentionally deferred to the final stage by product-owner decision.
 - Stage 2.4 completed in test build `1.0.8 (9)`: A-04 routes active episode, progress/seek/completion, and playback-speed writes through a persistent retry manager. Pending state is coalesced without losing completion or seek semantics, replayed after process restart, reconciled before queue restoration, and excluded from backup/device transfer.
 - Evidence: 59 unit tests, lint/build gate, 17/17 connected Pixel 9 tests, plus real test-backend offline/process-stop/reconnect checks for seek progress, speed, and active playback. Each mutation existed on disk before process stop, cleared after successful retry, restored the confirmed UI state without autoplay, and produced no crash. Completion retry/fallback is unit-covered; the expanded Media3 completion/auto-next device matrix remains Stage 3 work.
-- Remaining Stage 2 work must not start until the product owner accepts Stage 2.4.
+- Stage 2.5 / A-05 completed in test build `1.0.9 (10)`: Settings retains the backend-confirmed refresh time or proxy value when the follow-up Settings/Scheduler/Proxy reload fails, clears the saving state, and reports that the save succeeded but status refresh failed. Follow-up status endpoints now require successful HTTP responses instead of silently treating failures as empty status.
+- Evidence: 61 unit tests including confirmed-save/reload-failure and successful-reload paths, lint/build gate, and 17/17 connected Pixel 9 regression tests.
+- The product owner instructed Android to finish the remaining Stage 2 work without intermediate confirmation; A-06 follows in its own scoped commit.
 
 ### Stage 3 — Automated regression coverage
 

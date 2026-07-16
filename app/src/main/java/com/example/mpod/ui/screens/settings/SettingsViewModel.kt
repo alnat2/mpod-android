@@ -51,9 +51,16 @@ class SettingsViewModel @Inject constructor(
                 api.updateSettings(SettingsUpdateRequest(dailyRefreshTime = value))
             }.getOrNull()
             if (response?.isSuccessful == true) {
-                _state.value = runCatching { loadSettingsState() }.getOrElse {
-                    _state.value.copy(isSavingRefreshTime = false)
-                }
+                val confirmed = response.body()?.settings
+                val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
+                    dailyRefreshTime = confirmed?.dailyRefreshTime ?: value,
+                    isSavingRefreshTime = false
+                )
+                _state.value = reloadAfterConfirmedSave(
+                    confirmedState = confirmedState,
+                    reloadErrorMessage = "Refresh time was saved, but status could not be refreshed.",
+                    reload = ::loadSettingsState
+                )
             } else {
                 _state.value = _state.value.copy(
                     isSavingRefreshTime = false,
@@ -70,9 +77,16 @@ class SettingsViewModel @Inject constructor(
                 api.updateSettings(SettingsUpdateRequest(proxyEnabled = enabled))
             }.getOrNull()
             if (response?.isSuccessful == true) {
-                _state.value = runCatching { loadSettingsState() }.getOrElse {
-                    _state.value.copy(isSavingProxy = false)
-                }
+                val confirmed = response.body()?.settings
+                val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
+                    proxyEnabled = confirmed?.proxyEnabled ?: enabled,
+                    isSavingProxy = false
+                )
+                _state.value = reloadAfterConfirmedSave(
+                    confirmedState = confirmedState,
+                    reloadErrorMessage = "Proxy setting was saved, but status could not be refreshed.",
+                    reload = ::loadSettingsState
+                )
             } else {
                 _state.value = _state.value.copy(
                     isSavingProxy = false,
@@ -114,8 +128,12 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun loadSettingsState(): SettingsUiState {
         val settings = api.getSettings().requireBody("Could not load settings.").settings
-        val scheduler = api.getJobsStatus().body()?.scheduler
-        val proxy = api.getProxyStatus().body()?.proxy
+        val scheduler = api.getJobsStatus()
+            .requireBody("Could not load refresh status.")
+            .scheduler
+        val proxy = api.getProxyStatus()
+            .requireBody("Could not load proxy status.")
+            .proxy
 
         return SettingsUiState(
             dailyRefreshTime = settings.dailyRefreshTime ?: "03:00",
@@ -179,3 +197,23 @@ data class SettingsUiState(
     val schedulerStatusText: String = "Status: idle · last refresh never",
     val appBuild: String? = null
 )
+
+internal suspend fun reloadAfterConfirmedSave(
+    confirmedState: SettingsUiState,
+    reloadErrorMessage: String,
+    reload: suspend () -> SettingsUiState
+): SettingsUiState {
+    return runCatching { reload() }.getOrElse {
+        confirmedState.copy(errorMessage = reloadErrorMessage)
+    }
+}
+
+private fun SettingsUiState.withConfirmedSettings(settings: SettingsDto?): SettingsUiState {
+    if (settings == null) return this
+    return copy(
+        dailyRefreshTime = settings.dailyRefreshTime ?: dailyRefreshTime,
+        proxyEnabled = settings.proxyEnabled ?: proxyEnabled,
+        proxyConfigured = settings.proxyConfigured ?: proxyConfigured,
+        appBuild = settings.appBuild ?: appBuild
+    )
+}

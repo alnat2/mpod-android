@@ -160,6 +160,8 @@ Resolution evidence: active playback, progress/seek/completion, and speed mutati
 
 ### A-05 — P2 — Settings can hide a failed post-save reload
 
+Status: resolved and verified in Android `1.0.9 (10)` on 2026-07-16.
+
 Reproduction:
 
 1. Allow the settings PATCH to succeed.
@@ -172,6 +174,8 @@ Actual: both refresh-time and proxy flows only clear the saving flag; no error i
 Affected code: `SettingsViewModel.kt:47-81`.
 
 Missing test: PATCH success followed by failure of settings, scheduler, or proxy GET.
+
+Resolution evidence: Android applies the successful PATCH response as confirmed local state before reloading Settings/Scheduler/Proxy. A failed reload retains the confirmed value, clears the relevant saving flag, and shows an explicit saved-but-status-refresh-failed message. Status GET responses now require a successful HTTP response and body. Unit tests cover both confirmed-save/reload-failure and successful replacement by reloaded state; the complete local and connected gates passed.
 
 ### A-06 — P2 — Mark all listened is non-atomic and can partially complete
 
