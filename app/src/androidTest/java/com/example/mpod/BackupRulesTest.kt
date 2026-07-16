@@ -11,19 +11,32 @@ import org.xmlpull.v1.XmlPullParser
 class BackupRulesTest {
     @Test
     fun legacyBackupExcludesSessionCookies() {
-        val exclusions = readCookieExclusionParents(R.xml.backup_rules)
+        val cookieExclusions = readExclusionParents(R.xml.backup_rules, "CookiePrefs.xml")
+        val pendingSyncExclusions = readExclusionParents(
+            R.xml.backup_rules,
+            "PendingPlaybackSync.xml"
+        )
 
-        assertEquals(listOf("full-backup-content"), exclusions)
+        assertEquals(listOf("full-backup-content"), cookieExclusions)
+        assertEquals(listOf("full-backup-content"), pendingSyncExclusions)
     }
 
     @Test
     fun cloudBackupAndDeviceTransferExcludeSessionCookies() {
-        val exclusions = readCookieExclusionParents(R.xml.data_extraction_rules)
+        val cookieExclusions = readExclusionParents(
+            R.xml.data_extraction_rules,
+            "CookiePrefs.xml"
+        )
+        val pendingSyncExclusions = readExclusionParents(
+            R.xml.data_extraction_rules,
+            "PendingPlaybackSync.xml"
+        )
 
-        assertEquals(listOf("cloud-backup", "device-transfer"), exclusions)
+        assertEquals(listOf("cloud-backup", "device-transfer"), cookieExclusions)
+        assertEquals(listOf("cloud-backup", "device-transfer"), pendingSyncExclusions)
     }
 
-    private fun readCookieExclusionParents(resourceId: Int): List<String> {
+    private fun readExclusionParents(resourceId: Int, excludedPath: String): List<String> {
         val resources = ApplicationProvider.getApplicationContext<MpodApplication>().resources
         val parser = resources.getXml(resourceId)
         val parents = mutableListOf<String>()
@@ -40,7 +53,7 @@ class BackupRulesTest {
                         "exclude" -> {
                             val domain = parser.getAttributeValue(null, "domain")
                             val path = parser.getAttributeValue(null, "path")
-                            if (domain == "sharedpref" && path == "CookiePrefs.xml") {
+                            if (domain == "sharedpref" && path == excludedPath) {
                                 parents += parent
                             }
                         }

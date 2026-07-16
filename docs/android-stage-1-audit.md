@@ -140,6 +140,8 @@ Resolution evidence: `CookiePrefs.xml` is excluded from legacy backup, Android c
 
 ### A-04 — P1 — Playback synchronization failures are silent and important writes are not retried
 
+Status: resolved and verified in Android `1.0.8 (9)` on 2026-07-16.
+
 Reproduction:
 
 1. Start playback, then make `PUT /api/playback/active` or `POST /api/playback` fail.
@@ -153,6 +155,8 @@ Actual: active episode, progress, speed, completion, and queue-reconciliation re
 Affected code: `PlaybackService.kt:101-119`, `161-169`, `173-263`, and `283-308`.
 
 Missing test: device-level Media3/service suite with transient 5xx/timeout/offline failures, retry, pause, seek, auto-next, completion, and process restart.
+
+Resolution evidence: active playback, progress/seek/completion, and speed mutations now enter a persistent coalescing store before the network request and retry with bounded backoff after transient failures. Completion cannot be overwritten by later progress, backward-seek intent remains until acknowledgement, delayed completion uses fresh retry time, and pending state is reconciled before queue restoration after process restart. The full gate passed with 59 unit and 17/17 connected tests. Pixel 9 real-backend checks verified offline seek, speed, and active mutations across forced process stop and reconnect; the pending XML cleared only after successful retry, Home restored position/speed/active state without autoplay, and the crash buffer remained empty. A broader automated Media3 completion/auto-next/interruption matrix remains tracked for Stage 3.
 
 ### A-05 — P2 — Settings can hide a failed post-save reload
 

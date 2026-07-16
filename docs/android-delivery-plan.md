@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 2.3)
+Last updated: 2026-07-16 (Stage 2.4)
 
-Current Android baseline: `1.0.7 (8)`, Stage 2.3 scoped commit
+Current Android baseline: `1.0.8 (9)`, Stage 2.4 scoped commit
 
 ## Purpose
 
@@ -67,14 +67,14 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
 | Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery exercised on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
-| Session backup/transfer | Verified | CookiePrefs excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
+| Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
 | Initial setup and login | Implemented | Connected to real backend and manually exercised | Dedicated UI and API integration matrix, validation and error-state acceptance |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
-| Playback service | Implemented | Queue reconciliation unit tests; manual playback checks from earlier stages | Automated Media3/service integration, interruption, network loss, completion, and process-death scenarios |
+| Playback service | Verified | Queue reconciliation and durable-mutation unit tests; Pixel 9 offline seek/active/speed recovery across process stop | Expanded Media3 interruption, completion/auto-next, audio-network-loss, and OS process-death matrix |
 | Active episode restore | Verified | Backend integration and queue reconciliation tests | Full device restart scenario in release checklist |
 | Queue reorder | Implemented | Pure reorder unit tests and manual checks | Backend failure rollback and gesture instrumentation |
-| Playback speed | Implemented | Backend persistence code and manual checks | Automated persistence and restoration test |
+| Playback speed | Verified | Durable backend sync tests plus Pixel 9 offline/process-stop/reconnect restoration to 2.0x | Cross-device conflict and full speed-option matrix |
 | Subscriptions carousel/filter | Verified | Compose UI tests and real backend checks | Rotation/process-recreation behavior |
 | Refresh one/all | Verified | Refresh-all accepted/running/completed flow checked on the real test backend; polling unit tests and UI state tests; per-podcast real checks from accepted baseline | Real backend failed-job scenario and long-running/stuck-job policy |
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum and real failed-image case | Success/loading/cache matrix across multiple hosts |
@@ -95,8 +95,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 51 local unit tests.
-- 16 connected Android/Compose UI/configuration tests.
+- 59 local unit tests.
+- 17 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -111,7 +111,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 
 - No CI workflow currently enforces the test suite on every push.
 - ViewModels and Retrofit failure/retry paths have little direct automated coverage.
-- PlaybackService lacks device-level automated coverage.
+- PlaybackService now has durable-sync unit coverage and a connected persistence check, but still lacks a complete automated Media3 device matrix for interruptions, completion/auto-next, and audio-network loss.
 - Setup/login/logout, RSS add, OPML, download, unsubscribe, and Settings backend saves lack complete end-to-end automation.
 - Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
@@ -191,6 +191,7 @@ Verification evidence:
 Confirmed implementation decisions:
 
 - Backend unavailable: dedicated state with a `Retry` action.
+- Playback writes: Android durably retains the latest active episode and speed plus one coalesced update per episode. Completion cannot be replaced by later progress; `didSeek` remains set until acknowledgement. Network errors, HTTP 401/408/409/425/429, and 5xx retry with a 1/2/5/15/30-second capped backoff; semantic 4xx failures are discarded. Pending mutations survive process restart, are excluded from Android backup/device transfer, and are removed only after 2xx or a permanent client error.
 - Mark all listened: backend-owned `POST /api/podcasts/{podcastId}/mark-all-listened`; atomic DB updates, idempotent `markedEpisodes` response, and explicitly separate filesystem cleanup/reconcile semantics.
 - OPML import: 5 MB (`5,000,000` bytes) maximum enforced by both Android and backend; oversized requests return HTTP 413 with `OPML_TOO_LARGE`.
 
@@ -217,7 +218,9 @@ Progress:
 - Evidence: 51 unit tests, lint/build gate, 14/14 connected Pixel 9 tests, package-isolated offline cold start with a valid stored session, successful Retry restoration directly to Subscriptions, and an empty AndroidRuntime crash log.
 - Stage 2.3 completed in test build `1.0.7 (8)`: A-03 keeps backup enabled for non-sensitive preferences while excluding `CookiePrefs.xml` from legacy backup, cloud backup, and device transfer.
 - Evidence: 51 unit tests, lint/build gate, 16/16 connected Pixel 9 tests including direct parsing of both packaged backup-rule resources, cleared app-data launch to Login with no `CookiePrefs.xml`, and an empty crash buffer. Physical-phone validation remains intentionally deferred to the final stage by product-owner decision.
-- Remaining Stage 2 work must not start until the product owner accepts Stage 2.3.
+- Stage 2.4 completed in test build `1.0.8 (9)`: A-04 routes active episode, progress/seek/completion, and playback-speed writes through a persistent retry manager. Pending state is coalesced without losing completion or seek semantics, replayed after process restart, reconciled before queue restoration, and excluded from backup/device transfer.
+- Evidence: 59 unit tests, lint/build gate, 17/17 connected Pixel 9 tests, plus real test-backend offline/process-stop/reconnect checks for seek progress, speed, and active playback. Each mutation existed on disk before process stop, cleared after successful retry, restored the confirmed UI state without autoplay, and produced no crash. Completion retry/fallback is unit-covered; the expanded Media3 completion/auto-next device matrix remains Stage 3 work.
+- Remaining Stage 2 work must not start until the product owner accepts Stage 2.4.
 
 ### Stage 3 — Automated regression coverage
 

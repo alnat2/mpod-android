@@ -3,4 +3,7 @@
     <exclude
         domain="sharedpref"
         path="CookiePrefs.xml" />
+    <exclude
+        domain="sharedpref"
+        path="PendingPlaybackSync.xml" />
 </full-backup-content>

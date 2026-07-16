@@ -15,10 +15,9 @@ import androidx.media3.session.MediaSessionService
 import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.PersistentCookieJar
-import com.example.mpod.data.network.model.ActivePlaybackRequest
 import com.example.mpod.data.network.model.PlaybackQueueEpisodeDto
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
-import com.example.mpod.data.network.model.SettingsUpdateRequest
+import com.example.mpod.data.network.model.PlaybackUpdateResponse
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +53,7 @@ class PlaybackService : MediaSessionService() {
     private var lastCompletedEpisodeId: Int? = null
     private var applyingServerSpeed = false
     private val queueReconciliationMutex = Mutex()
+    private lateinit var playbackSyncManager: PlaybackSyncManager
 
     @UnstableApi
     override fun onCreate() {
@@ -75,9 +75,23 @@ class PlaybackService : MediaSessionService() {
             .also { it.addListener(playerListener) }
         mediaSession = MediaSession.Builder(this, player).build()
 
+        playbackSyncManager = PlaybackSyncManager(
+            transport = ApiPlaybackSyncTransport(api),
+            store = SharedPreferencesPendingPlaybackSyncStore(this),
+            scope = serviceScope,
+            onRetriedCompletion = ::handleRetriedCompletion
+        )
+        val pendingSpeed = playbackSyncManager.pendingSnapshot().speedLabel
+        pendingSpeed?.toPlaybackSpeedOrNull()?.let { speed ->
+            applyingServerSpeed = true
+            player.playbackParameters = PlaybackParameters(speed)
+            applyingServerSpeed = false
+        }
         serviceScope.launch {
-            loadSettings()
+            playbackSyncManager.flushPendingOnce()
+            if (pendingSpeed == null) loadSettings()
             loadInitialQueue()
+            playbackSyncManager.start()
         }
         serviceScope.launch {
             queueInvalidator.events.collectLatest {
@@ -117,16 +131,23 @@ class PlaybackService : MediaSessionService() {
         queueReconciliationMutex.withLock {
             val response = runCatching { api.getPlaybackQueue() }.getOrNull()
             val payload = response?.takeIf { it.isSuccessful }?.body() ?: return@withLock
-            val queue = payload.queue
+            val pending = playbackSyncManager.pendingSnapshot()
+            val pendingByEpisode = pending.playbackUpdates.associateBy { it.episodeId }
+            val queue = payload.queue.filterNot { pendingByEpisode[it.id]?.completed == true }
             val currentEpisodeId = currentEpisodeId()
             val target = resolveQueuePlaybackTarget(
                 queue = queue.map {
                     QueueEpisodeState(
                         episodeId = it.id,
-                        savedPositionMs = (it.playback?.positionSeconds ?: 0) * 1_000L
+                        savedPositionMs = (
+                            pendingByEpisode[it.id]?.positionSeconds
+                                ?: it.playback?.positionSeconds
+                                ?: 0
+                            ) * 1_000L
                     )
                 },
-                backendActiveEpisodeId = payload.activePlayback?.episodeId,
+                backendActiveEpisodeId = pending.activeEpisodeId
+                    ?: payload.activePlayback?.episodeId,
                 currentEpisodeId = currentEpisodeId,
                 currentPositionMs = player.currentPosition,
                 currentPlayWhenReady = player.playWhenReady,
@@ -161,7 +182,7 @@ class PlaybackService : MediaSessionService() {
             if (target.playWhenReady) {
                 startPeriodicSync()
                 if (preferredEpisodeId == target.episodeId && forcePlayPreferred) {
-                    runCatching { api.setActivePlayback(ActivePlaybackRequest(target.episodeId)) }
+                    playbackSyncManager.submitActive(target.episodeId)
                 }
             } else {
                 syncJob?.cancel()
@@ -175,7 +196,7 @@ class PlaybackService : MediaSessionService() {
             if (isPlaying) {
                 currentEpisodeId()?.let { episodeId ->
                     serviceScope.launch {
-                        runCatching { api.setActivePlayback(ActivePlaybackRequest(episodeId)) }
+                        playbackSyncManager.submitActive(episodeId)
                     }
                 }
                 startPeriodicSync()
@@ -223,15 +244,15 @@ class PlaybackService : MediaSessionService() {
 
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
                 serviceScope.launch {
-                    completeEpisode(finishedEpisodeId)
+                    val completion = completeEpisode(finishedEpisodeId)
                     nextEpisodeId?.let {
-                        runCatching { api.setActivePlayback(ActivePlaybackRequest(it)) }
+                        playbackSyncManager.submitActive(it)
                     }
-                    reconcileQueueWithBackend()
+                    if (completion != null) reconcileQueueWithBackend()
                 }
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
                 serviceScope.launch {
-                    runCatching { api.setActivePlayback(ActivePlaybackRequest(nextEpisodeId)) }
+                    playbackSyncManager.submitActive(nextEpisodeId)
                 }
             }
         }
@@ -242,7 +263,8 @@ class PlaybackService : MediaSessionService() {
             if (lastCompletedEpisodeId == episodeId) return
             lastCompletedEpisodeId = episodeId
             serviceScope.launch {
-                val fallbackEpisodeId = completeEpisode(episodeId)
+                val completion = completeEpisode(episodeId) ?: return@launch
+                val fallbackEpisodeId = completion.nextEpisodeId
                 if (fallbackEpisodeId != null) {
                     reconcileQueueWithBackend(
                         preferredEpisodeId = fallbackEpisodeId,
@@ -258,7 +280,7 @@ class PlaybackService : MediaSessionService() {
             if (applyingServerSpeed) return
             val label = playbackParameters.speed.toPlaybackSpeedLabel() ?: return
             serviceScope.launch {
-                runCatching { api.updateSettings(SettingsUpdateRequest(playbackSpeed = label)) }
+                playbackSyncManager.submitSpeed(label)
             }
         }
     }
@@ -286,26 +308,38 @@ class PlaybackService : MediaSessionService() {
         durationSeconds: Int,
         didSeek: Boolean = false
     ) {
-        runCatching {
-            api.updatePlayback(
-                playbackRequest(episodeId, positionSeconds, durationSeconds, didSeek = didSeek)
-            )
-        }
+        playbackSyncManager.submitPlayback(
+            playbackRequest(episodeId, positionSeconds, durationSeconds, didSeek = didSeek)
+        )
     }
 
-    private suspend fun completeEpisode(episodeId: Int): Int? {
+    private suspend fun completeEpisode(episodeId: Int): PlaybackUpdateResponse? {
         val durationSeconds = durationForEpisode(episodeId)
-        val response = runCatching {
-            api.updatePlayback(
-                playbackRequest(
-                    episodeId = episodeId,
-                    positionSeconds = durationSeconds,
-                    durationSeconds = durationSeconds,
-                    completed = true
-                )
+        return playbackSyncManager.submitPlayback(
+            playbackRequest(
+                episodeId = episodeId,
+                positionSeconds = durationSeconds,
+                durationSeconds = durationSeconds,
+                completed = true
             )
-        }.getOrNull()
-        return response?.takeIf { it.isSuccessful }?.body()?.nextEpisodeId
+        )
+    }
+
+    private suspend fun handleRetriedCompletion(
+        request: PlaybackUpdateRequest,
+        response: PlaybackUpdateResponse
+    ) {
+        val canResumeFallback = player.playbackState == Player.STATE_ENDED &&
+            currentEpisodeId() == request.episodeId
+        val fallbackEpisodeId = response.nextEpisodeId.takeIf { canResumeFallback }
+        if (fallbackEpisodeId != null) {
+            reconcileQueueWithBackend(
+                preferredEpisodeId = fallbackEpisodeId,
+                forcePlayPreferred = true
+            )
+        } else {
+            reconcileQueueWithBackend()
+        }
     }
 
     private fun playbackRequest(
