@@ -95,8 +95,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 66 local unit tests.
-- 17 connected Android/Compose UI/configuration tests.
+- 75 local unit tests.
+- 27 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -247,6 +247,7 @@ Progress:
 
 - Stage 3.1 / A-07 implemented: OPML imports no longer allocate the selected document with `readBytes()`. Android rejects known files over `5,000,000` bytes before the request, enforces the same limit while streaming when provider metadata is absent or incorrect, and distinguishes size and provider-read failures in the UI. Unit coverage includes the exact limit, known and streaming over-limit paths, provider-open failure, and provider-read failure. Final Stage 3 gate and emulator fixture verification remain pending.
 - Stage 3.2 / A-08 implemented: GitHub Actions runs unit tests, Android lint, debug APK assembly, and Android-test APK assembly on every push and pull request. Pull requests and manual dispatch additionally run the connected suite on an Android 14 Google APIs emulator. Reports are retained as workflow artifacts. Local workflow structure and commands are verified; the first upstream workflow execution remains pending.
+- Stage 3.3 completed: repeatable API-contract coverage now pins session/login/register/logout, RSS add, streaming OPML import/export, Settings PATCH fields, proxy status, and scheduler status endpoints. Connected Compose coverage verifies login/setup credential dispatch, authentication loading/error UI, RSS validation and trimming, OPML mode/error/loading actions, Settings refresh save, proxy, export, logout, loading, and backend-error states. The Pixel 9 connected suite passes 27/27 tests.
 
 Exit criterion: the agreed critical matrix is automated or explicitly documented as a manual release check.
 
