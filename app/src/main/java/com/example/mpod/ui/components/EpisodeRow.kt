@@ -21,6 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,7 +81,7 @@ fun EpisodeRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(76.dp)
+            .heightIn(min = 76.dp)
             .figmaDropShadow(radius = 4.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(backgroundColor)
@@ -89,7 +93,7 @@ fun EpisodeRow(
         if (showDragHandle) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_drag),
-                contentDescription = "Drag",
+                contentDescription = null,
                 modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -163,12 +167,16 @@ fun EpisodeRow(
                     } else {
                         Modifier.clickable { menuExpanded = true }
                     }
-                ),
+                )
+                .semantics {
+                    contentDescription = "Options for $title"
+                    role = Role.Button
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_ellipsis_vertical),
-                contentDescription = "Options",
+                contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary
             )

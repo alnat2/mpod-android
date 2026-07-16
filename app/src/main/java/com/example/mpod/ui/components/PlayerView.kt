@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,6 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,12 +94,12 @@ fun PlayerView(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .height(246.dp)
+            .heightIn(min = 246.dp)
             .figmaDropShadow(radius = 16.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
@@ -144,6 +149,7 @@ fun PlayerView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(16.dp)
+                        .progressSemantics(progress.coerceIn(0f, 1f))
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
@@ -177,7 +183,11 @@ fun PlayerView(
                         .size(36.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                        .clickable { showSpeedSheet = true }
+                        .semantics {
+                            contentDescription = "Playback speed ${speedLabel}x"
+                            role = Role.Button
+                        }
+                        .clickable(role = Role.Button) { showSpeedSheet = true }
                 ) {
                     Text(
                         text = speedLabel,
@@ -193,11 +203,12 @@ fun PlayerView(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
-                        .clickable(onClick = onSeekBackward)
+                        .semantics { contentDescription = "Rewind 10 seconds" }
+                        .clickable(role = Role.Button, onClick = onSeekBackward)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_go_backward_10_sec),
-                        contentDescription = "Rewind 10s",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(40.dp)
                     )
@@ -217,11 +228,12 @@ fun PlayerView(
                             spotColor = Color(0x1A000000)
                         )
                         .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .clickable(onClick = onPlayClick)
+                        .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
+                        .clickable(role = Role.Button, onClick = onPlayClick)
                 ) {
                     Icon(
                         painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -232,11 +244,12 @@ fun PlayerView(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(40.dp)
-                        .clickable(onClick = onSeekForward)
+                        .semantics { contentDescription = "Forward 15 seconds" }
+                        .clickable(role = Role.Button, onClick = onSeekForward)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_go_forward_15_sec),
-                        contentDescription = "Forward 15s",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(40.dp)
                     )
@@ -247,11 +260,12 @@ fun PlayerView(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(36.dp)
-                        .clickable(onClick = onNotesClick)
+                        .semantics { contentDescription = "Show notes" }
+                        .clickable(role = Role.Button, onClick = onNotesClick)
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_note),
-                        contentDescription = "Notes",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(30.dp)
                     )

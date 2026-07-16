@@ -9,6 +9,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -145,6 +148,7 @@ fun SquareIconButton(
         Modifier.clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
+            role = Role.Button,
             onClick = onClick
         )
     }
@@ -156,11 +160,12 @@ fun SquareIconButton(
             .clip(RoundedCornerShape(radius))
             .background(containerColor)
             .then(if (border == null) Modifier else Modifier.border(border, RoundedCornerShape(radius)))
+            .semantics { this.contentDescription = contentDescription }
             .then(clickModifier)
     ) {
         Icon(
             painter = painterResource(id = iconRes),
-            contentDescription = contentDescription,
+            contentDescription = null,
             modifier = Modifier
                 .size(iconSize)
                 .rotate(iconRotation),
@@ -196,7 +201,7 @@ fun MpodButton(
             .background(background)
             .then(if (outlined) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(radius)) else Modifier)
             .alpha(if (enabled) 1f else 0.65f)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -387,7 +392,12 @@ fun MpodSwitch(
                 }
             )
             .alpha(if (enabled) 1f else 0.65f)
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange
+            )
             .padding(2.dp),
         contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
     ) {
@@ -422,7 +432,8 @@ fun MpodBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(65.dp)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .selectableGroup(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -432,7 +443,11 @@ fun MpodBottomNav(
                 Column(
                     modifier = Modifier
                         .height(56.dp)
-                        .clickable { onNavigate(screen) },
+                        .selectable(
+                            selected = selected,
+                            role = Role.Tab,
+                            onClick = { onNavigate(screen) }
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -444,7 +459,7 @@ fun MpodBottomNav(
                     ) {
                         Icon(
                             painter = painterResource(id = iconRes),
-                            contentDescription = label,
+                            contentDescription = null,
                             tint = color,
                             modifier = Modifier.size(20.dp)
                         )
