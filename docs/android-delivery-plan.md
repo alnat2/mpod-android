@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (Stage 3 in progress)
+Last updated: 2026-07-16 (Stage 3 complete)
 
-Current Android baseline: `1.0.10 (11)`, Stage 3 in progress
+Current Android baseline: `1.0.11 (12)`, Stage 3 completed
 
 ## Purpose
 
@@ -95,8 +95,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 86 local unit tests.
-- 36 connected Android/Compose UI/configuration tests.
+- 85 local unit tests.
+- 35 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -245,13 +245,30 @@ Also add CI for unit tests, lint, and debug assembly. Connected tests may use a 
 
 Progress:
 
-- Stage 3.1 / A-07 implemented: OPML imports no longer allocate the selected document with `readBytes()`. Android rejects known files over `5,000,000` bytes before the request, enforces the same limit while streaming when provider metadata is absent or incorrect, and distinguishes size and provider-read failures in the UI. Unit coverage includes the exact limit, known and streaming over-limit paths, provider-open failure, and provider-read failure. Final Stage 3 gate and emulator fixture verification remain pending.
+- Stage 3.1 / A-07 completed: OPML imports no longer allocate the selected document with `readBytes()`. Android rejects known files over `5,000,000` bytes before the request, enforces the same limit while streaming when provider metadata is absent or incorrect, and distinguishes size and provider-read failures in the UI. Unit coverage includes the exact limit, known and streaming over-limit paths, provider-open failure, and provider-read failure; the final Stage 3 gate passes.
 - Stage 3.2 / A-08 implemented: GitHub Actions runs unit tests, Android lint, debug APK assembly, and Android-test APK assembly on every push and pull request. Pull requests and manual dispatch additionally run the connected suite on an Android 14 Google APIs emulator. Reports are retained as workflow artifacts. Local workflow structure and commands are verified; the first upstream workflow execution remains pending.
 - Stage 3.3 completed: repeatable API-contract coverage now pins session/login/register/logout, RSS add, streaming OPML import/export, Settings PATCH fields, proxy status, and scheduler status endpoints. Connected Compose coverage verifies login/setup credential dispatch, authentication loading/error UI, RSS validation and trimming, OPML mode/error/loading actions, Settings refresh save, proxy, export, logout, loading, and backend-error states. The Pixel 9 connected suite passes 27/27 tests.
 - Stage 3.4 completed: API-contract tests pin podcast refresh/unsubscribe/mark-all, playlist read/add/remove/reorder, and episode read/listened/download requests. Connected UI coverage now dispatches Home playback/seek/speed/notes and playlist removal; Subscriptions add/remove playlist, listened/unlistened, download, unsubscribe/Undo, load retry, download-error dismissal, and both empty-library add paths. The Pixel 9 connected suite passes 36/36 tests. Backend filesystem download lifecycle and long-press queue dragging remain explicit manual release checks.
-- Stage 3.5 implemented: playback contract coverage pins queue load, active episode, progress, seek, completion, and speed writes. Unit coverage now includes every supported playback speed, invalid-speed rejection, initial and changed queue reconciliation, completion fallback, missing fallback behavior, delayed-completion auto-next, and protection against a late retry hijacking newer playback. Real audio focus, noisy-route handling, Bluetooth/headset interruption, audio-network loss, and OS service/process termination remain device-only release checks. Final Stage 3 gate remains pending.
+- Stage 3.5 completed: playback contract coverage pins queue load, active episode, progress, seek, completion, and speed writes. Unit coverage now includes every supported playback speed, invalid-speed rejection, initial and changed queue reconciliation, completion fallback, missing fallback behavior, delayed-completion auto-next, and protection against a late retry hijacking newer playback. Real audio focus, noisy-route handling, Bluetooth/headset interruption, audio-network loss, and OS service/process termination remain device-only release checks; the final Stage 3 gate passes.
 
-Exit criterion: the agreed critical matrix is automated or explicitly documented as a manual release check.
+Critical regression matrix:
+
+| Flow | Automated evidence | Required manual release check |
+|---|---|---|
+| Setup, login, session restore, logout | Auth API contract, launch-state unit matrix, Login/Setup/Retry Compose tests | Expired-cookie recovery and real logout success/failure across process restart |
+| RSS add and validation | URL validation/dispatch UI tests and exact create-podcast request contract | Real valid, duplicate, malformed, unreachable, and slow feed fixture |
+| OPML import/export | Exact-limit/over-limit/provider-read unit tests, streaming multipart contract, modal and Settings UI tests | Android document-picker cancel/permission/reopen, real import result, exported file contents |
+| Refresh, filtering, artwork | Refresh job unit matrix, visibility and fallback UI tests, refresh API contracts | Failed/stuck backend job and successful artwork loading/cache across multiple hosts |
+| Playlist and destructive actions | Add/remove/reorder/listened/mark-all API and state tests plus Home/Subscriptions UI dispatch | Long-press drag gesture, backend rollback, 15-second unsubscribe commit/Undo across backgrounding |
+| Show notes and download | Show-notes data/UI tests, download endpoint and failure-banner UI tests | Real download success/failure/cancel, server file cleanup, listened cleanup, playback from downloaded file |
+| Playback and synchronization | Queue/active/progress/seek/completion/speed contracts, retry persistence/coalescing, completion/next decisions, Home control UI | Real audio completion/auto-next, focus/noisy route, Bluetooth/headset, audio-network loss, service/process kill |
+| Settings, proxy and theme | Save/reload unit tests, Settings contracts, proxy/theme/time UI tests | 12/24-hour picker, proxy off/running/error against backend, final light/dark screen audit |
+
+The manual column is the written release checklist for scenarios that depend on Android system services, external document providers, backend filesystem state, real audio delivery, or timed lifecycle behavior. These checks are not claimed as automated and remain mandatory in their assigned later stage.
+
+- Stage 3.6 completed: the complete local gate and Pixel 9 connected suite pass after removing the unused Room stack and generated template tests (A-10). Test build `1.0.11 (12)` contains 85 product unit tests and 35 connected product tests. The CI workflow is ready for its first upstream run.
+
+Stage 3 exit criterion: completed on 2026-07-16. Every agreed critical flow has repeatable automated evidence and/or an explicit mandatory manual release check. Stage 4 is next; physical-phone validation remains intentionally assigned to device-sensitive and final release work.
 
 ### Stage 4 — Figma parity and accessibility
 

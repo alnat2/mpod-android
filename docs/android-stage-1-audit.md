@@ -156,7 +156,7 @@ Affected code: `PlaybackService.kt:101-119`, `161-169`, `173-263`, and `283-308`
 
 Missing test: device-level Media3/service suite with transient 5xx/timeout/offline failures, retry, pause, seek, auto-next, completion, and process restart.
 
-Resolution evidence: active playback, progress/seek/completion, and speed mutations now enter a persistent coalescing store before the network request and retry with bounded backoff after transient failures. Completion cannot be overwritten by later progress, backward-seek intent remains until acknowledgement, delayed completion uses fresh retry time, and pending state is reconciled before queue restoration after process restart. The full gate passed with 59 unit and 17/17 connected tests. Pixel 9 real-backend checks verified offline seek, speed, and active mutations across forced process stop and reconnect; the pending XML cleared only after successful retry, Home restored position/speed/active state without autoplay, and the crash buffer remained empty. A broader automated Media3 completion/auto-next/interruption matrix remains tracked for Stage 3.
+Resolution evidence: active playback, progress/seek/completion, and speed mutations now enter a persistent coalescing store before the network request and retry with bounded backoff after transient failures. Completion cannot be overwritten by later progress, backward-seek intent remains until acknowledgement, delayed completion uses fresh retry time, and pending state is reconciled before queue restoration after process restart. The full gate passed with 59 unit and 17/17 connected tests. Pixel 9 real-backend checks verified offline seek, speed, and active mutations across forced process stop and reconnect; the pending XML cleared only after successful retry, Home restored position/speed/active state without autoplay, and the crash buffer remained empty. Stage 3 added playback contracts, completion/next decisions, speed and queue matrices; system audio interruptions remain explicit device release checks.
 
 ### A-05 — P2 — Settings can hide a failed post-save reload
 
@@ -273,6 +273,8 @@ Missing test: none required beyond removing the unreachable action or separating
 
 ### A-10 — P3 — Unused Room stack and template tests add noise
 
+Status: resolved in Stage 3.6 / `1.0.11 (12)`.
+
 Expected: dependencies and tests represent actual application behavior.
 
 Actual: Room runtime/compiler are configured without any Room database usage, and generated example unit/instrumentation tests remain in the suite.
@@ -280,6 +282,8 @@ Actual: Room runtime/compiler are configured without any Room database usage, an
 Affected code: `app/build.gradle.kts`, `ExampleUnitTest.kt`, `ExampleInstrumentedTest.kt`.
 
 Missing verification: dependency cleanup build and updated test count.
+
+Resolution evidence: unused Room runtime/KTX/compiler dependencies and their version-catalog entries were removed. The generated example JVM and instrumentation tests were deleted, leaving 85 product unit tests and 35 connected product tests. The complete unit/lint/build/connected gate passes without Room.
 
 ## Release-only blockers already assigned to later stages
 
@@ -299,8 +303,8 @@ These items remain Stage 6 work unless the product owner changes their priority.
 3. Stage 2C / A-03 session backup protection: completed.
 4. Stage 2D / A-04 playback synchronization and durable retry: completed.
 5. Stage 2E / A-05 and A-06 settings/mark-all consistency: completed.
-6. Stage 3 remains: A-07 input hardening, A-08 CI, and the complete critical regression matrix.
-7. Opportunistic cleanup remains: A-09 and A-10 only when adjacent code is changed.
+6. Stage 3 / A-07, A-08, and the complete critical regression matrix: completed.
+7. Opportunistic cleanup remaining: A-09 only when the adjacent production action model is changed.
 
 ## Accepted implementation decisions
 
@@ -310,4 +314,4 @@ The product owner accepted the prioritized backlog and confirmed:
 2. Mark all listened uses the accepted backend-owned contract above, with an atomic DB transaction and explicitly non-atomic filesystem cleanup.
 3. OPML import is limited to 5 MB on both Android and backend, with the accepted `OPML_TOO_LARGE` error contract.
 
-Stage 1 and Stage 2 are complete. Stage 3 is the next planned stage.
+Stages 1 through 3 are complete. Stage 4 is the next planned stage.
