@@ -247,6 +247,8 @@ Resolution evidence: Android now uses a streaming multipart request body. A know
 
 ### A-08 — P2 — No CI enforces the existing test gate
 
+Status: resolved in Stage 3.2; first upstream workflow run pending.
+
 Reproduction: push a commit that fails unit tests, lint, or debug assembly.
 
 Expected: the shared repository blocks or visibly fails the change before APK handoff.
@@ -256,6 +258,8 @@ Actual: all checks depend on a developer remembering to run local commands; no C
 Affected area: repository delivery process.
 
 Missing gate: unit tests, lint, debug app/test APK assembly on every change; connected tests at the agreed cadence.
+
+Resolution evidence: `.github/workflows/android.yml` runs the complete local gate on every push and pull request and uploads reports even after failures. A dependent Android 14 emulator job runs the connected suite for pull requests and manual dispatch, keeping routine branch pushes fast while enforcing device coverage before merge. The first remote GitHub Actions execution is required before the CI row can be marked fully verified.
 
 ### A-09 — P3 — Dead Play branch remains in the Subscriptions action handler
 

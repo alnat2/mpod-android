@@ -109,7 +109,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 
 ### Important coverage gaps
 
-- No CI workflow currently enforces the test suite on every push.
+- CI enforces unit tests, lint, and debug app/test APK assembly on every push and pull request. Connected Android 14 tests run for pull requests and manual workflow dispatch; the first remote run still needs verification after push.
 - ViewModels and Retrofit failure/retry paths have little direct automated coverage.
 - PlaybackService now has durable-sync unit coverage and a connected persistence check, but still lacks a complete automated Media3 device matrix for interruptions, completion/auto-next, and audio-network loss.
 - Setup/login/logout, RSS add, OPML, download, unsubscribe, and Settings backend saves lack complete end-to-end automation.
@@ -246,6 +246,7 @@ Also add CI for unit tests, lint, and debug assembly. Connected tests may use a 
 Progress:
 
 - Stage 3.1 / A-07 implemented: OPML imports no longer allocate the selected document with `readBytes()`. Android rejects known files over `5,000,000` bytes before the request, enforces the same limit while streaming when provider metadata is absent or incorrect, and distinguishes size and provider-read failures in the UI. Unit coverage includes the exact limit, known and streaming over-limit paths, provider-open failure, and provider-read failure. Final Stage 3 gate and emulator fixture verification remain pending.
+- Stage 3.2 / A-08 implemented: GitHub Actions runs unit tests, Android lint, debug APK assembly, and Android-test APK assembly on every push and pull request. Pull requests and manual dispatch additionally run the connected suite on an Android 14 Google APIs emulator. Reports are retained as workflow artifacts. Local workflow structure and commands are verified; the first upstream workflow execution remains pending.
 
 Exit criterion: the agreed critical matrix is automated or explicitly documented as a manual release check.
 
