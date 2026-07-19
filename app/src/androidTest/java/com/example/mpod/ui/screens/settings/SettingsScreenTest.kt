@@ -169,4 +169,27 @@ class SettingsScreenTest {
         composeRule.onNode(hasText("Export OPML") and hasClickAction()).assertIsDisplayed()
         composeRule.onNodeWithText("Log out").assertIsDisplayed()
     }
+
+    @Test
+    fun settingsShowsInstalledAndBackendBuildIdentity() {
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(appBuild = "abc1234"),
+                    installedAppBuildInfo = InstalledAppBuildInfo(
+                        environment = "Test",
+                        versionName = "1.2.3",
+                        versionCode = 42,
+                        applicationId = "com.prod.mpod.test",
+                        backendAddress = "192.168.0.222:5051"
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Current app build: 1.2.3 (42) · Test").assertIsDisplayed()
+        composeRule.onNodeWithText("Package: com.prod.mpod.test").assertIsDisplayed()
+        composeRule.onNodeWithText("Server: 192.168.0.222:5051 · Backend: abc1234")
+            .assertIsDisplayed()
+    }
 }

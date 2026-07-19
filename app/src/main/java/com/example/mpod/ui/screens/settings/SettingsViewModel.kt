@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import retrofit2.Response
 import javax.inject.Inject
@@ -37,13 +38,15 @@ class SettingsViewModel @Inject constructor(
     )
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
     private var hasResumed = false
+    private val operationMutex = Mutex()
+    private var exportInFlight = false
 
     init {
         refresh()
     }
 
     fun refresh() {
-        viewModelScope.launch {
+        launchSerialized {
             _state.value = _state.value.copy(
                 isLoading = true,
                 isRefreshLoading = true,
@@ -64,10 +67,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveDailyRefreshTime(value: String) {
-        viewModelScope.launch {
+        launchSerialized {
             if (_state.value.isSavingRefreshTime || !_state.value.hasConfirmedSettings ||
                 value == _state.value.dailyRefreshTime
-            ) return@launch
+            ) return@launchSerialized
             _state.value = _state.value.copy(
                 isSavingRefreshTime = true,
                 refreshErrorMessage = null
@@ -93,10 +96,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setProxyEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSerialized {
             if (_state.value.isSavingProxy || !_state.value.hasConfirmedSettings ||
                 !_state.value.proxyConfigured || enabled == _state.value.proxyEnabled
-            ) return@launch
+            ) return@launchSerialized
             _state.value = _state.value.copy(isSavingProxy = true, proxyErrorMessage = null)
             val response = runCatching {
                 api.updateSettings(SettingsUpdateRequest(proxyEnabled = enabled))
@@ -119,32 +122,49 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun exportOpml(uri: Uri?) {
-        if (uri == null) return
+        if (uri == null || exportInFlight) return
+        exportInFlight = true
 
-        viewModelScope.launch {
-            _state.value = _state.value.copy(
-                isExportingOpml = true,
-                exportMessage = null,
-                errorMessage = null
-            )
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val response = api.exportOpml()
-                    if (!response.isSuccessful) {
-                        error(response.errorBody()?.string().orEmpty().ifBlank { "Could not export OPML." })
+        launchSerialized {
+            try {
+                _state.value = _state.value.copy(
+                    isExportingOpml = true,
+                    exportMessage = null,
+                    errorMessage = null
+                )
+                val result = runCatching {
+                    withContext(Dispatchers.IO) {
+                        val response = api.exportOpml()
+                        if (!response.isSuccessful) {
+                            error(apiErrorMessage(response.errorBody()?.string(), "Could not export OPML."))
+                        }
+                        val bytes = response.body()?.bytes()
+                            ?: error("Backend returned an empty OPML file.")
+                        context.contentResolver.openOutputStream(uri)?.use { output ->
+                            output.write(bytes)
+                        } ?: error("Could not write to selected file.")
                     }
-                    val bytes = response.body()?.bytes() ?: error("Backend returned an empty OPML file.")
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        output.write(bytes)
-                    } ?: error("Could not write to selected file.")
                 }
-            }
 
-            _state.value = _state.value.copy(
-                isExportingOpml = false,
-                exportMessage = if (result.isSuccess) "OPML export saved." else null,
-                errorMessage = result.exceptionOrNull()?.message ?: _state.value.errorMessage
-            )
+                _state.value = _state.value.copy(
+                    isExportingOpml = false,
+                    exportMessage = if (result.isSuccess) "OPML export saved." else null,
+                    errorMessage = result.exceptionOrNull()?.message ?: _state.value.errorMessage
+                )
+            } finally {
+                exportInFlight = false
+            }
+        }
+    }
+
+    private fun launchSerialized(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            operationMutex.lock()
+            try {
+                block()
+            } finally {
+                operationMutex.unlock()
+            }
         }
     }
 

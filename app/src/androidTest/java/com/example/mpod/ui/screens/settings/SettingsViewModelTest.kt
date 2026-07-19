@@ -1,7 +1,10 @@
 package com.example.mpod.ui.screens.settings
 
+import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.mpod.data.network.MpodApi
+import java.io.File
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -28,6 +31,9 @@ class SettingsViewModelTest {
     private var schedulerFailureFromCall = Int.MAX_VALUE
     private var proxyCode = 200
     private var patchCode = 200
+    private var exportCode = 200
+    private var exportBody = "<opml><body><outline text=\"Planet Money\"/></body></opml>"
+    private var exportDelayMillis = 0L
     private var dailyRefreshTime = "03:00"
     private var proxyEnabled = true
     private var proxyConfigured = true
@@ -35,6 +41,7 @@ class SettingsViewModelTest {
     private var proxyError: String? = null
     private val schedulerCalls = AtomicInteger()
     private val patchCalls = AtomicInteger()
+    private val exportCalls = AtomicInteger()
 
     @Before
     fun setUp() {
@@ -72,6 +79,18 @@ class SettingsViewModelTest {
                                 .find(body)?.groupValues?.get(1)?.toBooleanStrict()
                                 ?.let { proxyEnabled = it }
                             settingsResponse()
+                        }
+                    }
+                    request.method == "GET" && request.path == "/api/podcasts/export-opml" -> {
+                        exportCalls.incrementAndGet()
+                        if (exportCode != 200) {
+                            MockResponse().setResponseCode(exportCode).setBody(
+                                """{"error":{"code":"EXPORT_FAILED","message":"Export unavailable"}}"""
+                            )
+                        } else {
+                            MockResponse().setResponseCode(200)
+                                .setBody(exportBody)
+                                .setBodyDelay(exportDelayMillis, TimeUnit.MILLISECONDS)
                         }
                     }
                     else -> MockResponse().setResponseCode(404)
@@ -222,9 +241,109 @@ class SettingsViewModelTest {
         assertEquals("SOCKS5 handshake failed", failed.proxyStatusText)
     }
 
+    @Test
+    fun exportCancellationIsANoOp() = runBlocking {
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+
+        viewModel.exportOpml(null)
+        delay(100)
+
+        assertEquals(0, exportCalls.get())
+        assertNull(viewModel.state.value.exportMessage)
+        assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
+    fun successfulExportWritesExactBackendDocument() = runBlocking {
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+        val destination = temporaryExportFile("successful-export.opml")
+
+        viewModel.exportOpml(Uri.fromFile(destination))
+        val state = viewModel.awaitState { it.exportMessage == "OPML export saved." }
+
+        assertFalse(state.isExportingOpml)
+        assertNull(state.errorMessage)
+        assertEquals(exportBody, destination.readText())
+        assertEquals(1, exportCalls.get())
+    }
+
+    @Test
+    fun failedExportKeepsExistingDestinationAndShowsParsedError() = runBlocking {
+        exportCode = 500
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+        val destination = temporaryExportFile("failed-export.opml").apply {
+            writeText("existing content")
+        }
+
+        viewModel.exportOpml(Uri.fromFile(destination))
+        val state = viewModel.awaitState { it.errorMessage == "Export unavailable" }
+
+        assertFalse(state.isExportingOpml)
+        assertNull(state.exportMessage)
+        assertEquals("existing content", destination.readText())
+    }
+
+    @Test
+    fun destinationWriteFailureDoesNotReportExportSuccess() = runBlocking {
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+
+        viewModel.exportOpml(Uri.parse("content://missing.mpod.provider/export.opml"))
+        val state = viewModel.awaitState { !it.isExportingOpml && it.errorMessage != null }
+
+        assertNull(state.exportMessage)
+        assertEquals(1, exportCalls.get())
+    }
+
+    @Test
+    fun duplicateExportWhileRequestIsPendingIsBlocked() = runBlocking {
+        exportDelayMillis = 300
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+        val first = temporaryExportFile("first-export.opml")
+        val second = temporaryExportFile("second-export.opml")
+
+        viewModel.exportOpml(Uri.fromFile(first))
+        viewModel.exportOpml(Uri.fromFile(second))
+        viewModel.awaitState { it.exportMessage == "OPML export saved." }
+
+        assertEquals(1, exportCalls.get())
+        assertEquals(exportBody, first.readText())
+        assertFalse(second.exists())
+    }
+
+    @Test
+    fun exportCompletionSurvivesConcurrentResumeReload() = runBlocking {
+        exportDelayMillis = 200
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+        viewModel.onResume()
+        val destination = temporaryExportFile("resume-export.opml")
+
+        viewModel.exportOpml(Uri.fromFile(destination))
+        viewModel.onResume()
+        val state = viewModel.awaitState {
+            schedulerCalls.get() == 2 && !it.isLoading &&
+                it.exportMessage == "OPML export saved."
+        }
+
+        assertFalse(state.isExportingOpml)
+        assertNull(state.errorMessage)
+        assertEquals(exportBody, destination.readText())
+        assertEquals(1, exportCalls.get())
+    }
+
     private fun newViewModel(): SettingsViewModel {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         return SettingsViewModel(context, api)
+    }
+
+    private fun temporaryExportFile(name: String): File {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        return File(context.cacheDir, name).also { it.delete() }
     }
 
     private suspend fun SettingsViewModel.awaitState(

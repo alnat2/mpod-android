@@ -80,12 +80,13 @@ fun SettingsRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val opmlExportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/xml")
+        contract = ActivityResultContracts.CreateDocument("text/x-opml")
     ) { uri ->
         viewModel.exportOpml(uri)
     }
     SettingsScreen(
         state = state,
+        installedAppBuildInfo = currentInstalledAppBuildInfo(),
         themeMode = themeMode,
         onThemeModeChange = onThemeModeChange,
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
@@ -99,6 +100,7 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
+    installedAppBuildInfo: InstalledAppBuildInfo = InstalledAppBuildInfo.Unknown,
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
@@ -268,14 +270,32 @@ fun SettingsScreen(
                 }
         )
 
-        Text(
-            text = "Backend build: ${state.appBuild ?: "unknown"}",
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "Current app build: ${installedAppBuildInfo.versionName} " +
+                    "(${installedAppBuildInfo.versionCode}) · ${installedAppBuildInfo.environment}",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = "Package: ${installedAppBuildInfo.applicationId}",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                text = "Server: ${installedAppBuildInfo.backendAddress} · " +
+                    "Backend: ${state.appBuild ?: "unknown"}",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
     }
 
     if (showTimePicker) {

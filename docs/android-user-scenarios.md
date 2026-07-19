@@ -211,10 +211,10 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 | SET-09 | Proxy reports running, unknown, or error | Current IP/geo/error/status are represented truthfully and unrelated Settings remain usable | C,U,E | Verified |
 | SET-10 | First install follows system theme | Dark device gives Dark; light device gives Light | C,U,E,D | Specified |
 | SET-11 | Toggle Use dark theme off/on | Off selects explicit Light; on selects explicit Dark; choice persists across restart | C,U,E,D | Specified |
-| SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Specified |
-| SET-13 | Cancel export destination selection | No file/error/success is falsely reported | U,E | Specified |
-| SET-14 | Export request or destination write fails | Specific recoverable error is shown and existing destination content is not falsely reported as valid | C,U,E,L | Specified |
-| SET-15 | View build/environment information | Displayed build identifies the installed APK sufficiently to distinguish test and production variants | U,E,R | Specified |
+| SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Verified |
+| SET-13 | Cancel export destination selection | No file/error/success is falsely reported | U,E | Verified |
+| SET-14 | Export request or destination write fails | Specific recoverable error is shown and existing destination content is not falsely reported as valid | C,U,E,L | Verified |
+| SET-15 | View build/environment information | Displayed build identifies the installed APK sufficiently to distinguish test and production variants | U,E,R | Verified |
 
 ## P0/P1 — cross-cutting reliability and delivery
 
@@ -265,6 +265,8 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W3 | 2026-07-19 | `SUB-13`, `SUB-15`–`SUB-17` | Real `5051` checks with a temporary feed: a slow Refresh all stayed visibly running and non-repeatable across background/restore until backend completion; failed final unsubscribe during a connectivity interruption kept the podcast visible and `Try again` repeated DELETE immediately and removed only that podcast. Earlier real Undo/final-countdown evidence remains applicable. A lifecycle reload bug that cleared active mutation guards and an incorrect unsubscribe Retry route were fixed. Full gate: 95 unit, 53 connected, debug/release lint and APK assembly |
 | EV-W3-PARTIAL | 2026-07-19 | `SUB-01`–`SUB-04`, `SUB-12`, `SUB-14` remain Specified | Compose/state tests protect loading without mutation actions, load-error Retry, both empty-library add paths, distinct caught-up/Show all behavior, refresh failure UI, and scoped episode failure with another usable podcast. Complete `5051` evidence would require an isolated empty library, controlled initial-load/episode endpoint failures, and allowing backend Refresh all to exhaust its 30s/2m/5m feed retry schedule; shared Planet Money state was not destructively altered and incomplete rows were not promoted |
 | EV-W5 | 2026-07-19 | `SET-01`–`SET-09` | Independent refresh/proxy loading and failure instrumentation; unchanged-save suppression; failed-save exact retry; confirmed-save/status-failure retention; unconfigured/off/running/unknown/error proxy states; Material 12-hour picker cancel; real Pixel 9 `04:00 → 04:05 → 04:00` save/restore; real proxy `on → off → on`; re-entry reload and empty crash buffer. Full gate: 97 unit, 74 connected, debug/release lint and APK assembly |
+| EV-W6 | 2026-07-19 | `SET-12`–`SET-15` | Android provider success/cancel/HTTP failure/write failure/duplicate-submit/resume-race instrumentation; real DocumentsUI save produced `mpod-subscriptions.opml`, not `.opml.xml`; its 269 bytes matched the authenticated `5051` response exactly and parsed as XML. Test UI displayed version/code, Test, package, `5051`, and backend commit; unit mapping covers the production package and the minified release APK compiled successfully. Full gate: 99 unit, 81 connected, debug/release lint and APK assembly |
+| EV-W6-PARTIAL | 2026-07-19 | `SET-10`, `SET-11` remain Specified | Pixel 9 emulator clean-data launch followed system Dark; explicit Light and Dark each survived force-stop, and the emulator/test data were restored to system Light/System. Physical-device evidence is intentionally deferred to the final phone pass, so these rows were not promoted |
 
 ## Execution order
 
