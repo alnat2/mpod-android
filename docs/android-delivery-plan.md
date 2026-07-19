@@ -361,7 +361,7 @@ After Stage 6 acceptance, these will be planned from the actual remaining defect
 
 ## Deferred product-owner input
 
-The scenario inventory contains five focused open questions covering OPML partial results, show-notes links, media notification controls, interrupted downloads, and Settings load Retry. They do not invalidate completed baseline work, but their named rows cannot be accepted until decided. Release signing details remain intentionally deferred until production packaging begins after acceptance of the working test build.
+There are no unanswered product questions blocking the functional scenario audit. The five scenario questions covering OPML partial results, show-notes links, media notification controls, interrupted downloads, and Settings error handling were resolved on 2026-07-19 and recorded in `docs/android-user-scenarios.md`. Release signing details remain intentionally deferred until production packaging begins after acceptance of the working test build.
 
 ## Stage report template
 

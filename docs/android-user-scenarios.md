@@ -86,7 +86,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | ADD-06 | Submit RSS during a slow request | Duplicate submission is blocked and the loading state remains truthful until completion | U,E,L | Specified |
 | ADD-07 | Open Android document picker and cancel | No import occurs and the Add modal remains usable without a false error | U,E | Specified |
 | ADD-08 | Select a readable valid OPML file | File streams to backend; imported subscriptions appear after success | C,U,E | Specified |
-| ADD-09 | Import OPML containing duplicates or skipped entries | Backend result is handled without creating duplicates | C,E | Open |
+| ADD-09 | Import OPML containing duplicates or skipped entries | The same modal replaces the form with `Import completed`, exact imported/skipped counts, and `Done`; no duplicate subscriptions are created | C,U,E | Specified |
 | ADD-10 | Select an OPML file larger than 5,000,000 bytes | Android or backend rejects it with the approved size error; no partial import is claimed | C,U,E | Specified |
 | ADD-11 | Selected document cannot be reopened/read or upload fails | A specific error is shown and Retry through choosing/importing again is possible | C,U,E,L | Specified |
 | ADD-12 | Background/restore during document selection or upload | No crash, duplicate import, or false success occurs | U,L | Specified |
@@ -129,7 +129,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | EPS-10 | Repeat Mark all listened or receive a failure | Repeat succeeds with zero changes; failure restores only the selected podcast and is retryable | C,U,E | Specified |
 | EPS-11 | Open Show notes with backend notes | Correct episode notes open in a scrollable modal | C,U,E | Specified |
 | EPS-12 | Open Show notes when notes are absent | A truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Specified |
-| EPS-13 | Interact with a link in Show notes | Link behavior follows the confirmed product decision | U,E | Open |
+| EPS-13 | Tap a link in Show notes | The URL opens through the Android system browser | U,E | Specified |
 
 ## P1 — Home, queue, and player interaction
 
@@ -167,7 +167,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | PLY-14 | Audio stream fails before or during playback | Player shows a recoverable error; retry does not corrupt queue/progress | U,E,L,D | Specified |
 | PLY-15 | Another app requests audio focus | mpod pauses/ducks and resumes only according to Android media behavior, without corrupting backend progress | E,L,D | Specified |
 | PLY-16 | Headphones/Bluetooth route disconnects | Audio does not unexpectedly continue through the speaker; playback state remains recoverable | E,L,D | Specified |
-| PLY-17 | Background, lock screen, notification controls, or return to app | Playback and displayed state remain consistent through the supported background-media path | E,L,D | Open |
+| PLY-17 | Background, lock screen, notification controls, or return to app | Media notification and system lock-screen surface show episode/podcast metadata and Play/Pause only; playback and in-app state remain consistent | E,L,D | Specified |
 | PLY-18 | Service/app process is stopped during playback | On next launch, backend/local state restores predictably without autoplay or lost confirmed progress | C,E,L,D | Specified |
 
 ## P1 — downloads and file lifecycle
@@ -182,13 +182,13 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | DLD-06 | Remove a downloaded episode from playlist | Backend applies the documented cleanup rule without corrupting unrelated files | C,E | Specified |
 | DLD-07 | Mark a cleaned episode unlistened | File is not recreated and UI does not claim it remains downloaded | C,E | Specified |
 | DLD-08 | Unsubscribe a podcast with downloaded episodes | Backend removes the podcast and applies cleanup to all affected server files | C,E | Specified |
-| DLD-09 | Interrupt/background/kill app during a download | Result follows the confirmed MVP policy and never falsely reports a complete file | E,L | Open |
+| DLD-09 | Interrupt/background/kill app during a download | A surviving backend request may complete; otherwise Android returns to a failed/retryable Download state and never claims a complete file; no Cancel action is required for MVP | E,L | Specified |
 
 ## P1 — Settings and export
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SET-01 | Open Settings while data loads or load fails | Loading is visible; failure has a usable recovery path | U,E | Open |
+| SET-01 | Open Settings while backend-dependent data loads or fails | Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Specified |
 | SET-02 | Open the daily refresh time control and cancel | Android time picker uses device 12/24-hour mode; cancel leaves the saved time unchanged | C,U,E | Specified |
 | SET-03 | Select a new time and save | Exact `HH:mm` value is persisted by backend and confirmed state is shown | C,U,E | Specified |
 | SET-04 | Open Settings without changing refresh time | Save is disabled/secondary and does not make a redundant write | U | Specified |
@@ -221,25 +221,26 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | REL-11 | Test and production APKs are installed together | Their sessions/data/launchers remain isolated and clearly identifiable | E,R,D | Specified |
 | REL-12 | Full regression gate and installable handoff | Unit, lint, assembly, connected checks pass; APK version/checksum/commit/backend/known limits are recorded | C,U,E,D,R | Specified |
 
-## Questions that remain genuinely open
+## Resolved scenario decisions
 
-These are not repeated resolved decisions. They are the only currently known product questions that prevent some scenario rows from becoming fully specified:
+The product owner confirmed on 2026-07-19:
 
-1. **OPML partial result (`ADD-09`)** — after a valid file imports some feeds and skips duplicates/invalid entries, should Android show the exact `imported`/`skipped` counts, or is closing the modal and showing the refreshed library sufficient?
-2. **Show-notes links (`EPS-13`)** — should links inside show notes be tappable and open the system browser, or remain plain text for the MVP?
-3. **Background-player controls (`PLY-17`)** — which controls are required in the Android media notification/lock screen for the MVP: Play/Pause only, or Play/Pause plus previous/next/seek?
-4. **Interrupted download (`DLD-09`)** — is it acceptable for the MVP that a download continues only while the backend request survives and otherwise returns to Retry, with no user-facing Cancel action?
-5. **Settings load failure (`SET-01`)** — should the Settings error state contain an explicit Retry button, consistent with the other core screens?
+1. OPML partial success is shown inside the existing import modal as `Import completed`, exact imported/skipped counts, and `Done`; do not stack another dialog over the modal.
+2. Links in Show notes are tappable and open through the Android system browser.
+3. Android media notification and lock-screen controls expose Play/Pause only, together with episode/podcast metadata.
+4. Downloads have no user-facing Cancel action in the MVP. An interrupted request either completes or returns to a retryable Download state without false success.
+5. Settings has no Retry buttons. Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
+
+There are no known unanswered product questions blocking the functional scenario audit.
 
 ## Execution order
 
 After the product owner reviews this map, work proceeds in functional waves:
 
-1. Resolve only the open questions above and update this file.
-2. Audit P0/P1 scenario rows against existing evidence; do not rerun unchanged evidence without a dependency reason.
-3. Execute unknown and high-risk scenarios end-to-end, recording `Verified`, `Failed`, and the exact evidence.
-4. Fix failed scenarios in small scenario-scoped commits, then rerun that scenario and affected regression paths.
-5. Run the cross-cutting reliability matrix.
-6. Install one versioned test APK on the physical phone and perform the written acceptance pass.
+1. Audit P0/P1 scenario rows against existing evidence; do not rerun unchanged evidence without a dependency reason.
+2. Execute unknown and high-risk scenarios end-to-end, recording `Verified`, `Failed`, and the exact evidence.
+3. Fix failed scenarios in small scenario-scoped commits, then rerun that scenario and affected regression paths.
+4. Run the cross-cutting reliability matrix.
+5. Install one versioned test APK on the physical phone and perform the written acceptance pass.
 
 Each implementation batch ends with a scoped commit and report. The next batch does not start until approval, unless the product owner explicitly authorizes completing a whole named wave without intermediate confirmation.
