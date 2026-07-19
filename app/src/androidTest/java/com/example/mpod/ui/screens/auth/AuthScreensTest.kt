@@ -60,4 +60,34 @@ class AuthScreensTest {
         composeRule.onNodeWithText("Invalid credentials").assertIsDisplayed()
         composeRule.onNodeWithText("Please wait...").assertIsNotEnabled()
     }
+
+    @Test
+    fun loginRejectsBlankCredentialsBeforeDispatch() {
+        var submissions = 0
+        composeRule.setContent {
+            MpodTheme {
+                LoginScreen(onSubmit = { _, _ -> submissions += 1 })
+            }
+        }
+
+        composeRule.onNode(hasText("Log in") and hasClickAction()).performClick()
+
+        composeRule.onNodeWithText("Enter username and password.").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, submissions) }
+    }
+
+    @Test
+    fun setupRejectsBlankCredentialsBeforeDispatch() {
+        var submissions = 0
+        composeRule.setContent {
+            MpodTheme {
+                SetupScreen(onSubmit = { _, _ -> submissions += 1 })
+            }
+        }
+
+        composeRule.onNode(hasText("Create account") and hasClickAction()).performClick()
+
+        composeRule.onNodeWithText("Enter username and password.").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, submissions) }
+    }
 }

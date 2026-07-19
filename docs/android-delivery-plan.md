@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (scenario-driven functional process introduced)
+Last updated: 2026-07-19 (first scenario wave verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -100,8 +100,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 92 local unit tests.
-- 39 connected Android/Compose UI/configuration tests.
+- 94 local unit tests.
+- 44 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -309,6 +309,10 @@ Progress:
 Process correction recorded on 2026-07-19: earlier work grouped checks by technical feature and sometimes treated callback, contract, or partial manual evidence as proof of a complete user path. From this point, existing results are baseline evidence only. Each scenario is traced from the real gesture through visible state to authoritative backend/Media3 state and applicable failure recovery before it can be marked `Verified`.
 
 The first evidence reconciliation is recorded in the scenario-map verification ledger. Only rows whose complete required evidence is explicitly present in Stages 4.1–4.4 were promoted to `Verified`; partially covered rows remain `Specified`. New shared-client, offline-completion, download-serialization, and explicit timeout scenarios remain to be executed.
+
+Scenario wave 1 completed on 2026-07-19 for the evidence that can be safely produced without resetting or interrupting the shared backend. `APP-05` and `NAV-01`–`NAV-05` are Verified. Login/Setup now reject blank credentials inside the screen before dispatch and preserve their entered state through Compose recreation; unit/connected tests protect logout outcome decisions, isolated `setupRequired → register`, failed logout recovery, and all bottom-nav destinations. Pixel 9 real-backend checks covered login to the default Subscriptions destination, Home/Settings/Add, modal Back, background restore, and process recreation without duplicate screens.
+
+`APP-03`, `APP-04`, `APP-11`, and `APP-12` intentionally remain Specified. Their partial automated evidence passed, but a complete result would require safely isolated application/backend routing for first setup and forced logout failure, plus the final production/device backup smoke check. The shared `5051` state was not reset or interrupted to manufacture evidence. Full gate: 94 unit tests, 44/44 connected tests, debug/release lint, debug/test assemblies, and minified release assembly. Lint was run sequentially after release generation because a combined parallel Gradle invocation hit an Android Lint/Hilt generated-source race; the sequential lint checks passed.
 
 For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
 

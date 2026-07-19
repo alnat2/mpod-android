@@ -14,10 +14,12 @@ import androidx.compose.ui.test.assertTouchWidthIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -74,6 +76,31 @@ class MpodAccessibilityTest {
 
         composeRule.onNodeWithText("Home").assertIsSelected()
         composeRule.onNodeWithText("Settings").assertIsNotSelected()
+    }
+
+    @Test
+    fun bottomNavigationDispatchesEveryDestination() {
+        val destinations = mutableListOf<Screen>()
+        composeRule.setContent {
+            MpodTheme {
+                MpodBottomNav(
+                    currentRoute = Screen.Subscriptions.route,
+                    onNavigate = destinations::add
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Home").performClick()
+        composeRule.onNodeWithText("Subscriptions").performClick()
+        composeRule.onNodeWithText("Settings").performClick()
+        composeRule.onNodeWithText("Add podcast").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(Screen.Home, Screen.Subscriptions, Screen.Settings, Screen.AddPodcast),
+                destinations
+            )
+        }
     }
 
     @Test

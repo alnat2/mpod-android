@@ -81,10 +81,10 @@ class AppLaunchViewModel @Inject constructor(
             _state.value = AppLaunchState.Loading
             _authUiState.value = AuthUiState()
             val response = runCatching { api.logout() }.getOrNull()
-            when {
-                response?.isSuccessful == true -> refreshSession()
-                response?.code() == 401 -> _state.value = AppLaunchState.Unauthenticated
-                else -> _state.value = AppLaunchState.BackendUnavailable
+            when (resolveLogoutOutcome(response?.code())) {
+                LogoutOutcome.RefreshSession -> refreshSession()
+                LogoutOutcome.Unauthenticated -> _state.value = AppLaunchState.Unauthenticated
+                LogoutOutcome.BackendUnavailable -> _state.value = AppLaunchState.BackendUnavailable
             }
         }
     }
@@ -122,6 +122,18 @@ sealed interface AppLaunchState {
     data object SetupRequired : AppLaunchState
     data object Unauthenticated : AppLaunchState
     data object Authenticated : AppLaunchState
+}
+
+internal enum class LogoutOutcome {
+    RefreshSession,
+    Unauthenticated,
+    BackendUnavailable
+}
+
+internal fun resolveLogoutOutcome(responseCode: Int?): LogoutOutcome = when {
+    responseCode in 200..299 -> LogoutOutcome.RefreshSession
+    responseCode == 401 -> LogoutOutcome.Unauthenticated
+    else -> LogoutOutcome.BackendUnavailable
 }
 
 internal fun resolveLaunchState(

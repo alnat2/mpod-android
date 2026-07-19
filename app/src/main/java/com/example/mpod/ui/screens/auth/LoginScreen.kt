@@ -1,6 +1,7 @@
 package com.example.mpod.ui.screens.auth
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.mpod.ui.theme.MpodTheme
 
@@ -10,20 +11,36 @@ fun LoginScreen(
     errorMessage: String? = null,
     onSubmit: (username: String, password: String) -> Unit = { _, _ -> }
 ) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var localError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun submit() {
+        if (username.isBlank() || password.isBlank()) {
+            localError = "Enter username and password."
+            return
+        }
+        localError = null
+        onSubmit(username, password)
+    }
 
     AuthScreen(
         hero = "Log in and\nkeep listening",
         cardTitle = "Log in",
         submitLabel = "Log in",
         username = username,
-        onUsernameChange = { username = it },
+        onUsernameChange = {
+            username = it
+            localError = null
+        },
         password = password,
-        onPasswordChange = { password = it },
+        onPasswordChange = {
+            password = it
+            localError = null
+        },
         isSubmitting = isSubmitting,
-        errorMessage = errorMessage,
-        onSubmit = { onSubmit(username, password) }
+        errorMessage = localError ?: errorMessage,
+        onSubmit = ::submit
     )
 }
 

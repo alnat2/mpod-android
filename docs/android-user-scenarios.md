@@ -55,7 +55,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | APP-02 | Tap Retry after backend connectivity returns | Session bootstrap is repeated and opens Setup, Login, or Subscriptions according to the authoritative response | C,U,E | Verified |
 | APP-03 | First launch against an unconfigured backend | Setup is shown and Login is not offered as a substitute | C,U,E | Specified |
 | APP-04 | Complete first-user setup with valid credentials | One submission creates the user/session and opens Subscriptions | C,U,E | Specified |
-| APP-05 | Submit Setup or Login with blank fields | Submission is blocked locally and a useful validation error is shown | U | Specified |
+| APP-05 | Submit Setup or Login with blank fields | Submission is blocked locally and a useful validation error is shown | U | Verified |
 | APP-06 | Login with valid credentials | The authenticated session is persisted and Subscriptions opens | C,U,E | Verified |
 | APP-07 | Login with invalid credentials | Backend error is shown; the user remains on Login and can retry | C,U,E | Verified |
 | APP-08 | Launch with a valid persisted session | Subscriptions opens without another login | C,E,L | Verified |
@@ -68,11 +68,11 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| NAV-01 | Authenticate or restore a session | Subscriptions is the initial selected destination | U,E | Specified |
-| NAV-02 | Switch among Home, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful | U,E | Specified |
-| NAV-03 | Tap Add podcast from bottom navigation | Add modal opens above the current destination; closing it returns without an unintended mutation | U,E | Specified |
-| NAV-04 | Press Android Back from a modal or secondary state | The top modal/state closes before leaving the application | U,E | Specified |
-| NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong authenticated destination or duplicate screen | U,L | Specified |
+| NAV-01 | Authenticate or restore a session | Subscriptions is the initial selected destination | U,E | Verified |
+| NAV-02 | Switch among Home, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful | U,E | Verified |
+| NAV-03 | Tap Add podcast from bottom navigation | Add modal opens above the current destination; closing it returns without an unintended mutation | U,E | Verified |
+| NAV-04 | Press Android Back from a modal or secondary state | The top modal/state closes before leaving the application | U,E | Verified |
+| NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong authenticated destination or duplicate screen | U,L | Verified |
 
 ## P1 — adding podcasts and OPML import
 
@@ -259,6 +259,8 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-4.3 | 2026-07-16 | `EPS-01`–`EPS-04`, `EPS-09`, `EPS-11`, `HOM-08`, `HOM-09` | Stage 4.3 three-episode fixture, authoritative playlist/mark-all/show-notes results, real drag reorder, and offline rollback |
 | EV-4.4 | 2026-07-16 to 2026-07-19 | `HOM-04`, `HOM-05`, `PLY-03`, `PLY-06`–`PLY-08`, `PLY-10`, `PLY-12` | Stage 4.4 authenticated MP3 fixtures, durable sync recovery, threshold reconciliation, and seek/speed/progress evidence; commits `0f1a0dc` and `47c73f0`. Device-required playback rows remain Specified until the final phone pass |
 | EV-PROD | 2026-07-19 | `REL-09`, `REL-10` baseline evidence only | Minified production startup defect fixed and production/test variant endpoints rechecked in commit `d755f99`; rows remain Specified until their complete delivery evidence is assembled |
+| EV-W1 | 2026-07-19 | `APP-05`, `NAV-01`–`NAV-05` | Blank Login/Setup dispatch tests; all-destination bottom-nav test; real `5051` login to Subscriptions; Home/Settings/Add navigation; system Back; background restore; and process recreation on Pixel 9. Full gate: 94 unit, 44 connected, debug/release lint and APK assembly |
+| EV-W1-PARTIAL | 2026-07-19 | `APP-03`, `APP-04`, `APP-11`, `APP-12` remain Specified | Isolated HTTP connected tests protect `setupRequired → register` and failed logout recovery; backend router tests protect real first setup. Shared `5051` cannot be reset or forced to fail safely, and `APP-12` still requires its final release/device backup smoke check, so these rows were not promoted |
 
 ## Execution order
 

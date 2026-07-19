@@ -87,4 +87,25 @@ class AppLaunchStateTest {
 
         assertEquals(AppLaunchState.BackendUnavailable, state)
     }
+
+    @Test
+    fun logoutOutcomesPreserveAuthoritativeSessionRules() {
+        assertEquals(LogoutOutcome.RefreshSession, resolveLogoutOutcome(204))
+        assertEquals(LogoutOutcome.Unauthenticated, resolveLogoutOutcome(401))
+        assertEquals(LogoutOutcome.BackendUnavailable, resolveLogoutOutcome(503))
+        assertEquals(LogoutOutcome.BackendUnavailable, resolveLogoutOutcome(null))
+    }
+
+    @Test
+    fun failedLogoutCanRecoverTheStillAuthenticatedSession() = runBlocking {
+        assertEquals(LogoutOutcome.BackendUnavailable, resolveLogoutOutcome(null))
+
+        val recovered = loadLaunchState {
+            Response.success(
+                SessionDto(authenticated = true, setupRequired = false, user = null)
+            )
+        }
+
+        assertEquals(AppLaunchState.Authenticated, recovered)
+    }
 }
