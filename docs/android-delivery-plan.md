@@ -1,12 +1,15 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (production release startup defect fixed and re-verified)
+Last updated: 2026-07-19 (scenario-driven functional process introduced)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
 ## Purpose
 
 This is the living delivery document for the native Android application. It is the only Android-specific source of truth for scope, decisions, implementation status, verification, acceptance, defects, and release readiness.
+
+The complete functional scenario inventory and its verification status live in
+[`docs/android-user-scenarios.md`](android-user-scenarios.md). This delivery plan defines sequencing and policy; the scenario map defines the complete user paths and expected results. A stage or feature status must not contradict a failed or open scenario row.
 
 The document must be updated in the same commit as any change that alters a tracked status. A feature is not considered complete merely because its UI exists.
 
@@ -276,7 +279,7 @@ Stage 3 exit criterion: completed on 2026-07-16. Automated coverage protects the
 
 ### Stage 4 — Complete the working application
 
-Goal: prove and fix every core user scenario end-to-end against the test backend before spending more time on polish.
+Goal: prove and fix every core user scenario end-to-end against the test backend before spending more time on polish. The authoritative inventory is now [`docs/android-user-scenarios.md`](android-user-scenarios.md); the numbered list below is a grouping summary, not a substitute for the individual scenarios.
 
 Required scope:
 
@@ -303,7 +306,9 @@ Progress:
 - The durable failed-write/process-stop recovery evidence from Stage 2.4 remains applicable because this change did not alter the persistent retry store or transport; its retry/coalescing tests passed in the full gate. All temporary podcasts/media were removed and backend state was restored to active `9`, playlist `[9, 1]`, speed `Speed 2x`. Final evidence: 91 unit tests, lint, both debug APK assemblies, and 38/38 connected Pixel 9 tests.
 - Stage 4.4 was reopened after the product owner reported that the visible progress track did not seek. The track had only display semantics and no gesture or Media3 absolute-seek path; the earlier verification covered the ±10/15-second buttons but incorrectly described that as complete seek coverage. The unchanged Figma track now supports both tap and horizontal drag, exposes an adjustable progress semantic action, and dispatches an absolute position to Media3. A Compose test performs a real tap at 75% and a real drag from 20% to 60%. On the Pixel 9, an actual Planet Money episode moved from `0:52` to `16:57` by tap and then to `11:17` by drag; the backend authoritatively stored `positionSeconds: 677`. The test state was restored to `0:51`/`positionSeconds: 51`, the crash buffer was empty, and the revised full gate passes with 91 unit tests, lint, both debug APK assemblies, and 39/39 connected tests.
 
-For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
+Process correction recorded on 2026-07-19: earlier work grouped checks by technical feature and sometimes treated callback, contract, or partial manual evidence as proof of a complete user path. From this point, existing results are baseline evidence only. Each scenario is traced from the real gesture through visible state to authoritative backend/Media3 state and applicable failure recovery before it can be marked `Verified`.
+
+For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
 
 Exit criterion: every visible core action has repeatable evidence of the expected final state; the complete regression gate passes; no open P0/P1 functional defect remains.
 
@@ -356,7 +361,7 @@ After Stage 6 acceptance, these will be planned from the actual remaining defect
 
 ## Deferred product-owner input
 
-There are no unanswered product questions blocking Stage 4. Release signing details are intentionally deferred until production packaging begins after acceptance of the working test build.
+The scenario inventory contains five focused open questions covering OPML partial results, show-notes links, media notification controls, interrupted downloads, and Settings load Retry. They do not invalidate completed baseline work, but their named rows cannot be accepted until decided. Release signing details remain intentionally deferred until production packaging begins after acceptance of the working test build.
 
 ## Stage report template
 
