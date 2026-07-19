@@ -32,9 +32,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".test"
+            buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5051\"")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5050\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("customRelease")
         }
@@ -44,6 +49,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }

@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (player progress scrubbing defect fixed and re-verified)
+Last updated: 2026-07-19 (production release startup defect fixed and re-verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -29,10 +29,10 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Distribution | APK, outside Google Play for the current scope |
 | Minimum OS | Android 14+ |
 | UI language | English |
-| Test backend | Hardcoded `192.168.0.222:5051` |
-| Production backend | Port `5050`; production build is deferred until a pre-release exists |
-| Test application ID | `com.prod.mpod.test` |
-| Production application ID | `com.prod.mpod` |
+| Test backend | Debug/test build: hardcoded `192.168.0.222:5051` |
+| Production backend | Release build: hardcoded `192.168.0.222:5050` |
+| Test application ID | Debug/test build: `com.prod.mpod.test` |
+| Production application ID | Release build: `com.prod.mpod` |
 | Backend storage | Downloads remain on the mpod server, as in the web application |
 | Default authenticated route | Subscriptions |
 | Primary navigation | Home, Subscriptions, Settings, Add podcast |
@@ -68,7 +68,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
-| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery exercised on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
+| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery; minified production release resolved a real `5050` session response to Login on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
 | Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
 | Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
@@ -97,17 +97,19 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 91 local unit tests.
+- 92 local unit tests.
 - 39 connected Android/Compose UI/configuration tests.
-- Android lint.
-- Debug app and Android-test APK assembly.
+- Debug and release Android lint.
+- Debug app, Android-test APK, and minified release APK assembly.
 
 Current verified command set:
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+./gradlew testDebugUnitTest lintDebug lintRelease assembleDebug assembleDebugAndroidTest assembleRelease
 ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 ```
+
+Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty. Debug/test remains isolated as `com.prod.mpod.test` on port `5051`, protected by a variant contract unit test.
 
 ### Important coverage gaps
 
@@ -339,7 +341,7 @@ These items remain useful, but are not allowed to displace functional work:
 - Pixel-level Figma parity and cosmetic animation tuning.
 - Exhaustive TalkBack, font/display scaling, and non-blocking contrast polish.
 - Detailed CPU, memory, frame-time, and startup profiling unless a real functional slowdown or crash is observed.
-- Production variant on port `5050`, `com.prod.mpod`, release signing, and production release packaging.
+- Final production signing credentials, TLS/network-security policy, backup/logging policy, and release packaging.
 
 After Stage 6 acceptance, these will be planned from the actual remaining defects instead of being treated as prerequisites for a working app.
 

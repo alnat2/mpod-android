@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Gson creates the API and persisted playback models through reflection. R8 cannot
+# infer those accesses and otherwise removes fields that are still required at runtime.
+-keep class com.example.mpod.data.network.model.** { *; }
