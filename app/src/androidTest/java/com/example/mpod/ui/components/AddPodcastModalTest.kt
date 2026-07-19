@@ -2,11 +2,13 @@ package com.example.mpod.ui.components
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -25,8 +27,10 @@ class AddPodcastModalTest {
             }
         }
 
-        composeRule.onNodeWithText("https://feeds.example.com/podcast.xml")
-            .performTextInput("ftp://example.com/feed")
+        composeRule.onNodeWithTag("add_podcast_rss_url")
+            .performTextReplacement("ftp://example.com/feed")
+        composeRule.onNodeWithTag("add_podcast_rss_url")
+            .assertTextEquals("ftp://example.com/feed")
         composeRule.onNodeWithText("Add Feed").performClick()
 
         composeRule.onNodeWithText("Enter a valid http or https RSS feed URL.").assertIsDisplayed()
@@ -42,8 +46,10 @@ class AddPodcastModalTest {
             }
         }
 
-        composeRule.onNodeWithText("https://feeds.example.com/podcast.xml")
-            .performTextInput("  https://example.com/feed.xml  ")
+        composeRule.onNodeWithTag("add_podcast_rss_url")
+            .performTextReplacement("  https://example.com/feed.xml  ")
+        composeRule.onNodeWithTag("add_podcast_rss_url")
+            .assertTextEquals("  https://example.com/feed.xml  ")
         composeRule.onNodeWithText("Add Feed").performClick()
 
         composeRule.runOnIdle { assertEquals("https://example.com/feed.xml", submitted) }

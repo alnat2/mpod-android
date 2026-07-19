@@ -107,11 +107,11 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | SUB-10 | Refresh one podcast fails | Failure is visible for that podcast and Retry repeats the same operation | C,U,E | Verified |
 | SUB-11 | Refresh all podcasts successfully | Refreshing animation/state persists through the async backend job; library reloads only after completion | C,U,E | Verified |
 | SUB-12 | One feed fails during Refresh all | Other feeds may finish; backend job error is visible and library remains usable | C,U,E | Specified |
-| SUB-13 | Status polling temporarily fails or backend job is slow | UI does not claim completion; polling recovers without duplicate refresh jobs | C,E,L | Specified |
+| SUB-13 | Status polling temporarily fails or backend job is slow | UI does not claim completion; polling recovers without duplicate refresh jobs | C,E,L | Verified |
 | SUB-14 | Episode list for one podcast fails while others load | Failure stays scoped to that podcast and its Retry does not discard the rest of the library | U,E | Specified |
-| SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Podcast remains in backend and returns to normal UI state | C,U,E,L | Specified |
-| SUB-16 | Let the 15-second unsubscribe countdown expire | Only selected podcast is deleted and its downloaded files/episodes disappear under backend lifecycle rules | C,U,E,L | Specified |
-| SUB-17 | Final unsubscribe request fails | Podcast is restored/reloaded truthfully and the error can be retried | C,U,E,L | Specified |
+| SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Podcast remains in backend and returns to normal UI state | C,U,E,L | Verified |
+| SUB-16 | Let the 15-second unsubscribe countdown expire | Only selected podcast is deleted and its downloaded files/episodes disappear under backend lifecycle rules | C,U,E,L | Verified |
+| SUB-17 | Final unsubscribe request fails | Podcast is restored/reloaded truthfully and the error can be retried | C,U,E,L | Verified |
 
 ## P1 — episode actions and authoritative playlist state
 
@@ -262,6 +262,8 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W1 | 2026-07-19 | `APP-05`, `NAV-01`–`NAV-05` | Blank Login/Setup dispatch tests; all-destination bottom-nav test; real `5051` login to Subscriptions; Home/Settings/Add navigation; system Back; background restore; and process recreation on Pixel 9. Full gate: 94 unit, 44 connected, debug/release lint and APK assembly |
 | EV-W1-PARTIAL | 2026-07-19 | `APP-03`, `APP-04`, `APP-11`, `APP-12` remain Specified | Isolated HTTP connected tests protect `setupRequired → register` and failed logout recovery; backend router tests protect real first setup. Shared `5051` cannot be reset or forced to fail safely, and `APP-12` still requires its final release/device backup smoke check, so these rows were not promoted |
 | EV-W2 | 2026-07-19 | `ADD-01`, `ADD-06`–`ADD-12` | Compose/ViewModel and multipart contract coverage plus real Pixel 9 emulator checks against `5051`: mode switching without submission; picker cancellation; mixed OPML result `1 imported / 1 skipped`; repeat result `0 / 2`; local 5,000,001-byte rejection; invalid-OPML error followed by successful retry; and double-submit plus background/restore during a five-second RSS request producing exactly one subscription. Process loss while the document picker was open produced no crash, import, or false result. Temporary subscriptions were removed. Full gate: 94 unit, 48 connected, debug/release lint and APK assembly |
+| EV-W3 | 2026-07-19 | `SUB-13`, `SUB-15`–`SUB-17` | Real `5051` checks with a temporary feed: a slow Refresh all stayed visibly running and non-repeatable across background/restore until backend completion; failed final unsubscribe during a connectivity interruption kept the podcast visible and `Try again` repeated DELETE immediately and removed only that podcast. Earlier real Undo/final-countdown evidence remains applicable. A lifecycle reload bug that cleared active mutation guards and an incorrect unsubscribe Retry route were fixed. Full gate: 95 unit, 53 connected, debug/release lint and APK assembly |
+| EV-W3-PARTIAL | 2026-07-19 | `SUB-01`–`SUB-04`, `SUB-12`, `SUB-14` remain Specified | Compose/state tests protect loading without mutation actions, load-error Retry, both empty-library add paths, distinct caught-up/Show all behavior, refresh failure UI, and scoped episode failure with another usable podcast. Complete `5051` evidence would require an isolated empty library, controlled initial-load/episode endpoint failures, and allowing backend Refresh all to exhaust its 30s/2m/5m feed retry schedule; shared Planet Money state was not destructively altered and incomplete rows were not promoted |
 
 ## Execution order
 

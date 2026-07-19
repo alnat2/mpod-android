@@ -138,6 +138,76 @@ class SubscriptionsScreenTest {
     }
 
     @Test
+    fun loadingStateDoesNotExposeSubscriptionMutationActions() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(state = SubscriptionsUiState(isLoading = true))
+            }
+        }
+
+        composeRule.onNodeWithText("Loading subscriptions").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Refresh").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Unsubscribe").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Mark all listened").assertCountEquals(0)
+    }
+
+    @Test
+    fun caughtUpStateIsDistinctFromEmptyLibraryAndCanShowListenedEpisodes() {
+        val caughtUpPodcast = podcast(
+            id = 1,
+            title = "Caught up podcast",
+            episodeTitle = "Listened episode"
+        ).copy(
+            unlistenedEpisodeCount = 0,
+            episodes = listOf(
+                podcast(1, "Caught up podcast", "Listened episode")
+                    .episodes.single().copy(isListened = true)
+            )
+        )
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(podcasts = listOf(caughtUpPodcast))
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("All caught up").assertIsDisplayed()
+        composeRule.onAllNodesWithText("No podcasts yet").assertCountEquals(0)
+        composeRule.onNodeWithText("Show all").performClick()
+        composeRule.onNodeWithText("Listened episode").assertIsDisplayed()
+    }
+
+    @Test
+    fun episodeLoadFailureStaysScopedWhileOtherPodcastRemainsUsable() {
+        val failedPodcast = podcast(1, "Failed podcast", "Missing episode").copy(
+            episodes = emptyList(),
+            totalEpisodeCount = 0,
+            unlistenedEpisodeCount = 0,
+            errorMessage = "Episodes unavailable. Refresh this podcast to try again.",
+            episodesUnavailable = true
+        )
+        val healthyPodcast = podcast(2, "Healthy podcast", "Healthy episode")
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(
+                        actionErrorMessage = "Some podcast episodes could not be loaded.",
+                        podcasts = listOf(failedPodcast, healthyPodcast)
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(
+            "Episodes could not be loaded. Use Refresh on the podcast card to try again."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Healthy episode").assertIsDisplayed()
+    }
+
+    @Test
     fun podcastRefreshShowsRefreshingStateOnlyForSelectedPodcast() {
         composeRule.setContent {
             MpodTheme {
@@ -265,6 +335,25 @@ class SubscriptionsScreenTest {
             assertEquals(1, retries)
             assertEquals(1, dismisses)
         }
+    }
+
+    @Test
+    fun actionFailureTryAgainDispatchesTheViewModelRetryRoute() {
+        var retries = 0
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = populatedState().copy(
+                        actionErrorMessage = "Could not unsubscribe from this podcast.",
+                        failedUnsubscribePodcastId = 1
+                    ),
+                    onRetryRefresh = { retries += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Try again").performClick()
+        composeRule.runOnIdle { assertEquals(1, retries) }
     }
 
     @Test

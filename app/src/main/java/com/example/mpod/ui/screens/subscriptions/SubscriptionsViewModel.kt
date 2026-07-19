@@ -133,8 +133,10 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     fun retryLastAction() {
+        val failedUnsubscribePodcastId = _state.value.failedUnsubscribePodcastId
         val failedPodcast = _state.value.podcasts.firstOrNull { it.errorMessage != null }
         when {
+            failedUnsubscribePodcastId != null -> unsubscribePodcastNow(failedUnsubscribePodcastId)
             failedPodcast == null -> refreshAll()
             failedPodcast.episodesUnavailable -> refresh()
             else -> refreshPodcast(failedPodcast.id)
@@ -165,9 +167,32 @@ class SubscriptionsViewModel @Inject constructor(
                 )
             }
             delay(UNSUBSCRIBE_TICK_MS)
+            pendingUnsubscribeJob = null
+            unsubscribePodcastNow(podcastId)
+        }
+    }
 
+    fun undoPodcastUnsubscribe(podcastId: Int) {
+        if (_state.value.pendingUnsubscribe?.podcastId != podcastId) return
+        pendingUnsubscribeJob?.cancel()
+        pendingUnsubscribeJob = null
+        _state.value = _state.value.copy(pendingUnsubscribe = null)
+    }
+
+    internal fun unsubscribePodcastNow(podcastId: Int) {
+        if (podcastId in _state.value.unsubscribingPodcastIds) return
+        if (_state.value.podcasts.none { it.id == podcastId }) {
+            _state.value = _state.value.copy(
+                failedUnsubscribePodcastId = null,
+                actionErrorMessage = null
+            )
+            return
+        }
+
+        viewModelScope.launch {
             _state.value = _state.value.copy(
                 pendingUnsubscribe = null,
+                failedUnsubscribePodcastId = null,
                 unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
                 actionErrorMessage = null
             )
@@ -185,19 +210,12 @@ class SubscriptionsViewModel @Inject constructor(
                 _state.value = nextState.withTransientStateFrom(_state.value)
             } else {
                 _state.value = _state.value.copy(
+                    failedUnsubscribePodcastId = podcastId,
                     unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId,
                     actionErrorMessage = response.errorMessage("Could not unsubscribe from this podcast.")
                 )
             }
-            pendingUnsubscribeJob = null
         }
-    }
-
-    fun undoPodcastUnsubscribe(podcastId: Int) {
-        if (_state.value.pendingUnsubscribe?.podcastId != podcastId) return
-        pendingUnsubscribeJob?.cancel()
-        pendingUnsubscribeJob = null
-        _state.value = _state.value.copy(pendingUnsubscribe = null)
     }
 
     fun markAllListened(podcastId: Int) {
@@ -471,6 +489,7 @@ data class SubscriptionsUiState(
     val downloadFailure: SubscriptionDownloadFailureUi? = null,
     val downloadingEpisodeIds: Set<Int> = emptySet(),
     val pendingUnsubscribe: PendingUnsubscribeUi? = null,
+    val failedUnsubscribePodcastId: Int? = null,
     val markingAllListenedPodcastIds: Set<Int> = emptySet(),
     val isRefreshingAll: Boolean = false,
     val refreshingPodcastIds: Set<Int> = emptySet(),
@@ -519,7 +538,7 @@ internal suspend fun awaitRefreshAllCompletion(
     }
 }
 
-private fun SubscriptionsUiState.withTransientStateFrom(
+internal fun SubscriptionsUiState.withTransientStateFrom(
     current: SubscriptionsUiState,
     completedEpisodeId: Int? = null
 ): SubscriptionsUiState {
@@ -529,8 +548,14 @@ private fun SubscriptionsUiState.withTransientStateFrom(
             current.downloadingEpisodeIds - it
         } ?: current.downloadingEpisodeIds,
         pendingUnsubscribe = current.pendingUnsubscribe,
+        failedUnsubscribePodcastId = current.failedUnsubscribePodcastId?.takeIf { podcastId ->
+            podcasts.any { it.id == podcastId }
+        },
         markingAllListenedPodcastIds = current.markingAllListenedPodcastIds,
-        unsubscribingPodcastIds = current.unsubscribingPodcastIds
+        isRefreshingAll = current.isRefreshingAll,
+        refreshingPodcastIds = current.refreshingPodcastIds,
+        unsubscribingPodcastIds = current.unsubscribingPodcastIds,
+        busyEpisodeIds = current.busyEpisodeIds
     )
 }
 
