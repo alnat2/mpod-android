@@ -308,6 +308,8 @@ Progress:
 
 Process correction recorded on 2026-07-19: earlier work grouped checks by technical feature and sometimes treated callback, contract, or partial manual evidence as proof of a complete user path. From this point, existing results are baseline evidence only. Each scenario is traced from the real gesture through visible state to authoritative backend/Media3 state and applicable failure recovery before it can be marked `Verified`.
 
+The first evidence reconciliation is recorded in the scenario-map verification ledger. Only rows whose complete required evidence is explicitly present in Stages 4.1–4.4 were promoted to `Verified`; partially covered rows remain `Specified`. New shared-client, offline-completion, download-serialization, and explicit timeout scenarios remain to be executed.
+
 For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
 
 Exit criterion: every visible core action has repeatable evidence of the expected final state; the complete regression gate passes; no open P0/P1 functional defect remains.
