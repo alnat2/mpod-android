@@ -2,6 +2,7 @@ package com.example.mpod.ui.screens.settings
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -57,7 +58,12 @@ class SettingsScreenTest {
     fun dailyRefreshTimeOpensMaterialTimePicker() {
         composeRule.setContent {
             MpodTheme {
-                SettingsScreen(state = SettingsUiState(dailyRefreshTime = "04:00"))
+                SettingsScreen(
+                    state = SettingsUiState(
+                        hasConfirmedSettings = true,
+                        dailyRefreshTime = "04:00"
+                    )
+                )
             }
         }
 
@@ -65,6 +71,29 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithText("Cancel").assertIsDisplayed()
         composeRule.onNodeWithText("OK").assertIsDisplayed()
+    }
+
+    @Test
+    fun cancellingTimePickerDoesNotSaveOrChangeConfirmedTime() {
+        var saves = 0
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(
+                        hasConfirmedSettings = true,
+                        dailyRefreshTime = "04:00"
+                    ),
+                    onSaveDailyRefreshTime = { saves += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
+        composeRule.onNodeWithText("Cancel").performClick()
+
+        composeRule.onNodeWithText("04:00").assertIsDisplayed()
+        composeRule.onNodeWithText("Save time").assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(0, saves) }
     }
 
     @Test
@@ -77,6 +106,7 @@ class SettingsScreenTest {
             MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(
+                        hasConfirmedSettings = true,
                         dailyRefreshTime = "04:00",
                         proxyEnabled = false,
                         proxyConfigured = true
@@ -89,13 +119,12 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Save time").performClick()
         composeRule.onNodeWithContentDescription("Use SOCKS5 proxy").performClick()
         composeRule.onNode(hasText("Export OPML") and hasClickAction()).performClick()
         composeRule.onNodeWithText("Log out").performClick()
 
         composeRule.runOnIdle {
-            assertEquals("04:00", savedTime)
+            assertEquals(null, savedTime)
             assertEquals(true, proxyEnabled)
             assertEquals(1, exports)
             assertEquals(1, logouts)
@@ -106,19 +135,38 @@ class SettingsScreenTest {
     fun settingsShowsLoadingState() {
         composeRule.setContent {
             MpodTheme {
-                SettingsScreen(state = SettingsUiState(isLoading = true))
+                SettingsScreen(
+                    state = SettingsUiState(
+                        isLoading = true,
+                        isRefreshLoading = true,
+                        isProxyLoading = true
+                    )
+                )
             }
         }
-        composeRule.onNodeWithText("Loading settings").assertIsDisplayed()
+        composeRule.onNodeWithText("Loading refresh settings…").assertIsDisplayed()
+        composeRule.onNodeWithText("Loading proxy status…").assertIsDisplayed()
+        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
+        composeRule.onNode(hasText("Export OPML") and hasClickAction()).assertIsDisplayed()
+        composeRule.onNodeWithText("Session").assertIsDisplayed()
     }
 
     @Test
     fun settingsShowsBackendFailureState() {
         composeRule.setContent {
             MpodTheme {
-                SettingsScreen(state = SettingsUiState(errorMessage = "Settings unavailable"))
+                SettingsScreen(
+                    state = SettingsUiState(
+                        refreshErrorMessage = "Refresh unavailable",
+                        proxyErrorMessage = "Proxy unavailable"
+                    )
+                )
             }
         }
-        composeRule.onNodeWithText("Settings unavailable").assertIsDisplayed()
+        composeRule.onNodeWithText("Refresh unavailable").assertIsDisplayed()
+        composeRule.onNodeWithText("Proxy unavailable").assertIsDisplayed()
+        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
+        composeRule.onNode(hasText("Export OPML") and hasClickAction()).assertIsDisplayed()
+        composeRule.onNodeWithText("Log out").assertIsDisplayed()
     }
 }

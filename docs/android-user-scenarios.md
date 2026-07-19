@@ -200,15 +200,15 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SET-01 | Open Settings while backend-dependent data loads or fails | Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Specified |
-| SET-02 | Open the daily refresh time control and cancel | Android time picker uses device 12/24-hour mode; cancel leaves the saved time unchanged | C,U,E | Specified |
-| SET-03 | Select a new time and save | Exact `HH:mm` value is persisted by backend and confirmed state is shown | C,U,E | Specified |
-| SET-04 | Open Settings without changing refresh time | Save is disabled/secondary and does not make a redundant write | U | Specified |
-| SET-05 | Refresh-time save fails | Old confirmed value remains and the error is retryable | C,U,E | Specified |
-| SET-06 | Save succeeds but status reload fails | Saved confirmed value remains; UI distinguishes save success from status-refresh failure | C,U,E | Specified |
-| SET-07 | Proxy is not configured | Status is truthful and the switch cannot claim a running proxy | C,U,E | Specified |
-| SET-08 | Enable or disable configured SOCKS5 proxy | Backend setting and visible switch/status agree after save/reload | C,U,E | Specified |
-| SET-09 | Proxy reports running, unknown, or error | Current IP/geo/error/status are represented truthfully and unrelated Settings remain usable | C,U,E | Specified |
+| SET-01 | Open Settings while backend-dependent data loads or fails | Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Verified |
+| SET-02 | Open the daily refresh time control and cancel | Android time picker uses device 12/24-hour mode; cancel leaves the saved time unchanged | C,U,E | Verified |
+| SET-03 | Select a new time and save | Exact `HH:mm` value is persisted by backend and confirmed state is shown | C,U,E | Verified |
+| SET-04 | Open Settings without changing refresh time | Save is disabled/secondary and does not make a redundant write | U | Verified |
+| SET-05 | Refresh-time save fails | Old confirmed value remains and the error is retryable | C,U,E | Verified |
+| SET-06 | Save succeeds but status reload fails | Saved confirmed value remains; UI distinguishes save success from status-refresh failure | C,U,E | Verified |
+| SET-07 | Proxy is not configured | Status is truthful and the switch cannot claim a running proxy | C,U,E | Verified |
+| SET-08 | Enable or disable configured SOCKS5 proxy | Backend setting and visible switch/status agree after save/reload | C,U,E | Verified |
+| SET-09 | Proxy reports running, unknown, or error | Current IP/geo/error/status are represented truthfully and unrelated Settings remain usable | C,U,E | Verified |
 | SET-10 | First install follows system theme | Dark device gives Dark; light device gives Light | C,U,E,D | Specified |
 | SET-11 | Toggle Use dark theme off/on | Off selects explicit Light; on selects explicit Dark; choice persists across restart | C,U,E,D | Specified |
 | SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Specified |
@@ -264,6 +264,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W2 | 2026-07-19 | `ADD-01`, `ADD-06`–`ADD-12` | Compose/ViewModel and multipart contract coverage plus real Pixel 9 emulator checks against `5051`: mode switching without submission; picker cancellation; mixed OPML result `1 imported / 1 skipped`; repeat result `0 / 2`; local 5,000,001-byte rejection; invalid-OPML error followed by successful retry; and double-submit plus background/restore during a five-second RSS request producing exactly one subscription. Process loss while the document picker was open produced no crash, import, or false result. Temporary subscriptions were removed. Full gate: 94 unit, 48 connected, debug/release lint and APK assembly |
 | EV-W3 | 2026-07-19 | `SUB-13`, `SUB-15`–`SUB-17` | Real `5051` checks with a temporary feed: a slow Refresh all stayed visibly running and non-repeatable across background/restore until backend completion; failed final unsubscribe during a connectivity interruption kept the podcast visible and `Try again` repeated DELETE immediately and removed only that podcast. Earlier real Undo/final-countdown evidence remains applicable. A lifecycle reload bug that cleared active mutation guards and an incorrect unsubscribe Retry route were fixed. Full gate: 95 unit, 53 connected, debug/release lint and APK assembly |
 | EV-W3-PARTIAL | 2026-07-19 | `SUB-01`–`SUB-04`, `SUB-12`, `SUB-14` remain Specified | Compose/state tests protect loading without mutation actions, load-error Retry, both empty-library add paths, distinct caught-up/Show all behavior, refresh failure UI, and scoped episode failure with another usable podcast. Complete `5051` evidence would require an isolated empty library, controlled initial-load/episode endpoint failures, and allowing backend Refresh all to exhaust its 30s/2m/5m feed retry schedule; shared Planet Money state was not destructively altered and incomplete rows were not promoted |
+| EV-W5 | 2026-07-19 | `SET-01`–`SET-09` | Independent refresh/proxy loading and failure instrumentation; unchanged-save suppression; failed-save exact retry; confirmed-save/status-failure retention; unconfigured/off/running/unknown/error proxy states; Material 12-hour picker cancel; real Pixel 9 `04:00 → 04:05 → 04:00` save/restore; real proxy `on → off → on`; re-entry reload and empty crash buffer. Full gate: 97 unit, 74 connected, debug/release lint and APK assembly |
 
 ## Execution order
 

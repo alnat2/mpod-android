@@ -52,6 +52,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
@@ -68,6 +71,14 @@ fun SettingsRoute(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onResume()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val opmlExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/xml")
     ) { uri ->
@@ -115,31 +126,40 @@ fun SettingsScreen(
     ) {
         PageHeader(title = "Settings")
 
-        if (state.isLoading) {
-            SettingsStatusCard(message = "Loading settings")
-        } else {
-            if (state.errorMessage != null) {
-                SettingsStatusCard(
-                    message = state.errorMessage,
-                    isError = true
-                )
-            }
+        if (state.errorMessage != null) {
+            SettingsStatusCard(
+                message = state.errorMessage,
+                isError = true
+            )
+        }
 
-            if (state.exportMessage != null) {
-                Text(
-                    text = state.exportMessage,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+        if (state.exportMessage != null) {
+            Text(
+                text = state.exportMessage,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
-            SettingCard(
-                title = "Feed daily refresh",
-                description = "Feeds are refreshed once per day at a single global time."
+        SettingCard(
+            title = "Feed daily refresh",
+            description = "Feeds are refreshed once per day at a single global time."
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if (state.isRefreshLoading) {
+                    SettingsSectionStatus(message = "Loading refresh settings…")
+                } else if (state.refreshErrorMessage != null) {
+                    SettingsSectionStatus(
+                        message = state.refreshErrorMessage,
+                        isError = true
+                    )
+                }
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -150,41 +170,59 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         DailyRefreshTimeField(
-                            value = feedRefreshTime,
-                            enabled = !state.isSavingRefreshTime && !state.isLoading,
+                            value = if (state.hasConfirmedSettings) feedRefreshTime else "—",
+                            enabled = state.hasConfirmedSettings &&
+                                !state.isSavingRefreshTime && !state.isRefreshLoading,
                             onClick = { showTimePicker = true },
                             modifier = Modifier.weight(1f)
                         )
                         SettingsPrimaryButton(
                             text = "Save time",
-                            enabled = !state.isSavingRefreshTime && !state.isLoading,
+                            enabled = state.hasConfirmedSettings &&
+                                feedRefreshTime != state.dailyRefreshTime &&
+                                !state.isSavingRefreshTime && !state.isRefreshLoading,
                             onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
                         )
                     }
-                    Text(
-                        text = state.schedulerStatusText,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                    if (!state.isRefreshLoading && state.refreshErrorMessage == null) {
+                        Text(
+                            text = state.schedulerStatusText,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
+        }
 
-            SettingCard(
-                title = "Use SOCKS5 proxy",
-                description = state.proxyStatusText,
-                action = {
+        SettingCard(
+            title = "Use SOCKS5 proxy",
+            descriptionContent = {
+                when {
+                    state.isProxyLoading -> SettingsSectionStatus("Loading proxy status…")
+                    state.proxyErrorMessage != null -> SettingsSectionStatus(
+                        state.proxyErrorMessage,
+                        isError = true
+                    )
+                    else -> SettingsSectionStatus(state.proxyStatusText)
+                }
+            },
+            action = {
+                if (!state.isProxyLoading) {
                     MpodSwitch(
                         checked = state.proxyEnabled,
                         onCheckedChange = onProxyEnabledChange,
-                        enabled = state.proxyConfigured && !state.isSavingProxy && !state.isLoading,
+                        enabled = state.hasConfirmedSettings && state.proxyConfigured &&
+                            !state.isSavingProxy,
                         contentDescription = "Use SOCKS5 proxy"
                     )
                 }
-            )
+            }
+        )
 
-            SettingCard(
+        SettingCard(
                 title = "Use dark theme",
                 description = "Use this option if it feels more comfortable for you.",
                 action = {
@@ -198,9 +236,9 @@ fun SettingsScreen(
                         contentDescription = "Use dark theme"
                     )
                 }
-            )
+        )
 
-            SettingCard(
+        SettingCard(
                 title = "Export OPML",
                 description = "Download the current subscription list as an OPML file.",
                 action = {
@@ -209,13 +247,13 @@ fun SettingsScreen(
                         width = 113.dp,
                         height = 32.dp,
                         radius = 6.dp,
-                        enabled = !state.isExportingOpml && !state.isLoading,
+                        enabled = !state.isExportingOpml,
                         onClick = onExportOpml
                     )
                 }
-            )
+        )
 
-            SettingCard(
+        SettingCard(
                 title = "Session",
                 description = "End the current app session",
                 action = {
@@ -228,17 +266,16 @@ fun SettingsScreen(
                         onClick = onLogout
                     )
                 }
-            )
+        )
 
-            Text(
-                text = "Backend build: ${state.appBuild ?: "unknown"}",
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        Text(
+            text = "Backend build: ${state.appBuild ?: "unknown"}",
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 
     if (showTimePicker) {
@@ -343,6 +380,20 @@ private fun SettingsStatusCard(
 }
 
 @Composable
+private fun SettingsSectionStatus(
+    message: String,
+    isError: Boolean = false
+) {
+    Text(
+        text = message,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        color = if (isError) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
 private fun SettingsPrimaryButton(
     text: String,
     width: Dp = 100.dp,
@@ -356,7 +407,10 @@ private fun SettingsPrimaryButton(
             .width(width)
             .height(height)
             .clip(RoundedCornerShape(radius))
-            .background(MaterialTheme.colorScheme.primary)
+            .background(
+                if (enabled) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.secondaryContainer
+            )
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
@@ -366,7 +420,8 @@ private fun SettingsPrimaryButton(
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onPrimary,
+            color = if (enabled) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSecondaryContainer,
             maxLines = 1
         )
     }
