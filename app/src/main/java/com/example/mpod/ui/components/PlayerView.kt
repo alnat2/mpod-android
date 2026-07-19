@@ -4,8 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -17,11 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +51,7 @@ fun PlayerView(
     onPlayClick: () -> Unit = {},
     onSeekBackward: () -> Unit = {},
     onSeekForward: () -> Unit = {},
+    onSeekTo: (Float) -> Unit = {},
     onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
@@ -149,7 +156,32 @@ fun PlayerView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(16.dp)
-                        .progressSemantics(progress.coerceIn(0f, 1f))
+                        .testTag("player_seek_bar")
+                        .semantics {
+                            contentDescription = "Playback position"
+                            progressBarRangeInfo = ProgressBarRangeInfo(
+                                current = progress.coerceIn(0f, 1f),
+                                range = 0f..1f
+                            )
+                            setProgress { targetProgress ->
+                                onSeekTo(targetProgress.coerceIn(0f, 1f))
+                                true
+                            }
+                        }
+                        .pointerInput(onSeekTo) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                onSeekTo((down.position.x / size.width).coerceIn(0f, 1f))
+
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                        ?: break
+                                    onSeekTo((change.position.x / size.width).coerceIn(0f, 1f))
+                                    change.consume()
+                                } while (change.pressed)
+                            }
+                        }
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {

@@ -160,6 +160,15 @@ fun HomeRoute(
                 player.seekTo(nextPosition)
             }
         },
+        onSeekTo = { progress ->
+            controller?.let { player ->
+                val durationMs = player.duration.takeIf { it > 0 }
+                    ?: playbackState.durationSeconds.takeIf { it > 0 }?.times(1_000L)
+                if (durationMs != null) {
+                    player.seekTo((durationMs * progress.coerceIn(0f, 1f)).toLong())
+                }
+            }
+        },
         onSpeedChange = { speed ->
             speed.toFloatOrNull()?.let { speedValue ->
                 controller?.setPlaybackSpeed(speedValue)
@@ -196,6 +205,7 @@ fun HomeScreen(
     ),
     onPlayToggle: () -> Unit = {},
     onSeekBy: (Int) -> Unit = {},
+    onSeekTo: (Float) -> Unit = {},
     onSpeedChange: (String) -> Unit = {},
     onPlayEpisode: (Int) -> Unit = {},
     onAddRssFeed: () -> Unit = {},
@@ -316,6 +326,7 @@ fun HomeScreen(
                             onPlayClick = onPlayToggle,
                             onSeekBackward = { onSeekBy(-10) },
                             onSeekForward = { onSeekBy(15) },
+                            onSeekTo = onSeekTo,
                             onNotesClick = { showNotesEpisode = currentEpisode }
                         )
                     }

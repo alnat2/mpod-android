@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-16 (functional-first sequence approved after Stage 3)
+Last updated: 2026-07-19 (player progress scrubbing defect fixed and re-verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -73,7 +73,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
 | Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
-| Playback service | Verified | Queue/retry automation plus real local audio play, pause, progress, seek, natural completion, auto-next, and paused completion-window reconciliation on Pixel 9 | Audio focus/route/network and service/process reliability matrix in Stage 5 |
+| Playback service | Verified | Queue/retry automation plus real local audio play, pause, progress, tap/drag scrubbing, button seeks, natural completion, auto-next, and paused completion-window reconciliation on Pixel 9 | Audio focus/route/network and service/process reliability matrix in Stage 5 |
 | Active episode restore | Verified | Backend integration, queue reconciliation tests, and real force-stop restore at saved position without autoplay | Physical-device restart smoke check in Stage 6 |
 | Queue reorder | Verified | Pure reorder tests plus real long-press drag with authoritative backend order and offline rollback on Pixel 9 | Background/process lifecycle behavior in Stage 5 |
 | Playback speed | Verified | All supported labels unit-tested; real 0.5x/1x/2x backend restore plus earlier offline/process-stop/reconnect restoration | Cross-device conflict behavior in Stage 5 |
@@ -98,7 +98,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 Current automated suite:
 
 - 91 local unit tests.
-- 38 connected Android/Compose UI/configuration tests.
+- 39 connected Android/Compose UI/configuration tests.
 - Android lint.
 - Debug app and Android-test APK assembly.
 
@@ -299,6 +299,7 @@ Progress:
 - Stage 4.4 playback completed on 2026-07-16 with authenticated local MP3 fixtures. A force-stop restored backend active episode A at `0:00` with `Play`, proving no autoplay. Play/Pause states and progress were real; a 30-second episode paused at 3 seconds persisted `positionSeconds: 3` while remaining active and unlistened. Rewind updated the local player to zero while the backend correctly retained 3 under its documented rule that backward changes under 30 seconds are ignored. Forward 15 reached the exact completion boundary, removed the finished episode, selected the eligible backend fallback at zero, and did not autoplay. Speed restoration was exercised at 0.5x, 1x, and the original 2x.
 - Natural completion of a 4-second A transitioned automatically to the queued 30-second B, which was observed playing at `0:02 / 0:28` with `Pause`. This exposed and fixed a real protocol mismatch: a pause or seek inside the backend's 15-second completion window removed/cleared the episode server-side while Android kept showing it. PlaybackService now recognizes the same boundary and, after a successful paused update, reconciles to the backend/local next target without autoplay. Three unit tests protect the exact boundary, paused reconciliation, and non-hijacking of continuing/newer playback.
 - The durable failed-write/process-stop recovery evidence from Stage 2.4 remains applicable because this change did not alter the persistent retry store or transport; its retry/coalescing tests passed in the full gate. All temporary podcasts/media were removed and backend state was restored to active `9`, playlist `[9, 1]`, speed `Speed 2x`. Final evidence: 91 unit tests, lint, both debug APK assemblies, and 38/38 connected Pixel 9 tests.
+- Stage 4.4 was reopened after the product owner reported that the visible progress track did not seek. The track had only display semantics and no gesture or Media3 absolute-seek path; the earlier verification covered the ±10/15-second buttons but incorrectly described that as complete seek coverage. The unchanged Figma track now supports both tap and horizontal drag, exposes an adjustable progress semantic action, and dispatches an absolute position to Media3. A Compose test performs a real tap at 75% and a real drag from 20% to 60%. On the Pixel 9, an actual Planet Money episode moved from `0:52` to `16:57` by tap and then to `11:17` by drag; the backend authoritatively stored `positionSeconds: 677`. The test state was restored to `0:51`/`positionSeconds: 51`, the crash buffer was empty, and the revised full gate passes with 91 unit tests, lint, both debug APK assemblies, and 39/39 connected tests.
 
 For each group: inspect the production path, add the missing automated evidence where practical, execute the real test-backend scenario, fix defects found, then commit the group separately.
 
