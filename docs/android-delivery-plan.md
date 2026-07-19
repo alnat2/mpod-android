@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (first scenario wave verified)
+Last updated: 2026-07-19 (second scenario wave verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -88,8 +88,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Mark all listened | Verified | Single backend-owned atomic endpoint; unit/UI contract coverage; real Pixel 9 one-episode fixture verified listened/playlist/active effects and idempotent repeat | Release-candidate smoke check |
 | Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
 | Podcast unsubscribe/undo | Verified | Countdown/unit coverage plus real Undo preserving backend state and final 15-second commit removing only the selected podcast | Background/process lifecycle behavior in Stage 5 |
-| Add RSS feed | Verified | API/Compose automation plus real valid, duplicate, invalid-scheme, and unreachable-feed checks | Slow-response lifecycle behavior in Stage 5 |
-| OPML import/export | Implemented | Android document intents and backend calls exist; earlier manual checks | Repeatable fixture-based instrumentation and permission/error cases |
+| Add RSS feed | Verified | API/Compose automation plus real valid, duplicate, invalid-scheme, unreachable-feed, double-submit, and slow-request lifecycle checks | Final physical-device smoke check |
+| OPML import/export | Verified | Multipart contract, stream-limit/read-failure, modal, and ViewModel automation; real picker cancel, partial success, duplicate/skipped counts, oversize rejection, parse failure/retry, library reload, and process-loss checks | Export remains covered separately under Settings; final physical-device picker smoke check |
 | Daily refresh time | Verified | Material TimePicker unit/UI/manual checks; confirmed save survives failed status reload | Full API fixture integration and 12/24-hour device matrix |
 | SOCKS5 switch/status | Implemented | Real backend status displayed; confirmed switch value survives failed status reload | Full failure/running/off API fixture matrix and acceptance |
 | Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
@@ -101,7 +101,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 Current automated suite:
 
 - 94 local unit tests.
-- 44 connected Android/Compose UI/configuration tests.
+- 48 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -117,9 +117,9 @@ Production release regression evidence from 2026-07-19: R8 had removed Gson-refl
 ### Important coverage gaps
 
 - CI enforces unit tests, lint, and debug app/test APK assembly on every push and pull request. Connected Android 14 tests run for pull requests and manual workflow dispatch. The first upstream push run completed successfully on commit `1da88a1` (GitHub Actions run `29487361492`).
-- ViewModels and Retrofit failure/retry paths have little direct automated coverage.
+- ViewModel and Retrofit failure/retry coverage remains sparse outside the now directly covered Add-podcast flow.
 - PlaybackService has durable-sync automation and real completion/auto-next evidence, but still lacks the Stage 5 Media3 reliability matrix for audio focus, route changes, audio-network loss, and service/process termination.
-- OPML, downloads, and Settings backend saves still lack complete end-to-end evidence; their focused checks remain in Stage 4.
+- Downloads and Settings backend saves still lack complete end-to-end evidence; their focused checks remain in Stage 4.
 - Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
 - Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
 - The physical-phone pass is manual and does not yet use a written repeatable release checklist.
@@ -313,6 +313,8 @@ The first evidence reconciliation is recorded in the scenario-map verification l
 Scenario wave 1 completed on 2026-07-19 for the evidence that can be safely produced without resetting or interrupting the shared backend. `APP-05` and `NAV-01`–`NAV-05` are Verified. Login/Setup now reject blank credentials inside the screen before dispatch and preserve their entered state through Compose recreation; unit/connected tests protect logout outcome decisions, isolated `setupRequired → register`, failed logout recovery, and all bottom-nav destinations. Pixel 9 real-backend checks covered login to the default Subscriptions destination, Home/Settings/Add, modal Back, background restore, and process recreation without duplicate screens.
 
 `APP-03`, `APP-04`, `APP-11`, and `APP-12` intentionally remain Specified. Their partial automated evidence passed, but a complete result would require safely isolated application/backend routing for first setup and forced logout failure, plus the final production/device backup smoke check. The shared `5051` state was not reset or interrupted to manufacture evidence. Full gate: 94 unit tests, 44/44 connected tests, debug/release lint, debug/test assemblies, and minified release assembly. Lint was run sequentially after release generation because a combined parallel Gradle invocation hit an Android Lint/Hilt generated-source race; the sequential lint checks passed.
+
+Scenario wave 2 completed on 2026-07-19. `ADD-01` and `ADD-06`–`ADD-12` are Verified. Android now preserves picker cancellation as a no-op, consumes the backend OPML result instead of discarding it, keeps the modal open for exact imported/skipped counts, and blocks every competing close/mode/file/submit action while a request is pending. The ViewModel independently rejects duplicate submissions. Real `5051` checks covered a mixed valid/unavailable OPML (`1 / 1`), repeat import (`0 / 2`), 5,000,001-byte local rejection, invalid-OPML error and successful retry, library refresh, a five-second RSS request with double-tap plus background/restore, and process loss while the picker was open without false import. Temporary subscriptions were removed. Full gate: 94 unit tests, 48/48 connected tests, debug/release lint, debug/test assemblies, and minified release assembly.
 
 For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
 

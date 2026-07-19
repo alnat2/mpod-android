@@ -11,6 +11,12 @@ data class CreatePodcastRequest(
     @SerializedName("rssUrl") val rssUrl: String
 )
 
+data class OpmlImportResponse(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("imported") val imported: Int,
+    @SerializedName("skipped") val skipped: Int
+)
+
 data class PlaylistAddRequest(
     @SerializedName("episodeId") val episodeId: Int
 )

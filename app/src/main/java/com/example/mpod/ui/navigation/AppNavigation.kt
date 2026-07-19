@@ -151,9 +151,10 @@ fun AppNavigation(
                     val opmlPicker = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri ->
-                        addPodcastViewModel.importOpml(uri) {
-                            libraryRefreshKey += 1
-                            navController.popBackStack()
+                        uri?.let { selectedUri ->
+                            addPodcastViewModel.importOpml(selectedUri) {
+                                libraryRefreshKey += 1
+                            }
                         }
                     }
                     AddPodcastModal(
@@ -169,7 +170,8 @@ fun AppNavigation(
                         },
                         initialMode = addPodcastInitialMode,
                         isSubmitting = addPodcastState.isSubmitting,
-                        errorMessage = addPodcastState.errorMessage
+                        errorMessage = addPodcastState.errorMessage,
+                        importResult = addPodcastState.importResult
                     )
                 }
             }

@@ -10,6 +10,7 @@ import com.example.mpod.data.network.LimitedContentRequestBody
 import com.example.mpod.data.network.OpmlReadException
 import com.example.mpod.data.network.OpmlTooLargeException
 import com.example.mpod.data.network.model.CreatePodcastRequest
+import com.example.mpod.data.network.model.OpmlImportResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ class AddPodcastViewModel @Inject constructor(
     val state: StateFlow<AddPodcastUiState> = _state.asStateFlow()
 
     fun addRssFeed(url: String, onSuccess: () -> Unit) {
+        if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
             _state.value = AddPodcastUiState(errorMessage = "Paste RSS feed URL.")
@@ -61,12 +63,8 @@ class AddPodcastViewModel @Inject constructor(
         }
     }
 
-    fun importOpml(uri: Uri?, onSuccess: () -> Unit) {
-        if (uri == null) {
-            _state.value = AddPodcastUiState(errorMessage = "Choose an OPML file.")
-            return
-        }
-
+    fun importOpml(uri: Uri, onSuccess: () -> Unit) {
+        if (_state.value.isSubmitting) return
         viewModelScope.launch {
             _state.value = AddPodcastUiState(isSubmitting = true)
             val result = runCatching {
@@ -77,8 +75,9 @@ class AddPodcastViewModel @Inject constructor(
             }
             val response = result.getOrNull()
 
-            if (response?.isSuccessful == true) {
-                _state.value = AddPodcastUiState()
+            val payload = response?.takeIf { it.isSuccessful }?.body()
+            if (payload != null) {
+                _state.value = AddPodcastUiState(importResult = payload.toUiResult())
                 onSuccess()
             } else {
                 _state.value = AddPodcastUiState(
@@ -178,5 +177,16 @@ private inline fun <reified T : Throwable> Throwable?.hasCause(): Boolean {
 
 data class AddPodcastUiState(
     val isSubmitting: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val importResult: OpmlImportResultUi? = null
+)
+
+data class OpmlImportResultUi(
+    val imported: Int,
+    val skipped: Int
+)
+
+private fun OpmlImportResponse.toUiResult() = OpmlImportResultUi(
+    imported = imported.coerceAtLeast(0),
+    skipped = skipped.coerceAtLeast(0)
 )

@@ -6,6 +6,7 @@ import com.example.mpod.data.network.model.EpisodeResponse
 import com.example.mpod.data.network.model.EpisodesResponse
 import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.data.network.model.MarkAllListenedResponse
+import com.example.mpod.data.network.model.OpmlImportResponse
 import com.example.mpod.data.network.model.ActivePlaybackRequest
 import com.example.mpod.data.network.model.ActivePlaybackResponse
 import com.example.mpod.data.network.model.PlaybackQueueResponse
@@ -58,7 +59,7 @@ interface MpodApi {
 
     @Multipart
     @POST("api/podcasts/import-opml")
-    suspend fun importOpml(@Part file: MultipartBody.Part): Response<Unit>
+    suspend fun importOpml(@Part file: MultipartBody.Part): Response<OpmlImportResponse>
 
     @POST("api/podcasts/refresh-all")
     suspend fun refreshAllPodcasts(): Response<Unit>

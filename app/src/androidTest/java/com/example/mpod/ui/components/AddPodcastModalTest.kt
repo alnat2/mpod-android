@@ -3,6 +3,7 @@ package com.example.mpod.ui.components
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -73,6 +74,31 @@ class AddPodcastModalTest {
     }
 
     @Test
+    fun switchingModesDoesNotSubmitAndCanReturnToRss() {
+        var imports = 0
+        var feeds = 0
+        composeRule.setContent {
+            MpodTheme {
+                AddPodcastModal(
+                    onDismiss = {},
+                    onAddUrl = { feeds += 1 },
+                    onImportOpml = { imports += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Import OPML File").performClick()
+        composeRule.onNodeWithText("Choose OPML file").assertIsDisplayed()
+        composeRule.onNodeWithText("RSS Feed URL").performClick()
+        composeRule.onNodeWithText("Paste RSS feed URL").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals(0, imports)
+            assertEquals(0, feeds)
+        }
+    }
+
+    @Test
     fun submittingStateDisablesImportActionAndShowsBackendError() {
         composeRule.setContent {
             MpodTheme {
@@ -89,5 +115,32 @@ class AddPodcastModalTest {
 
         composeRule.onNodeWithText("OPML file is too large. Maximum size is 5 MB.").assertIsDisplayed()
         composeRule.onNodeWithText("Please wait...").assertIsNotEnabled()
+        composeRule.onNodeWithText("Cancel").assertIsNotEnabled()
+        composeRule.onNodeWithText("RSS Feed URL").assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("Close").assertIsNotEnabled()
+        composeRule.onNodeWithText("Choose file").assertIsNotEnabled()
+    }
+
+    @Test
+    fun importResultReplacesFormAndDoneDismissesModal() {
+        var dismisses = 0
+        composeRule.setContent {
+            MpodTheme {
+                AddPodcastModal(
+                    onDismiss = { dismisses += 1 },
+                    onAddUrl = {},
+                    onImportOpml = {},
+                    initialMode = AddPodcastMode.ImportOpmlFile,
+                    importResult = OpmlImportResultUi(imported = 8, skipped = 2)
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Import completed").assertIsDisplayed()
+        composeRule.onNodeWithText("Imported: 8").assertIsDisplayed()
+        composeRule.onNodeWithText("Skipped: 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Done").performClick()
+
+        composeRule.runOnIdle { assertEquals(1, dismisses) }
     }
 }

@@ -61,7 +61,13 @@ class MpodApiContractTest {
 
     @Test
     fun `RSS and OPML use the podcast import contracts`() = runBlocking {
-        repeat(3) { server.enqueue(success()) }
+        server.enqueue(success())
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"success":true,"imported":2,"skipped":1}"""
+            )
+        )
+        server.enqueue(success())
         val opml = "<opml version=\"2.0\"><body/></opml>".encodeToByteArray()
         val body = LimitedContentRequestBody(
             mediaType = "text/xml".toMediaType(),
@@ -70,7 +76,9 @@ class MpodApiContractTest {
         )
 
         api.createPodcast(CreatePodcastRequest("https://feeds.example.com/show.xml"))
-        api.importOpml(MultipartBody.Part.createFormData("file", "subscriptions.opml", body))
+        val importResponse = api.importOpml(
+            MultipartBody.Part.createFormData("file", "subscriptions.opml", body)
+        )
         api.exportOpml()
 
         assertJsonRequest(
@@ -83,6 +91,8 @@ class MpodApiContractTest {
         assertEquals("/api/podcasts/import-opml", importRequest.path)
         assertTrue(importRequest.getHeader("Content-Type").orEmpty().startsWith("multipart/form-data;"))
         assertTrue(importRequest.body.readUtf8().contains("<opml version=\"2.0\"><body/></opml>"))
+        assertEquals(2, importResponse.body()?.imported)
+        assertEquals(1, importResponse.body()?.skipped)
         assertRequest("GET", "/api/podcasts/export-opml")
     }
 

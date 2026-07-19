@@ -24,10 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -56,11 +57,12 @@ fun AddPodcastModal(
     onImportOpml: () -> Unit,
     initialMode: AddPodcastMode = AddPodcastMode.RssFeedUrl,
     isSubmitting: Boolean = false,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    importResult: OpmlImportResultUi? = null
 ) {
-    var mode by remember(initialMode) { mutableStateOf(initialMode) }
-    var url by remember { mutableStateOf("") }
-    var inputError by remember { mutableStateOf<String?>(null) }
+    var mode by rememberSaveable(initialMode) { mutableStateOf(initialMode) }
+    var url by rememberSaveable { mutableStateOf("") }
+    var inputError by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun submitRssUrl() {
         val trimmedUrl = url.trim()
@@ -75,19 +77,69 @@ fun AddPodcastModal(
     }
 
     ModalScreenMobile {
-        AddPodcastMobile(
-            mode = mode,
-            onModeChange = { mode = it },
-            url = url,
-            onUrlChange = {
-                url = it
-                inputError = null
-            },
-            isSubmitting = isSubmitting,
-            errorMessage = inputError ?: errorMessage,
-            onDismiss = onDismiss,
-            onAddUrl = ::submitRssUrl,
-            onImportOpml = onImportOpml
+        if (importResult != null) {
+            OpmlImportResultMobile(
+                result = importResult,
+                onDone = onDismiss
+            )
+        } else {
+            AddPodcastMobile(
+                mode = mode,
+                onModeChange = { mode = it },
+                url = url,
+                onUrlChange = {
+                    url = it
+                    inputError = null
+                },
+                isSubmitting = isSubmitting,
+                errorMessage = inputError ?: errorMessage,
+                onDismiss = onDismiss,
+                onAddUrl = ::submitRssUrl,
+                onImportOpml = onImportOpml
+            )
+        }
+    }
+}
+
+@Composable
+private fun OpmlImportResultMobile(
+    result: OpmlImportResultUi,
+    onDone: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = 320.dp)
+            .fillMaxWidth()
+            .figmaDropShadow(radius = 8.dp, offsetY = 8.dp, blur = 9.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "Import completed",
+            fontSize = 20.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text = "Imported: ${result.imported}",
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "Skipped: ${result.skipped}",
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        MpodButton(
+            text = "Done",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onDone
         )
     }
 }
@@ -145,7 +197,7 @@ fun AddPodcastMobile(
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .size(24.dp)
-                    .clickable(onClick = onDismiss)
+                    .clickable(enabled = !isSubmitting, onClick = onDismiss)
             )
         }
 
@@ -166,11 +218,13 @@ fun AddPodcastMobile(
                 ModalTab(
                     text = "RSS Feed URL",
                     selected = mode == AddPodcastMode.RssFeedUrl,
+                    enabled = !isSubmitting,
                     onClick = { onModeChange(AddPodcastMode.RssFeedUrl) }
                 )
                 ModalTab(
                     text = "Import OPML File",
                     selected = mode == AddPodcastMode.ImportOpmlFile,
+                    enabled = !isSubmitting,
                     onClick = { onModeChange(AddPodcastMode.ImportOpmlFile) }
                 )
             }
@@ -213,6 +267,7 @@ fun AddPodcastMobile(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(232.dp),
+                    enabled = !isSubmitting,
                     onBrowse = onImportOpml
                 )
             }
@@ -238,6 +293,7 @@ fun AddPodcastMobile(
                 primary = false,
                 elevation = 0.dp,
                 modifier = Modifier.weight(1f),
+                enabled = !isSubmitting,
                 onClick = onDismiss
             )
             MpodButton(
@@ -257,6 +313,7 @@ fun AddPodcastMobile(
 @Composable
 fun FileDropzone(
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onBrowse: () -> Unit = {}
 ) {
     Column(
@@ -267,7 +324,8 @@ fun FileDropzone(
                 color = MaterialTheme.colorScheme.primary,
                 radius = 8.dp
             )
-            .clickable(onClick = onBrowse)
+            .clickable(enabled = enabled, onClick = onBrowse)
+            .then(if (enabled) Modifier else Modifier.alpha(0.65f))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
@@ -304,6 +362,7 @@ fun FileDropzone(
             elevation = 0.dp,
             height = 36.dp,
             modifier = Modifier.width(140.dp),
+            enabled = enabled,
             onClick = onBrowse
         )
     }
@@ -395,6 +454,7 @@ private fun AddRssFeedLoadingPreview() {
 private fun ModalTab(
     text: String,
     selected: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Box(
@@ -411,7 +471,8 @@ private fun ModalTab(
                     Modifier
                 }
             )
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .selectable(selected = selected, enabled = enabled, role = Role.Tab, onClick = onClick)
+            .then(if (enabled) Modifier else Modifier.alpha(0.65f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {

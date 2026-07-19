@@ -78,18 +78,18 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| ADD-01 | Open Add podcast and switch RSS/OPML modes | Correct fields and actions are shown; no submission occurs while switching | U | Specified |
+| ADD-01 | Open Add podcast and switch RSS/OPML modes | Correct fields and actions are shown; no submission occurs while switching | U | Verified |
 | ADD-02 | Submit a blank or non-HTTP(S) RSS address | Invalid input is rejected locally and no request is sent | C,U | Verified |
 | ADD-03 | Add a valid reachable RSS feed | Backend creates the subscription, modal closes, and Subscriptions shows it | C,U,E | Verified |
 | ADD-04 | Add an already subscribed feed | Duplicate error is shown and no duplicate subscription is created | C,U,E | Verified |
 | ADD-05 | Add an unreachable or invalid feed | Backend error is shown, modal stays usable, and library state is unchanged | C,U,E | Verified |
-| ADD-06 | Submit RSS during a slow request | Duplicate submission is blocked and the loading state remains truthful until completion | U,E,L | Specified |
-| ADD-07 | Open Android document picker and cancel | No import occurs and the Add modal remains usable without a false error | U,E | Specified |
-| ADD-08 | Select a readable valid OPML file | File streams to backend; imported subscriptions appear after success | C,U,E | Specified |
-| ADD-09 | Import OPML containing duplicates or skipped entries | The same modal replaces the form with `Import completed`, exact imported/skipped counts, and `Done`; no duplicate subscriptions are created | C,U,E | Specified |
-| ADD-10 | Select an OPML file larger than 5,000,000 bytes | Android or backend rejects it with the approved size error; no partial import is claimed | C,U,E | Specified |
-| ADD-11 | Selected document cannot be reopened/read or upload fails | A specific error is shown and Retry through choosing/importing again is possible | C,U,E,L | Specified |
-| ADD-12 | Background/restore during document selection or upload | No crash, duplicate import, or false success occurs | U,L | Specified |
+| ADD-06 | Submit RSS during a slow request | Duplicate submission is blocked and the loading state remains truthful until completion | U,E,L | Verified |
+| ADD-07 | Open Android document picker and cancel | No import occurs and the Add modal remains usable without a false error | U,E | Verified |
+| ADD-08 | Select a readable valid OPML file | File streams to backend; imported subscriptions appear after success | C,U,E | Verified |
+| ADD-09 | Import OPML containing duplicates or skipped entries | The same modal replaces the form with `Import completed`, exact imported/skipped counts, and `Done`; no duplicate subscriptions are created | C,U,E | Verified |
+| ADD-10 | Select an OPML file larger than 5,000,000 bytes | Android or backend rejects it with the approved size error; no partial import is claimed | C,U,E | Verified |
+| ADD-11 | Selected document cannot be reopened/read or upload fails | A specific error is shown and Retry through choosing/importing again is possible | C,U,E,L | Verified |
+| ADD-12 | Background/restore during document selection or upload | No crash, duplicate import, or false success occurs | U,L | Verified |
 
 ## P1 — subscriptions and refresh
 
@@ -261,6 +261,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-PROD | 2026-07-19 | `REL-09`, `REL-10` baseline evidence only | Minified production startup defect fixed and production/test variant endpoints rechecked in commit `d755f99`; rows remain Specified until their complete delivery evidence is assembled |
 | EV-W1 | 2026-07-19 | `APP-05`, `NAV-01`–`NAV-05` | Blank Login/Setup dispatch tests; all-destination bottom-nav test; real `5051` login to Subscriptions; Home/Settings/Add navigation; system Back; background restore; and process recreation on Pixel 9. Full gate: 94 unit, 44 connected, debug/release lint and APK assembly |
 | EV-W1-PARTIAL | 2026-07-19 | `APP-03`, `APP-04`, `APP-11`, `APP-12` remain Specified | Isolated HTTP connected tests protect `setupRequired → register` and failed logout recovery; backend router tests protect real first setup. Shared `5051` cannot be reset or forced to fail safely, and `APP-12` still requires its final release/device backup smoke check, so these rows were not promoted |
+| EV-W2 | 2026-07-19 | `ADD-01`, `ADD-06`–`ADD-12` | Compose/ViewModel and multipart contract coverage plus real Pixel 9 emulator checks against `5051`: mode switching without submission; picker cancellation; mixed OPML result `1 imported / 1 skipped`; repeat result `0 / 2`; local 5,000,001-byte rejection; invalid-OPML error followed by successful retry; and double-submit plus background/restore during a five-second RSS request producing exactly one subscription. Process loss while the document picker was open produced no crash, import, or false result. Temporary subscriptions were removed. Full gate: 94 unit, 48 connected, debug/release lint and APK assembly |
 
 ## Execution order
 
