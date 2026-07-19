@@ -12,9 +12,20 @@ class SubscriptionTransientStateTest {
             title = "Podcast",
             description = "Description",
             imageUrl = null,
-            totalEpisodeCount = 0,
-            unlistenedEpisodeCount = 0,
-            episodes = emptyList()
+            totalEpisodeCount = 1,
+            unlistenedEpisodeCount = 1,
+            episodes = listOf(
+                SubscriptionEpisodeUi(
+                    id = 11,
+                    title = "Episode",
+                    durationSeconds = 60,
+                    publishedAt = null,
+                    isListened = false,
+                    downloaded = false,
+                    summary = null,
+                    inPlaylist = false
+                )
+            )
         )
         val current = SubscriptionsUiState(
             isRefreshingAll = true,
@@ -23,6 +34,8 @@ class SubscriptionTransientStateTest {
             unsubscribingPodcastIds = setOf(7),
             busyEpisodeIds = setOf(11),
             failedUnsubscribePodcastId = 7,
+            failedMarkAllListenedPodcastId = 7,
+            failedEpisodeAction = FailedEpisodeActionUi(11, FailedEpisodeActionType.MarkListened),
             podcasts = listOf(podcast)
         )
 
@@ -35,5 +48,7 @@ class SubscriptionTransientStateTest {
         assertEquals(setOf(7), reloaded.unsubscribingPodcastIds)
         assertEquals(setOf(11), reloaded.busyEpisodeIds)
         assertEquals(7, reloaded.failedUnsubscribePodcastId)
+        assertEquals(7, reloaded.failedMarkAllListenedPodcastId)
+        assertEquals(current.failedEpisodeAction, reloaded.failedEpisodeAction)
     }
 }

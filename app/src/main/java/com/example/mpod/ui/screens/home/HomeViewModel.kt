@@ -37,7 +37,8 @@ class HomeViewModel @Inject constructor(
             val nextState = runCatching { loadHomeState() }.getOrElse { error ->
                 HomeUiState(errorMessage = error.message ?: "Could not load playlist.")
             }
-            _state.value = nextState.withDownloadStateFrom(_state.value)
+            _state.value = nextState.withTransientStateFrom(_state.value)
+            if (nextState.errorMessage == null) queueInvalidator.invalidate()
         }
     }
 
@@ -110,9 +111,9 @@ class HomeViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload playlist."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(
+                _state.value = nextState.withTransientStateFrom(
                     current = _state.value,
-                    completedEpisodeId = episodeId
+                    completedDownloadEpisodeId = episodeId
                 )
             } else {
                 val failure = DownloadFailureUi(
@@ -164,7 +165,10 @@ class HomeViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload playlist."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(
+                    current = _state.value,
+                    completedBusyEpisodeId = episodeId
+                )
             } else {
                 _state.value = _state.value.copy(
                     queue = currentQueue,
@@ -181,11 +185,13 @@ class HomeViewModel @Inject constructor(
         invalidatePlaybackQueue: Boolean = false,
         request: suspend () -> Response<Unit>
     ) {
+        if (episodeId in _state.value.busyEpisodeIds) return
+        _state.value = _state.value.copy(
+            busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
+            actionErrorMessage = null
+        )
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
-                actionErrorMessage = null
-            )
             val response = runCatching { request() }.getOrNull()
             if (response?.isSuccessful == true) {
                 if (invalidatePlaybackQueue) queueInvalidator.invalidate()
@@ -195,7 +201,10 @@ class HomeViewModel @Inject constructor(
                         actionErrorMessage = error.message ?: "Could not reload playlist."
                     )
                 }
-                _state.value = nextState.withDownloadStateFrom(_state.value)
+                _state.value = nextState.withTransientStateFrom(
+                    current = _state.value,
+                    completedBusyEpisodeId = episodeId
+                )
             } else {
                 _state.value = _state.value.copy(
                     busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
@@ -237,15 +246,19 @@ data class DownloadFailureUi(
 
 private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
 
-private fun HomeUiState.withDownloadStateFrom(
+internal fun HomeUiState.withTransientStateFrom(
     current: HomeUiState,
-    completedEpisodeId: Int? = null
+    completedDownloadEpisodeId: Int? = null,
+    completedBusyEpisodeId: Int? = null
 ): HomeUiState {
     return copy(
         downloadFailure = current.downloadFailure,
-        downloadingEpisodeIds = completedEpisodeId?.let {
+        downloadingEpisodeIds = completedDownloadEpisodeId?.let {
             current.downloadingEpisodeIds - it
-        } ?: current.downloadingEpisodeIds
+        } ?: current.downloadingEpisodeIds,
+        busyEpisodeIds = completedBusyEpisodeId?.let {
+            current.busyEpisodeIds - it
+        } ?: current.busyEpisodeIds
     )
 }
 

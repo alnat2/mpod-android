@@ -125,15 +125,103 @@ class HomeScreenTest {
     @Test
     fun homeEmptyAndFailureStatesRemainActionableAndVisible() {
         var rssAdds = 0
+        var opmlImports = 0
         composeRule.setContent {
             MpodTheme {
                 HomeScreen(
                     state = HomeUiState(hasPodcasts = false),
-                    onAddRssFeed = { rssAdds += 1 }
+                    onAddRssFeed = { rssAdds += 1 },
+                    onImportOpml = { opmlImports += 1 }
                 )
             }
         }
         composeRule.onNodeWithText("Add RSS feed").performClick()
-        composeRule.runOnIdle { assertEquals(1, rssAdds) }
+        composeRule.onNodeWithText("Import OPML").performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, rssAdds)
+            assertEquals(1, opmlImports)
+        }
+    }
+
+    @Test
+    fun homeLoadFailureOffersRetry() {
+        var retryCount = 0
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(
+                    state = HomeUiState(errorMessage = "Could not load playlist."),
+                    onRetryLoad = { retryCount += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Could not load playlist.").assertIsDisplayed()
+        composeRule.onNodeWithText("Retry").performClick()
+        composeRule.runOnIdle { assertEquals(1, retryCount) }
+    }
+
+    @Test
+    fun homeLoadingStateIsVisibleWithoutInventedQueueData() {
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(state = HomeUiState(isLoading = true))
+            }
+        }
+
+        composeRule.onNodeWithText("Loading playlist").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Playlist is empty").assertCountEquals(0)
+    }
+
+    @Test
+    fun emptyPlaylistIsDistinctFromNoSubscriptions() {
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(state = HomeUiState(hasPodcasts = true, queue = emptyList()))
+            }
+        }
+
+        composeRule.onNodeWithText("Playlist is empty").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Add RSS feed").assertCountEquals(0)
+    }
+
+    @Test
+    fun tappingQueueRowStartsThatEpisode() {
+        var playedEpisodeId: Int? = null
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(onPlayEpisode = { playedEpisodeId = it })
+            }
+        }
+
+        composeRule.onNodeWithText("How public transit maps teach invisible habits")
+            .performClick()
+        composeRule.runOnIdle { assertEquals(2, playedEpisodeId) }
+    }
+
+    @Test
+    fun missingShowNotesUseTruthfulEmptyState() {
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        queue = listOf(
+                            HomeEpisodeUi(
+                                id = 1,
+                                title = "Episode without notes",
+                                podcastTitle = "Podcast",
+                                durationSeconds = 60,
+                                playbackPositionSeconds = 0,
+                                isListened = false,
+                                downloaded = false,
+                                summary = null
+                            )
+                        )
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Show notes").performClick()
+        composeRule.onNodeWithText("No show notes for this episode.").assertIsDisplayed()
     }
 }

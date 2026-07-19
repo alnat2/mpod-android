@@ -27,7 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
@@ -56,9 +63,16 @@ fun ShowNotesMobile(
     podcastTitle: String = "Decoder Ring - Why store loyalty cards became a UX minefield",
     notes: String? = null,
     onClose: () -> Unit = {},
+    onOpenLink: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val notesText = notes ?: rememberDefaultShowNotes()
+    val linkColor = MaterialTheme.colorScheme.primary
+    val uriHandler = LocalUriHandler.current
+    val openLink = onOpenLink ?: uriHandler::openUri
+    val annotatedNotes = remember(notesText, linkColor, openLink) {
+        notesWithClickableLinks(notesText, linkColor, openLink)
+    }
     val hasLongNotes = notesText.length > 280 || notesText.count { it == '\n' } > 6
 
     Column(
@@ -121,7 +135,7 @@ fun ShowNotesMobile(
         ) {
             val scrollState = rememberScrollState()
             Text(
-                text = notesText,
+                text = annotatedNotes,
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
                 fontWeight = FontWeight.Normal,
@@ -135,6 +149,44 @@ fun ShowNotesMobile(
             }
         }
     }
+}
+
+private const val SHOW_NOTES_URL_TAG = "show_notes_url"
+private val SHOW_NOTES_URL_REGEX = Regex("https?://[^\\s<>]+")
+
+internal fun notesWithClickableLinks(
+    text: String,
+    linkColor: Color,
+    onOpenLink: (String) -> Unit = {}
+): AnnotatedString {
+    val builder = AnnotatedString.Builder()
+    var cursor = 0
+    SHOW_NOTES_URL_REGEX.findAll(text).forEach { match ->
+        builder.append(text.substring(cursor, match.range.first))
+        val rawUrl = match.value
+        val trailingPunctuation = rawUrl.takeLastWhile { it in ".,;:!?)]}" }
+        val url = rawUrl.dropLast(trailingPunctuation.length)
+        builder.pushStringAnnotation(SHOW_NOTES_URL_TAG, url)
+        builder.withLink(
+            LinkAnnotation.Clickable(
+                tag = url,
+                styles = TextLinkStyles(
+                    style = SpanStyle(
+                        color = linkColor,
+                        textDecoration = TextDecoration.Underline
+                    )
+                ),
+                linkInteractionListener = { onOpenLink(url) }
+            )
+        ) {
+            append(url)
+        }
+        builder.pop()
+        builder.append(trailingPunctuation)
+        cursor = match.range.last + 1
+    }
+    builder.append(text.substring(cursor))
+    return builder.toAnnotatedString()
 }
 
 @Composable

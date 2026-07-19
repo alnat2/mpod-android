@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (third scenario wave verified)
+Last updated: 2026-07-19 (fourth scenario wave verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -75,7 +75,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
 | Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
-| Home queue | Implemented | Real backend flow; basic UI test | Complete interaction, error, empty-state, and lifecycle coverage |
+| Home queue | Verified | Real backend row play, active removal, empty/error recovery, exact compact menu, authoritative queue reconciliation, and focused unit/Compose coverage | No-subscriptions E2E and external-client lifecycle conflict remain in the scenario map |
 | Playback service | Verified | Queue/retry automation plus real local audio play, pause, progress, tap/drag scrubbing, button seeks, natural completion, auto-next, and paused completion-window reconciliation on Pixel 9 | Audio focus/route/network and service/process reliability matrix in Stage 5 |
 | Active episode restore | Verified | Backend integration, queue reconciliation tests, and real force-stop restore at saved position without autoplay | Physical-device restart smoke check in Stage 6 |
 | Queue reorder | Verified | Pure reorder tests plus real long-press drag with authoritative backend order and offline rollback on Pixel 9 | Background/process lifecycle behavior in Stage 5 |
@@ -84,7 +84,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 | Refresh one/all | Verified | Refresh-all completion plus per-podcast success, feed failure, visible error, and Try again recovery checked on the real test backend; transient polling and a real slow-job background/restore path preserve the truthful non-repeatable running state | Final failed Refresh-all E2E after the backend retry schedule is isolated from shared subscriptions |
 | Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum, real missing-image fallback, and successful Android decode/render from a fixture image URL | Cache and lifecycle behavior in Stage 5 |
 | Episode playlist actions | Verified | API/Compose automation plus real add/remove, listened/unlistened, backend cleanup, and failed-add rollback on a temporary podcast | Background/process lifecycle behavior in Stage 5 |
-| Show notes | Verified | Backend contract tests, UI test, real Planet Money notes and scrolling | Link handling decision and accessibility review |
+| Show notes | Verified | Backend contract tests, missing-notes state, scrolling, and real external-browser link dispatch | Accessibility review |
 | Mark all listened | Verified | Single backend-owned atomic endpoint; unit/UI contract coverage; real Pixel 9 one-episode fixture verified listened/playlist/active effects and idempotent repeat | Release-candidate smoke check |
 | Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
 | Podcast unsubscribe/undo | Verified | Countdown/unit coverage plus real Undo, final 15-second deletion, connectivity failure rollback, and immediate DELETE retry without a second countdown | Process-death behavior in Stage 5 |
@@ -100,8 +100,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 95 local unit tests.
-- 53 connected Android/Compose UI/configuration tests.
+- 99 local unit tests.
+- 63 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -317,6 +317,8 @@ Scenario wave 1 completed on 2026-07-19 for the evidence that can be safely prod
 Scenario wave 2 completed on 2026-07-19. `ADD-01` and `ADD-06`–`ADD-12` are Verified. Android now preserves picker cancellation as a no-op, consumes the backend OPML result instead of discarding it, keeps the modal open for exact imported/skipped counts, and blocks every competing close/mode/file/submit action while a request is pending. The ViewModel independently rejects duplicate submissions. Real `5051` checks covered a mixed valid/unavailable OPML (`1 / 1`), repeat import (`0 / 2`), 5,000,001-byte local rejection, invalid-OPML error and successful retry, library refresh, a five-second RSS request with double-tap plus background/restore, and process loss while the picker was open without false import. Temporary subscriptions were removed. Full gate: 94 unit tests, 48/48 connected tests, debug/release lint, debug/test assemblies, and minified release assembly.
 
 Scenario wave 3 completed on 2026-07-19 for `SUB-13` and `SUB-15`–`SUB-17`. A real slow Refresh all exposed that an `ON_RESUME` reload replaced `isRefreshingAll` and other mutation guards with default values, making a still-running backend job appear finished and repeatable. Reload reconciliation now preserves refresh, episode, mark-all, and unsubscribe guards until their owning operation finishes. A failed final unsubscribe also exposed that `Try again` incorrectly launched Refresh all; the failure now records its podcast and Retry immediately repeats DELETE. The real connectivity-interruption check kept the temporary podcast visible after failure and removed only it after Retry. `SUB-01`–`SUB-04`, `SUB-12`, and `SUB-14` retain partial automation but remain Specified because their complete `5051` evidence requires isolated empty/failing endpoint state rather than destructive changes to the shared Planet Money library. Full gate: 95 unit tests, 53/53 connected tests, debug/release lint, debug/test assemblies, and minified release assembly.
+
+Scenario wave 4 completed on 2026-07-19 for `EPS-05`–`EPS-08`, `EPS-10`, `EPS-12`–`EPS-13`, `HOM-01`, `HOM-03`, `HOM-06`–`HOM-07`, and `HOM-11`. The Pixel 9 and real `5051` backend covered queue-row playback with matching MediaSession/backend active state, exact Play/Pause + Remove menu contents, active removal without a stale card, listened/unlistened cleanup, offline optimistic rollback, failed Mark all followed by an exact successful Retry, truthful absent notes, and a URL dispatched to Chrome. Home now exposes a real load Retry; successful lifecycle reloads also invalidate the service queue, while in-flight action guards survive reload and block duplicate mutations. Live external queue clearing produced the distinct `Playlist is empty` state, then the original Planet Money order `[16, 18, 26]` was restored. Failure testing exposed that episode-action Retry also incorrectly fell through to Refresh all; add/remove/listened/unlistened failures now retain and repeat the exact mutation, while a successful authoritative reload clears obsolete retry state. Temporary podcasts were deleted and the shared library/queue were verified restored. `HOM-02` remains Specified with Compose evidence only because verifying a zero-subscription backend would require deleting the shared Planet Money subscription; `HOM-10` retains contract and real reconciliation evidence but remains Specified until its required background/foreground conflict path is executed. Full gate: 99 unit tests, 63/63 connected tests, debug/release lint, debug/test assemblies, and minified release assembly. The scenario map is now 64/130 Verified (49%).
 
 For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
 

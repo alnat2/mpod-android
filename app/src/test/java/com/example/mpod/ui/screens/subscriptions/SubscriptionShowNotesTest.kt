@@ -1,7 +1,9 @@
 package com.example.mpod.ui.screens.subscriptions
 
 import com.example.mpod.data.network.model.EpisodeDto
+import com.example.mpod.ui.components.notesWithClickableLinks
 import org.junit.Assert.assertEquals
+import androidx.compose.ui.graphics.Color
 import org.junit.Test
 
 class SubscriptionShowNotesTest {
@@ -20,6 +22,20 @@ class SubscriptionShowNotesTest {
             "Description",
             episode(showNotes = null, description = "Description", summary = null)
                 .subscriptionShowNotes()
+        )
+    }
+
+    @Test
+    fun webLinksRemainVisibleAndAnnotatedWithoutTrailingPunctuation() {
+        val notes = notesWithClickableLinks(
+            "Details: https://example.com/episode).",
+            Color.Green
+        )
+
+        assertEquals("Details: https://example.com/episode).", notes.text)
+        assertEquals(
+            "https://example.com/episode",
+            notes.getStringAnnotations("show_notes_url", 0, notes.length).single().item
         )
     }
 

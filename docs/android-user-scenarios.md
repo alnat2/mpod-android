@@ -121,31 +121,31 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | EPS-02 | Add an episode to playlist | Backend playlist changes; row/count/menu update to In playlist / Remove | C,U,E | Verified |
 | EPS-03 | Add to playlist fails | Optimistic UI rolls back only the target episode and a retryable error is shown | C,U,E | Verified |
 | EPS-04 | Remove a non-active episode from playlist | Backend and both screens remove only that episode; unrelated playback is uninterrupted | C,U,E | Verified |
-| EPS-05 | Remove the active episode from playlist | Backend active state and Home player reconcile without stale playback or unintended autoplay | C,U,E | Specified |
-| EPS-06 | Mark an episode listened | Backend marks it listened, removes it from playlist, applies download cleanup, and UI reconciles | C,U,E | Specified |
-| EPS-07 | Mark a listened episode unlistened | Backend/UI change to unlistened; it is not silently re-added to playlist and deleted media is not restored | C,U,E | Specified |
-| EPS-08 | Mark listened/unlistened fails | Target optimistic state rolls back and the backend remains authoritative | C,U,E | Specified |
+| EPS-05 | Remove the active episode from playlist | Backend active state and Home player reconcile without stale playback or unintended autoplay | C,U,E | Verified |
+| EPS-06 | Mark an episode listened | Backend marks it listened, removes it from playlist, applies download cleanup, and UI reconciles | C,U,E | Verified |
+| EPS-07 | Mark a listened episode unlistened | Backend/UI change to unlistened; it is not silently re-added to playlist and deleted media is not restored | C,U,E | Verified |
+| EPS-08 | Mark listened/unlistened fails | Target optimistic state rolls back and the backend remains authoritative | C,U,E | Verified |
 | EPS-09 | Mark all listened for selected podcast | One backend operation marks only that podcast, removes its playlist rows, clears its active episode, and returns `markedEpisodes` | C,U,E | Verified |
-| EPS-10 | Repeat Mark all listened or receive a failure | Repeat succeeds with zero changes; failure restores only the selected podcast and is retryable | C,U,E | Specified |
+| EPS-10 | Repeat Mark all listened or receive a failure | Repeat succeeds with zero changes; failure restores only the selected podcast and is retryable | C,U,E | Verified |
 | EPS-11 | Open Show notes with backend notes | Correct episode notes open in a scrollable modal | C,U,E | Verified |
-| EPS-12 | Open Show notes when notes are absent | A truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Specified |
-| EPS-13 | Tap a link in Show notes | The URL opens through the Android system browser | U,E | Specified |
+| EPS-12 | Open Show notes when notes are absent | A truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Verified |
+| EPS-13 | Tap a link in Show notes | The URL opens through the Android system browser | U,E | Verified |
 
 ## P1 — Home, queue, and player interaction
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| HOM-01 | Open Home while queue loads or load fails | Loading is visible; failure has a usable Retry and does not show invented queue data | U,E | Specified |
+| HOM-01 | Open Home while queue loads or load fails | Loading is visible; failure has a usable Retry and does not show invented queue data | U,E | Verified |
 | HOM-02 | Open Home with no subscriptions | No-podcast state offers Add RSS and Import OPML | U,E | Specified |
-| HOM-03 | Open Home with subscriptions but an empty playlist | Empty-playlist state is distinct from no subscriptions and navigation remains usable | U,E | Specified |
+| HOM-03 | Open Home with subscriptions but an empty playlist | Empty-playlist state is distinct from no subscriptions and navigation remains usable | U,E | Verified |
 | HOM-04 | Open Home with a queue and no backend active episode | First queue item is displayed without autoplay | C,U,E | Verified |
 | HOM-05 | Open Home with saved active playback | Correct episode and saved position restore without autoplay | C,U,E,L | Verified |
-| HOM-06 | Tap a queue row | That episode becomes active and starts playing | C,U,E | Specified |
-| HOM-07 | Open a Home episode menu | Menu contains only Play/Pause and Remove from playlist, matching web behavior | U | Specified |
+| HOM-06 | Tap a queue row | That episode becomes active and starts playing | C,U,E | Verified |
+| HOM-07 | Open a Home episode menu | Menu contains only Play/Pause and Remove from playlist, matching web behavior | U | Verified |
 | HOM-08 | Long-press and drag a queue row | Visible order and authoritative backend order change together | C,U,E | Verified |
 | HOM-09 | Queue reorder fails | UI returns to backend order and shows a truthful error | C,U,E | Verified |
 | HOM-10 | Queue changes from another client/backend operation | Home reconciles without duplicate/stale rows and preserves the current item when still valid | C,E,L | Specified |
-| HOM-11 | Use Home after its queue becomes empty | Player and active state clear; no stale playable card remains | C,U,E | Specified |
+| HOM-11 | Use Home after its queue becomes empty | Player and active state clear; no stale playable card remains | C,U,E | Verified |
 
 ## P0/P1 — playback and synchronization
 

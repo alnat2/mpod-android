@@ -186,6 +186,7 @@ fun HomeRoute(
         },
         onAddRssFeed = onAddRssFeed,
         onImportOpml = onImportOpml,
+        onRetryLoad = viewModel::refresh,
         onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
@@ -210,6 +211,7 @@ fun HomeScreen(
     onPlayEpisode: (Int) -> Unit = {},
     onAddRssFeed: () -> Unit = {},
     onImportOpml: () -> Unit = {},
+    onRetryLoad: () -> Unit = {},
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
@@ -254,7 +256,13 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
-                    item { StatusCard(message = state.errorMessage) }
+                    item {
+                        StatusCard(
+                            message = state.errorMessage,
+                            actionLabel = "Retry",
+                            onAction = onRetryLoad
+                        )
+                    }
                 }
 
                 !state.hasPodcasts -> {
@@ -484,6 +492,8 @@ private fun QueueSummaryCard(
 @Composable
 private fun StatusCard(
     message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -494,13 +504,25 @@ private fun StatusCard(
             .fillMaxWidth()
             .figmaDropShadow(radius = 8.dp)
     ) {
-        Text(
-            text = message,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(16.dp)
-        )
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            actionLabel?.let { label ->
+                MpodButton(
+                    text = label,
+                    height = 32.dp,
+                    radius = 6.dp,
+                    onClick = onAction
+                )
+            }
+        }
     }
 }
 
