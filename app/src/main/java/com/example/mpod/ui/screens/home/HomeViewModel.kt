@@ -14,6 +14,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Response
@@ -29,16 +30,27 @@ class HomeViewModel @Inject constructor(
 
     init {
         refresh()
+        viewModelScope.launch {
+            queueInvalidator.homeRefreshEvents.collectLatest {
+                reloadNow(invalidatePlaybackQueue = false)
+            }
+        }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true, errorMessage = null)
-            val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-                HomeUiState(errorMessage = error.message ?: "Could not load playlist.")
-            }
-            _state.value = nextState.withTransientStateFrom(_state.value)
-            if (nextState.errorMessage == null) queueInvalidator.invalidate()
+            reloadNow(invalidatePlaybackQueue = true)
+        }
+    }
+
+    private suspend fun reloadNow(invalidatePlaybackQueue: Boolean) {
+        _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+        val nextState = runCatching { loadHomeState() }.getOrElse { error ->
+            HomeUiState(errorMessage = error.message ?: "Could not load playlist.")
+        }
+        _state.value = nextState.withTransientStateFrom(_state.value)
+        if (invalidatePlaybackQueue && nextState.errorMessage == null) {
+            queueInvalidator.invalidate()
         }
     }
 

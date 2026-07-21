@@ -175,7 +175,13 @@ class PlaybackService : MediaSessionService() {
                 return@withLock
             }
 
-            if (currentEpisodeId != null && queue.any { it.id == currentEpisodeId }) {
+            if (
+                shouldSyncCurrentBeforeQueueReconciliation(
+                    currentEpisodeId = currentEpisodeId,
+                    queuedEpisodeIds = queue.map { it.id }.toSet(),
+                    isPlaying = player.isPlaying
+                )
+            ) {
                 syncCurrentPlayback()
             }
 
@@ -257,7 +263,10 @@ class PlaybackService : MediaSessionService() {
                     nextEpisodeId?.let {
                         playbackSyncManager.submitActive(it)
                     }
-                    if (completion != null) reconcileQueueWithBackend()
+                    if (completion != null) {
+                        reconcileQueueWithBackend()
+                        queueInvalidator.refreshHome()
+                    }
                 }
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
                 serviceScope.launch {
@@ -282,6 +291,7 @@ class PlaybackService : MediaSessionService() {
                 } else {
                     reconcileQueueWithBackend()
                 }
+                queueInvalidator.refreshHome()
             }
         }
 
@@ -317,12 +327,15 @@ class PlaybackService : MediaSessionService() {
         durationSeconds: Int,
         didSeek: Boolean = false
     ) {
+        val wasPlayingWhenSubmitted =
+            player.isPlaying && currentEpisodeId() == episodeId
         val response = playbackSyncManager.submitPlayback(
             playbackRequest(episodeId, positionSeconds, durationSeconds, didSeek = didSeek)
         )
         val shouldReconcileCompletion = shouldReconcilePausedThresholdCompletion(
             completedByPosition = countsAsBackendCompletion(positionSeconds, durationSeconds),
-            isPlaying = player.isPlaying,
+            wasPlayingWhenSubmitted = wasPlayingWhenSubmitted,
+            isPlayingNow = player.isPlaying,
             completedEpisodeId = episodeId,
             currentEpisodeId = currentEpisodeId()
         )
@@ -331,6 +344,7 @@ class PlaybackService : MediaSessionService() {
                 preferredEpisodeId = response.nextEpisodeId ?: episodeAfter(episodeId),
                 forcePlayPreferred = false
             )
+            queueInvalidator.refreshHome()
         }
     }
 
@@ -365,6 +379,7 @@ class PlaybackService : MediaSessionService() {
         } else {
             reconcileQueueWithBackend()
         }
+        queueInvalidator.refreshHome()
     }
 
     private fun playbackRequest(
@@ -450,6 +465,12 @@ internal fun resolveRetriedCompletionNextEpisode(
     }
 }
 
+internal fun shouldSyncCurrentBeforeQueueReconciliation(
+    currentEpisodeId: Int?,
+    queuedEpisodeIds: Set<Int>,
+    isPlaying: Boolean
+): Boolean = isPlaying && currentEpisodeId != null && currentEpisodeId in queuedEpisodeIds
+
 internal fun countsAsBackendCompletion(
     positionSeconds: Int,
     durationSeconds: Int
@@ -460,10 +481,14 @@ internal fun countsAsBackendCompletion(
 
 internal fun shouldReconcilePausedThresholdCompletion(
     completedByPosition: Boolean,
-    isPlaying: Boolean,
+    wasPlayingWhenSubmitted: Boolean,
+    isPlayingNow: Boolean,
     completedEpisodeId: Int,
     currentEpisodeId: Int?
-): Boolean = completedByPosition && !isPlaying && currentEpisodeId == completedEpisodeId
+): Boolean = completedByPosition &&
+    !wasPlayingWhenSubmitted &&
+    !isPlayingNow &&
+    currentEpisodeId == completedEpisodeId
 
 internal fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
     "Speed 0.5x" -> 0.5f

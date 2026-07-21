@@ -161,15 +161,15 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | PLY-08 | Play continuously | Progress syncs periodically without flooding or moving backward unexpectedly | C,E | Verified |
 | PLY-09 | Finish an episode naturally | Backend marks completion, cleans queue/download state, and eligible next episode starts automatically | C,E,D | Specified |
 | PLY-10 | Pause or seek inside the final 15 seconds | Backend completion rule is honored; queue/player reconcile without stale episode or unintended autoplay | C,E | Verified |
-| PLY-11 | Finish the last eligible queue item | Completed item disappears and player reaches a truthful empty/non-playing state | C,E | Specified |
+| PLY-11 | Finish the last eligible queue item | Completed item disappears and player reaches a truthful empty/non-playing state | C,E | Verified |
 | PLY-12 | Playback progress/active/speed write fails transiently | Latest semantic state persists locally, retries with backoff, survives process restart, and clears only after success | C,E,L | Verified |
-| PLY-13 | A delayed completion retry returns after another episode starts | Retry cannot hijack the newer active playback | C,E,L | Specified |
+| PLY-13 | A delayed completion retry returns after another episode starts | Retry cannot hijack the newer active playback | C,E,L | Verified |
 | PLY-14 | Audio stream fails before or during playback | Player shows a recoverable error; retry does not corrupt queue/progress | U,E,L,D | Specified |
 | PLY-15 | Another app requests audio focus | mpod pauses/ducks and resumes only according to Android media behavior, without corrupting backend progress | E,L,D | Specified |
 | PLY-16 | Headphones/Bluetooth route disconnects | Audio does not unexpectedly continue through the speaker; playback state remains recoverable | E,L,D | Specified |
 | PLY-17 | Background, lock screen, notification controls, or return to app | Media notification and system lock-screen surface show episode/podcast metadata and Play/Pause only; playback and in-app state remain consistent | E,L,D | Specified |
 | PLY-18 | Service/app process is stopped during playback | On next launch, backend/local state restores predictably without autoplay or lost confirmed progress | C,E,L,D | Specified |
-| PLY-19 | Episode completes during a network outage, another episode starts, then connectivity returns | Delayed completion synchronizes and cleans the old episode but cannot replace, pause, seek, or otherwise hijack the newer playback | C,E,L | Specified |
+| PLY-19 | Episode completes during a network outage, another episode starts, then connectivity returns | Delayed completion synchronizes and cleans the old episode but cannot replace, pause, seek, or otherwise hijack the newer playback | C,E,L | Verified |
 
 ## P1 — shared web/Android backend reconciliation
 
@@ -248,6 +248,11 @@ The product owner confirmed on 2026-07-19:
 
 There are no known unanswered product questions blocking the functional scenario audit.
 
+## Backend follow-ups
+
+1. `BE-FU-01`: during EV-W8, `DELETE /api/podcasts/23` returned success and removed the podcast, but `/api/playlist` retained episode `11764`; `/api/playback/queue` already filtered that orphan. The orphan made the next full reorder fail with `INVALID_PLAYLIST_ORDER` until the row was explicitly deleted. Backend podcast deletion must remove every affected playlist row in the committed database state.
+2. `BE-FU-02`: the documented rule `positionSeconds >= durationSeconds - 15` treats every position, including zero, as completed when duration is 15 seconds or less. Android no longer sends a redundant paused zero-position update during queue reconciliation, but the backend/product rule for a real short episode still needs an explicit decision; Android must not invent a different threshold independently.
+
 ## Verification ledger
 
 This ledger records why scenario statuses changed. Git remains the change history for the document itself.
@@ -268,6 +273,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W6 | 2026-07-19 | `SET-12`–`SET-15` | Android provider success/cancel/HTTP failure/write failure/duplicate-submit/resume-race instrumentation; real DocumentsUI save produced `mpod-subscriptions.opml`, not `.opml.xml`; its 269 bytes matched the authenticated `5051` response exactly and parsed as XML. Test UI displayed version/code, Test, package, `5051`, and backend commit; unit mapping covers the production package and the minified release APK compiled successfully. Full gate: 99 unit, 81 connected, debug/release lint and APK assembly |
 | EV-W6-PARTIAL | 2026-07-19 | `SET-10`, `SET-11` remain Specified | Pixel 9 emulator clean-data launch followed system Dark; explicit Light and Dark each survived force-stop, and the emulator/test data were restored to system Light/System. Physical-device evidence is intentionally deferred to the final phone pass, so these rows were not promoted |
 | EV-W7 | 2026-07-21 | `HOM-10`, `SYN-01`–`SYN-04` | Pixel 9 and real `5051` multi-client checks: background queue reorder and speed change were applied on foreground while the valid active episode kept playing; foreground backend changes caused no immediate interruption or polling update, then entering Subscriptions applied both; externally marking the active episode listened cleared backend active/queue state and Android reconciled to the next episode paused without autoplay. Android now reconciles backend speed with queue invalidations from Home and Subscriptions while preserving a pending local speed write. Backend queue `[16,18,26]`, null active, speed `1.3x`, listened flags, and playback position were restored. Full gate: 101 unit, 82 connected, debug/release lint and APK assembly |
+| EV-W8 | 2026-07-21 | `PLY-11`, `PLY-13`, `PLY-19`; partial `PLY-09` | Authenticated 20/60/20-second MP3 fixture on Pixel 9 and real `5051`. Online natural completion moved from A to B playing. With network denied only to mpod, B started from buffer while backend remained active A and A completion persisted on disk; after recovery pending cleared, backend removed A and selected B, and MediaSession continued B instead of being hijacked. A race that classified a playing request from post-response state was fixed by retaining submission-time state. Finishing sole C cleared backend active/queue and MediaSession; a stale Home card exposed and fixed missing service-to-Home completion invalidation. Redundant paused reconciliation writes are suppressed. Temporary podcasts were removed and Planet Money queue `[16,18,26]`, null active, positions `51/242`, and speed `1.3x` were restored. `PLY-09` remains Specified only because its required physical-phone evidence is deferred. Full gate: 103 unit, 83 connected, debug/release lint and APK assembly |
 
 ## Execution order
 
