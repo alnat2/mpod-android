@@ -89,13 +89,13 @@ class PlaybackService : MediaSessionService() {
         }
         serviceScope.launch {
             playbackSyncManager.flushPendingOnce()
-            if (pendingSpeed == null) loadSettings()
+            if (pendingSpeed == null) loadAuthoritativeSpeed()
             loadInitialQueue()
             playbackSyncManager.start()
         }
         serviceScope.launch {
             queueInvalidator.events.collectLatest {
-                reconcileQueueWithBackend()
+                reconcileSharedStateWithBackend()
             }
         }
     }
@@ -112,12 +112,21 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    private suspend fun loadSettings() {
+    private suspend fun loadAuthoritativeSpeed() {
+        val pendingSpeed = playbackSyncManager.pendingSnapshot().speedLabel
         val response = runCatching { api.getSettings() }.getOrNull() ?: return
-        val speed = response.body()?.settings?.playbackSpeed.toPlaybackSpeedOrNull() ?: return
+        val speed = resolvePlaybackSpeedForReconciliation(
+            backendSpeedLabel = response.body()?.settings?.playbackSpeed,
+            pendingSpeedLabel = pendingSpeed
+        ) ?: return
         applyingServerSpeed = true
         player.playbackParameters = PlaybackParameters(speed)
         applyingServerSpeed = false
+    }
+
+    private suspend fun reconcileSharedStateWithBackend() {
+        loadAuthoritativeSpeed()
+        reconcileQueueWithBackend()
     }
 
     private suspend fun loadInitialQueue() {
@@ -464,6 +473,15 @@ internal fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
     "Speed 1.5x" -> 1.5f
     "Speed 2x" -> 2f
     else -> null
+}
+
+internal fun resolvePlaybackSpeedForReconciliation(
+    backendSpeedLabel: String?,
+    pendingSpeedLabel: String?
+): Float? = if (pendingSpeedLabel == null) {
+    backendSpeedLabel.toPlaybackSpeedOrNull()
+} else {
+    null
 }
 
 internal fun Float.toPlaybackSpeedLabel(): String? = when (this) {

@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-07-19
+Last updated: 2026-07-21
 
 ## Purpose
 
@@ -144,7 +144,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | HOM-07 | Open a Home episode menu | Menu contains only Play/Pause and Remove from playlist, matching web behavior | U | Verified |
 | HOM-08 | Long-press and drag a queue row | Visible order and authoritative backend order change together | C,U,E | Verified |
 | HOM-09 | Queue reorder fails | UI returns to backend order and shows a truthful error | C,U,E | Verified |
-| HOM-10 | Queue changes from another client/backend operation | Home reconciles without duplicate/stale rows and preserves the current item when still valid | C,E,L | Specified |
+| HOM-10 | Queue changes from another client/backend operation | Home reconciles without duplicate/stale rows and preserves the current item when still valid | C,E,L | Verified |
 | HOM-11 | Use Home after its queue becomes empty | Player and active state clear; no stale playable card remains | C,U,E | Verified |
 
 ## P0/P1 — playback and synchronization
@@ -177,10 +177,10 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SYN-01 | Web changes playlist order/content while Android is inactive, then Android launches, foregrounds, or enters Home | Android replaces stale queue state with backend state and retains the active item only if it remains valid | C,E,L | Specified |
-| SYN-02 | Web changes playback speed while Android is inactive, then Android launches or foregrounds | Android loads and applies the authoritative backend speed without continuous polling | C,E,L | Specified |
-| SYN-03 | Web marks listened/Mark all listened/removes the episode Android considered active | At the next reconciliation event Android stops/clears stale playback and adopts the authoritative queue without autoplay | C,E,L | Specified |
-| SYN-04 | Web changes state while Android is actively playing and no reconciliation event occurs | Current audio is not interrupted immediately; the change is applied at the next defined reconciliation event | E,L | Specified |
+| SYN-01 | Web changes playlist order/content while Android is inactive, then Android launches, foregrounds, or enters Home | Android replaces stale queue state with backend state and retains the active item only if it remains valid | C,E,L | Verified |
+| SYN-02 | Web changes playback speed while Android is inactive, then Android launches or foregrounds | Android loads and applies the authoritative backend speed without continuous polling | C,E,L | Verified |
+| SYN-03 | Web marks listened/Mark all listened/removes the episode Android considered active | At the next reconciliation event Android stops/clears stale playback and adopts the authoritative queue without autoplay | C,E,L | Verified |
+| SYN-04 | Web changes state while Android is actively playing and no reconciliation event occurs | Current audio is not interrupted immediately; the change is applied at the next defined reconciliation event | E,L | Verified |
 
 ## P1 — downloads and file lifecycle
 
@@ -267,6 +267,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W5 | 2026-07-19 | `SET-01`–`SET-09` | Independent refresh/proxy loading and failure instrumentation; unchanged-save suppression; failed-save exact retry; confirmed-save/status-failure retention; unconfigured/off/running/unknown/error proxy states; Material 12-hour picker cancel; real Pixel 9 `04:00 → 04:05 → 04:00` save/restore; real proxy `on → off → on`; re-entry reload and empty crash buffer. Full gate: 97 unit, 74 connected, debug/release lint and APK assembly |
 | EV-W6 | 2026-07-19 | `SET-12`–`SET-15` | Android provider success/cancel/HTTP failure/write failure/duplicate-submit/resume-race instrumentation; real DocumentsUI save produced `mpod-subscriptions.opml`, not `.opml.xml`; its 269 bytes matched the authenticated `5051` response exactly and parsed as XML. Test UI displayed version/code, Test, package, `5051`, and backend commit; unit mapping covers the production package and the minified release APK compiled successfully. Full gate: 99 unit, 81 connected, debug/release lint and APK assembly |
 | EV-W6-PARTIAL | 2026-07-19 | `SET-10`, `SET-11` remain Specified | Pixel 9 emulator clean-data launch followed system Dark; explicit Light and Dark each survived force-stop, and the emulator/test data were restored to system Light/System. Physical-device evidence is intentionally deferred to the final phone pass, so these rows were not promoted |
+| EV-W7 | 2026-07-21 | `HOM-10`, `SYN-01`–`SYN-04` | Pixel 9 and real `5051` multi-client checks: background queue reorder and speed change were applied on foreground while the valid active episode kept playing; foreground backend changes caused no immediate interruption or polling update, then entering Subscriptions applied both; externally marking the active episode listened cleared backend active/queue state and Android reconciled to the next episode paused without autoplay. Android now reconciles backend speed with queue invalidations from Home and Subscriptions while preserving a pending local speed write. Backend queue `[16,18,26]`, null active, speed `1.3x`, listened flags, and playback position were restored. Full gate: 101 unit, 82 connected, debug/release lint and APK assembly |
 
 ## Execution order
 

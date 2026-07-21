@@ -66,6 +66,7 @@ class SubscriptionsViewModel @Inject constructor(
             } else {
                 mergedState
             }
+            if (loadResult.isSuccess) queueInvalidator.invalidate()
         }
     }
 

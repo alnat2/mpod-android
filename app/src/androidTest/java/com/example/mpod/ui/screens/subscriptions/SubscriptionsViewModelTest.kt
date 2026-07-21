@@ -3,6 +3,8 @@ package com.example.mpod.ui.screens.subscriptions
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import okhttp3.mockwebserver.MockResponse
@@ -17,6 +19,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 class SubscriptionsViewModelTest {
     private lateinit var server: MockWebServer
     private lateinit var viewModel: SubscriptionsViewModel
+    private lateinit var queueInvalidator: PlaybackQueueInvalidator
 
     @Before
     fun setUp() {
@@ -29,7 +32,8 @@ class SubscriptionsViewModelTest {
             .create(MpodApi::class.java)
 
         enqueueLoadedPodcast()
-        viewModel = SubscriptionsViewModel(api, PlaybackQueueInvalidator())
+        queueInvalidator = PlaybackQueueInvalidator()
+        viewModel = SubscriptionsViewModel(api, queueInvalidator)
     }
 
     @After
@@ -162,6 +166,21 @@ class SubscriptionsViewModelTest {
         }
 
         assertEquals(null, reloaded.actionErrorMessage)
+    }
+
+    @Test
+    fun successfulForegroundReloadInvalidatesSharedPlaybackState() = runBlocking {
+        awaitState { !it.isLoading }
+        enqueueLoadedPodcast()
+        val invalidation = async(start = CoroutineStart.UNDISPATCHED) {
+            queueInvalidator.events.first()
+        }
+
+        viewModel.refresh()
+        withTimeout(5_000) { invalidation.await() }
+
+        awaitState { !it.isLoading }
+        Unit
     }
 
     private fun enqueueLoadedPodcast() {

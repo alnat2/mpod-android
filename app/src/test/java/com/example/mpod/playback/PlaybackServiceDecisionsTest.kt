@@ -25,6 +25,27 @@ class PlaybackServiceDecisionsTest {
     }
 
     @Test
+    fun `foreground reconciliation applies authoritative backend speed`() {
+        assertEquals(
+            1.5f,
+            resolvePlaybackSpeedForReconciliation(
+                backendSpeedLabel = "Speed 1.5x",
+                pendingSpeedLabel = null
+            )
+        )
+    }
+
+    @Test
+    fun `foreground reconciliation does not overwrite pending local speed`() {
+        assertNull(
+            resolvePlaybackSpeedForReconciliation(
+                backendSpeedLabel = "Speed 0.5x",
+                pendingSpeedLabel = "Speed 2x"
+            )
+        )
+    }
+
+    @Test
     fun `delayed completion resumes backend next episode only at same ended item`() {
         assertEquals(
             8,
