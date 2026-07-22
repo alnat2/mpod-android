@@ -6,6 +6,8 @@ Audited baseline: `1.0.4 (5)`, commit `d5fb07c`
 
 Status: completed and accepted by the product owner on 2026-07-15
 
+Historical note: release-process recommendations in this audit were superseded on 2026-07-22. mpod does not require separate Test/Production applications, two application IDs, APK coexistence, or upgrade/co-installation acceptance. The current release process is defined only in `docs/android-delivery-plan.md` and `docs/android-user-scenarios.md`.
+
 ## Executive result
 
 No P0 defect was found. The proposed backlog contains four P1 defects, four P2 defects, and two P3 maintenance items. The current APK remains suitable for feature testing against the test backend, but it is not release-ready.
@@ -285,16 +287,9 @@ Missing verification: dependency cleanup build and updated test count.
 
 Resolution evidence: unused Room runtime/KTX/compiler dependencies and their version-catalog entries were removed. The generated example JVM and instrumentation tests were deleted, leaving 85 product unit tests and 35 connected product tests. The complete unit/lint/build/connected gate passes without Room.
 
-## Release-only blockers already assigned to later stages
+## Historical release recommendations
 
-These are not Stage 2 functional fixes but must block a production APK:
-
-- The only current application ID is the test ID and backend is the test LAN address.
-- The current `release` build type uses the debug signing key and has optimization disabled.
-- Cleartext traffic is enabled for the entire application rather than a test-only network policy.
-- Production port `5050`, release signing, upgrade install, logging policy, and production backup/network rules are not configured.
-
-These items remain Stage 6 work unless the product owner changes their priority.
+The original generic release recommendations in this section are no longer project requirements. Stage 6 now requires successful PRD/regression coverage, switching release configuration to production server `5050`, assembling one release APK, and the approved production smoke path. With no critical defects, that APK is ready for release.
 
 ## Execution status
 

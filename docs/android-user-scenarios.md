@@ -227,11 +227,8 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 | REL-05 | Network is offline, slow, times out, then returns | Core screen remains usable or recoverable; retry does not duplicate mutations | C,E,L | Specified |
 | REL-06 | Process is recreated with pending destructive/mutating UI | Backend remains authoritative; no mutation occurs merely because stale UI state was restored | C,E,L | Specified |
 | REL-07 | Library/queue contains long titles and enough rows to scroll | Core actions remain reachable and operate on the intended item | U,E,D | Specified |
-| REL-08 | Upgrade test APK over the accepted previous test build | Session/preferences needed by the app survive; schema/config changes do not break startup | E,D | Specified |
-| REL-09 | Clean-install test APK | Package `com.prod.mpod.test` uses hardcoded `5051` and does not replace production app | C,E,D | Specified |
-| REL-10 | Clean-install minified production APK | Package `com.prod.mpod` uses hardcoded `5050`, parses API models, and reaches the correct launch state | C,R,D | Specified |
-| REL-11 | Test and production APKs are installed together | Their sessions/data/launchers remain isolated and clearly identifiable | E,R,D | Specified |
-| REL-12 | Full regression gate and installable handoff | Unit, lint, assembly, connected checks pass; APK version/checksum/commit/backend/known limits are recorded | C,U,E,D,R | Specified |
+| REL-10 | Build the release APK against production and run the approved smoke path | Release uses server `5050`; login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback work without a critical defect | C,R,D | Specified |
+| REL-12 | Complete regression gate and release handoff | All PRD scenarios and regression checks pass; release APK version/checksum/commit/backend and known limitations are recorded | C,U,E,D,R | Specified |
 | REL-13 | Backend accepts a connection but a core request exceeds the 30-second network timeout | Loading remains visible and duplicate submission is blocked; timeout ends in the screen/action-specific error state rather than an infinite spinner; the documented reload/retry path can recover | C,U,E,L | Specified |
 
 ## Resolved scenario decisions
@@ -245,6 +242,7 @@ The product owner confirmed on 2026-07-19:
 5. Settings has no Retry buttons. Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
 6. Web/Android synchronization is event-driven for the MVP: launch, foreground, entry to Home or Subscriptions, and manual Refresh reconcile shared state. There is no continuous polling and no immediate interruption of current audio before reconciliation.
 7. Until Downloads is redesigned, Android permits one download at a time and disables other Download actions while it is running. Parallel download behavior is outside the current MVP design.
+8. Release acceptance uses one release APK. A separate test application, a second application ID, Test/Production coexistence, and upgrade/co-installation checks are not mpod requirements. After all PRD scenarios and regression tests pass, release is switched to production server `5050`, assembled, and smoke-tested for login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback. With no critical defects, the APK is ready for release.
 
 There are no known unanswered product questions blocking the functional scenario audit.
 
@@ -263,7 +261,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-4.2 | 2026-07-16 | `ADD-02`–`ADD-05`, `SUB-05`–`SUB-11` | Stage 4.2 temporary RSS fixture, real backend refresh success/failure/recovery, filters, and artwork success/fallback |
 | EV-4.3 | 2026-07-16 | `EPS-01`–`EPS-04`, `EPS-09`, `EPS-11`, `HOM-08`, `HOM-09` | Stage 4.3 three-episode fixture, authoritative playlist/mark-all/show-notes results, real drag reorder, and offline rollback |
 | EV-4.4 | 2026-07-16 to 2026-07-19 | `HOM-04`, `HOM-05`, `PLY-03`, `PLY-06`–`PLY-08`, `PLY-10`, `PLY-12` | Stage 4.4 authenticated MP3 fixtures, durable sync recovery, threshold reconciliation, and seek/speed/progress evidence; commits `0f1a0dc` and `47c73f0`. Device-required playback rows remain Specified until the final phone pass |
-| EV-PROD | 2026-07-19 | `REL-09`, `REL-10` baseline evidence only | Minified production startup defect fixed and production/test variant endpoints rechecked in commit `d755f99`; rows remain Specified until their complete delivery evidence is assembled |
+| EV-PROD | 2026-07-19 | `REL-10` baseline evidence only | Minified release startup defect fixed in commit `d755f99`; the release build reached production server `5050`. The row remains Specified until the complete approved production smoke path is executed |
 | EV-W1 | 2026-07-19 | `APP-05`, `NAV-01`–`NAV-05` | Blank Login/Setup dispatch tests; all-destination bottom-nav test; real `5051` login to Subscriptions; Home/Settings/Add navigation; system Back; background restore; and process recreation on Pixel 9. Full gate: 94 unit, 44 connected, debug/release lint and APK assembly |
 | EV-W1-PARTIAL | 2026-07-19 | `APP-03`, `APP-04`, `APP-11`, `APP-12` remain Specified | Isolated HTTP connected tests protect `setupRequired → register` and failed logout recovery; backend router tests protect real first setup. Shared `5051` cannot be reset or forced to fail safely, and `APP-12` still requires its final release/device backup smoke check, so these rows were not promoted |
 | EV-W2 | 2026-07-19 | `ADD-01`, `ADD-06`–`ADD-12` | Compose/ViewModel and multipart contract coverage plus real Pixel 9 emulator checks against `5051`: mode switching without submission; picker cancellation; mixed OPML result `1 imported / 1 skipped`; repeat result `0 / 2`; local 5,000,001-byte rejection; invalid-OPML error followed by successful retry; and double-submit plus background/restore during a five-second RSS request producing exactly one subscription. Process loss while the document picker was open produced no crash, import, or false result. Temporary subscriptions were removed. Full gate: 94 unit, 48 connected, debug/release lint and APK assembly |
@@ -285,6 +283,6 @@ After the product owner reviews this map, work proceeds in functional waves:
 2. Execute unknown and high-risk scenarios end-to-end, recording `Verified`, `Failed`, and the exact evidence.
 3. Fix failed scenarios in small scenario-scoped commits, then rerun that scenario and affected regression paths.
 4. Run the cross-cutting reliability matrix.
-5. Install one versioned test APK on the physical phone and perform the written acceptance pass.
+5. Switch release configuration to production server `5050`, build one release APK, and perform the approved production smoke pass on the physical phone.
 
 Each implementation batch ends with a scoped commit and report. The next batch does not start until approval, unless the product owner explicitly authorizes completing a whole named wave without intermediate confirmation.
