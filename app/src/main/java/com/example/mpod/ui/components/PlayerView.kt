@@ -55,8 +55,10 @@ fun PlayerView(
     onNotesClick: () -> Unit = {}
 ) {
     var showSpeedSheet by remember { mutableStateOf(false) }
+    var draggedProgress by remember { mutableStateOf<Float?>(null) }
     val speedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val speeds = listOf("0.5", "0.75", "1.0", "1.3", "1.5", "2.0")
+    val displayedProgress = draggedProgress ?: progress.coerceIn(0f, 1f)
 
     if (showSpeedSheet) {
         ModalBottomSheet(
@@ -160,7 +162,7 @@ fun PlayerView(
                         .semantics {
                             contentDescription = "Playback position"
                             progressBarRangeInfo = ProgressBarRangeInfo(
-                                current = progress.coerceIn(0f, 1f),
+                                current = displayedProgress,
                                 range = 0f..1f
                             )
                             setProgress { targetProgress ->
@@ -171,15 +173,22 @@ fun PlayerView(
                         .pointerInput(onSeekTo) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                onSeekTo((down.position.x / size.width).coerceIn(0f, 1f))
+                                var targetProgress =
+                                    (down.position.x / size.width).coerceIn(0f, 1f)
+                                draggedProgress = targetProgress
 
                                 do {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id }
                                         ?: break
-                                    onSeekTo((change.position.x / size.width).coerceIn(0f, 1f))
+                                    targetProgress =
+                                        (change.position.x / size.width).coerceIn(0f, 1f)
+                                    draggedProgress = targetProgress
                                     change.consume()
                                 } while (change.pressed)
+
+                                draggedProgress = null
+                                onSeekTo(targetProgress)
                             }
                         }
                         .clip(CircleShape)
@@ -188,7 +197,7 @@ fun PlayerView(
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
-                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .fillMaxWidth(displayedProgress)
                             .background(MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 }

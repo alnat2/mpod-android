@@ -54,13 +54,17 @@ class HomeScreenTest {
         var playCount = 0
         var seekTotal = 0
         var absoluteSeek = 0f
+        var absoluteSeekCount = 0
         var speed: String? = null
         composeRule.setContent {
             MpodTheme {
                 HomeScreen(
                     onPlayToggle = { playCount += 1 },
                     onSeekBy = { seekTotal += it },
-                    onSeekTo = { absoluteSeek = it },
+                    onSeekTo = {
+                        absoluteSeek = it
+                        absoluteSeekCount += 1
+                    },
                     onSpeedChange = { speed = it }
                 )
             }
@@ -81,6 +85,7 @@ class HomeScreenTest {
             assertEquals(1, playCount)
             assertEquals(5, seekTotal)
             assertEquals(0.75f, absoluteSeek, 0.02f)
+            assertEquals(1, absoluteSeekCount)
             assertEquals("2.0", speed)
         }
     }
@@ -88,9 +93,15 @@ class HomeScreenTest {
     @Test
     fun playerProgressCanBeDraggedToAnAbsolutePosition() {
         var absoluteSeek = 0f
+        var absoluteSeekCount = 0
         composeRule.setContent {
             MpodTheme {
-                HomeScreen(onSeekTo = { absoluteSeek = it })
+                HomeScreen(
+                    onSeekTo = {
+                        absoluteSeek = it
+                        absoluteSeekCount += 1
+                    }
+                )
             }
         }
 
@@ -104,6 +115,7 @@ class HomeScreenTest {
 
         composeRule.runOnIdle {
             assertEquals(0.6f, absoluteSeek, 0.03f)
+            assertEquals(1, absoluteSeekCount)
         }
     }
 
