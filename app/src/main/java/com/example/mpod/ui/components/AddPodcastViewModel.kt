@@ -76,7 +76,7 @@ class AddPodcastViewModel @Inject constructor(
             val response = result.getOrNull()
 
             val payload = response?.takeIf { it.isSuccessful }?.body()
-            if (payload != null) {
+            if (payload?.success == true) {
                 _state.value = AddPodcastUiState(importResult = payload.toUiResult())
                 onSuccess()
             } else {

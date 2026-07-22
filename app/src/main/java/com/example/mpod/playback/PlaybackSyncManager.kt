@@ -32,7 +32,18 @@ internal class ApiPlaybackSyncTransport(private val api: MpodApi) : PlaybackSync
     override suspend fun setActive(episodeId: Int): SyncAttempt<Unit> {
         return runCatching { api.setActivePlayback(ActivePlaybackRequest(episodeId)) }
             .fold(
-                onSuccess = { it.toUnitSyncAttempt() },
+                onSuccess = { response ->
+                    when {
+                        response.isSuccessful &&
+                            response.body()?.activePlayback?.episodeId == episodeId -> {
+                            SyncAttempt.Success(Unit)
+                        }
+                        isPermanentPlaybackSyncFailure(response.code()) -> {
+                            SyncAttempt.PermanentFailure
+                        }
+                        else -> SyncAttempt.RetryableFailure
+                    }
+                },
                 onFailure = { SyncAttempt.RetryableFailure }
             )
     }
@@ -44,7 +55,7 @@ internal class ApiPlaybackSyncTransport(private val api: MpodApi) : PlaybackSync
             .fold(
                 onSuccess = { response ->
                     when {
-                        response.isSuccessful && response.body() != null -> {
+                        response.isSuccessful && response.body()?.playback != null -> {
                             SyncAttempt.Success(response.body()!!)
                         }
                         isPermanentPlaybackSyncFailure(response.code()) -> SyncAttempt.PermanentFailure
@@ -59,18 +70,22 @@ internal class ApiPlaybackSyncTransport(private val api: MpodApi) : PlaybackSync
         return runCatching {
             api.updateSettings(SettingsUpdateRequest(playbackSpeed = label))
         }.fold(
-            onSuccess = { it.toUnitSyncAttempt() },
+            onSuccess = { response ->
+                when {
+                    response.isSuccessful &&
+                        response.body()?.settings?.playbackSpeed == label -> {
+                        SyncAttempt.Success(Unit)
+                    }
+                    isPermanentPlaybackSyncFailure(response.code()) -> {
+                        SyncAttempt.PermanentFailure
+                    }
+                    else -> SyncAttempt.RetryableFailure
+                }
+            },
             onFailure = { SyncAttempt.RetryableFailure }
         )
     }
 
-    private fun Response<*>.toUnitSyncAttempt(): SyncAttempt<Unit> {
-        return when {
-            isSuccessful -> SyncAttempt.Success(Unit)
-            isPermanentPlaybackSyncFailure(code()) -> SyncAttempt.PermanentFailure
-            else -> SyncAttempt.RetryableFailure
-        }
-    }
 }
 
 internal class PlaybackSyncManager(

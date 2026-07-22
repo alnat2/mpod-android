@@ -10,6 +10,8 @@ import com.example.mpod.data.network.model.SchedulerStatusDto
 import com.example.mpod.data.network.model.SettingsDto
 import com.example.mpod.data.network.model.SettingsUpdateRequest
 import com.example.mpod.ui.util.apiErrorMessage
+import com.example.mpod.ui.util.missingApiPayload
+import com.example.mpod.ui.util.requireApiBody
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,8 @@ class SettingsViewModel @Inject constructor(
     private var hasResumed = false
     private val operationMutex = Mutex()
     private var exportInFlight = false
+    private var refreshTimeSaveInFlight = false
+    private var proxySaveInFlight = false
 
     init {
         refresh()
@@ -67,56 +71,69 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveDailyRefreshTime(value: String) {
+        if (refreshTimeSaveInFlight || !_state.value.hasConfirmedSettings ||
+            value == _state.value.dailyRefreshTime
+        ) return
+        refreshTimeSaveInFlight = true
         launchSerialized {
-            if (_state.value.isSavingRefreshTime || !_state.value.hasConfirmedSettings ||
-                value == _state.value.dailyRefreshTime
-            ) return@launchSerialized
-            _state.value = _state.value.copy(
-                isSavingRefreshTime = true,
-                refreshErrorMessage = null
-            )
-            val response = runCatching {
-                api.updateSettings(SettingsUpdateRequest(dailyRefreshTime = value))
-            }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val confirmed = response.body()?.settings
-                val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
-                    dailyRefreshTime = confirmed?.dailyRefreshTime ?: value,
-                    isSavingRefreshTime = false,
-                    hasConfirmedSettings = true
-                )
-                _state.value = reloadRefreshStatusAfterConfirmedSave(confirmedState)
-            } else {
+            try {
                 _state.value = _state.value.copy(
-                    isSavingRefreshTime = false,
-                    refreshErrorMessage = response.errorMessage("Could not save refresh time.")
+                    isSavingRefreshTime = true,
+                    refreshErrorMessage = null
                 )
+                val response = runCatching {
+                    api.updateSettings(SettingsUpdateRequest(dailyRefreshTime = value))
+                }.getOrNull()
+                val confirmed = response?.takeIf { it.isSuccessful }?.body()?.settings
+                if (confirmed != null) {
+                    val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
+                        dailyRefreshTime = confirmed.dailyRefreshTime ?: value,
+                        isSavingRefreshTime = false,
+                        hasConfirmedSettings = true
+                    )
+                    _state.value = reloadRefreshStatusAfterConfirmedSave(confirmedState)
+                } else {
+                    _state.value = _state.value.copy(
+                        isSavingRefreshTime = false,
+                        refreshErrorMessage = response.errorMessage("Could not save refresh time.")
+                    )
+                }
+            } finally {
+                refreshTimeSaveInFlight = false
             }
         }
     }
 
     fun setProxyEnabled(enabled: Boolean) {
+        if (proxySaveInFlight || !_state.value.hasConfirmedSettings ||
+            !_state.value.proxyConfigured || enabled == _state.value.proxyEnabled
+        ) return
+        proxySaveInFlight = true
         launchSerialized {
-            if (_state.value.isSavingProxy || !_state.value.hasConfirmedSettings ||
-                !_state.value.proxyConfigured || enabled == _state.value.proxyEnabled
-            ) return@launchSerialized
-            _state.value = _state.value.copy(isSavingProxy = true, proxyErrorMessage = null)
-            val response = runCatching {
-                api.updateSettings(SettingsUpdateRequest(proxyEnabled = enabled))
-            }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val confirmed = response.body()?.settings
-                val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
-                    proxyEnabled = confirmed?.proxyEnabled ?: enabled,
-                    isSavingProxy = false,
-                    hasConfirmedSettings = true
-                )
-                _state.value = reloadProxyStatusAfterConfirmedSave(confirmedState)
-            } else {
+            try {
                 _state.value = _state.value.copy(
-                    isSavingProxy = false,
-                    proxyErrorMessage = response.errorMessage("Could not update proxy setting.")
+                    isSavingProxy = true,
+                    proxyErrorMessage = null
                 )
+                val response = runCatching {
+                    api.updateSettings(SettingsUpdateRequest(proxyEnabled = enabled))
+                }.getOrNull()
+                val confirmed = response?.takeIf { it.isSuccessful }?.body()?.settings
+                if (confirmed != null) {
+                    val confirmedState = _state.value.withConfirmedSettings(confirmed).copy(
+                        proxyEnabled = confirmed.proxyEnabled ?: enabled,
+                        isSavingProxy = false,
+                        hasConfirmedSettings = true
+                    )
+                    _state.value = reloadProxyStatusAfterConfirmedSave(confirmedState)
+                } else {
+                    _state.value = _state.value.copy(
+                        isSavingProxy = false,
+                        proxyErrorMessage = response.errorMessage("Could not update proxy setting.")
+                    )
+                }
+            } finally {
+                proxySaveInFlight = false
             }
         }
     }
@@ -170,15 +187,22 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun loadSettingsState(base: SettingsUiState): SettingsUiState = coroutineScope {
         val settingsRequest = async {
-            runCatching { api.getSettings().requireBody("Could not load settings.").settings }
+            runCatching {
+                api.getSettings().requireApiBody("Could not load settings.").settings
+                    ?: missingApiPayload("Could not load settings.")
+            }
         }
         val schedulerRequest = async {
             runCatching {
-                api.getJobsStatus().requireBody("Could not load refresh status.").scheduler
+                api.getJobsStatus().requireApiBody("Could not load refresh status.").scheduler
+                    ?: missingApiPayload("Could not load refresh status.")
             }
         }
         val proxyRequest = async {
-            runCatching { api.getProxyStatus().requireBody("Could not load proxy status.").proxy }
+            runCatching {
+                api.getProxyStatus().requireApiBody("Could not load proxy status.").proxy
+                    ?: missingApiPayload("Could not load proxy status.")
+            }
         }
         val settingsResult = settingsRequest.await()
         val schedulerResult = schedulerRequest.await()
@@ -222,8 +246,9 @@ class SettingsViewModel @Inject constructor(
         confirmedState: SettingsUiState
     ): SettingsUiState = runCatching {
         val scheduler = api.getJobsStatus()
-            .requireBody("Could not load refresh status.")
+            .requireApiBody("Could not load refresh status.")
             .scheduler
+            ?: missingApiPayload("Could not load refresh status.")
         confirmedState.copy(
             schedulerStatusText = schedulerStatusText(scheduler),
             refreshErrorMessage = null
@@ -238,8 +263,9 @@ class SettingsViewModel @Inject constructor(
         confirmedState: SettingsUiState
     ): SettingsUiState = runCatching {
         val proxy = api.getProxyStatus()
-            .requireBody("Could not load proxy status.")
+            .requireApiBody("Could not load proxy status.")
             .proxy
+            ?: missingApiPayload("Could not load proxy status.")
         val settings = SettingsDto(
             dailyRefreshTime = confirmedState.dailyRefreshTime,
             playbackSpeed = null,
@@ -283,13 +309,6 @@ class SettingsViewModel @Inject constructor(
             val compact = lastRefresh.replace('T', ' ').take(16)
             "Status: $state · last refresh $compact"
         }
-    }
-
-    private fun <T> Response<T>.requireBody(defaultMessage: String): T {
-        if (isSuccessful) {
-            body()?.let { return it }
-        }
-        throw IllegalStateException(apiErrorMessage(errorBody()?.string(), defaultMessage))
     }
 
     private fun Response<*>?.errorMessage(defaultMessage: String): String {

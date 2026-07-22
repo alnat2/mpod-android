@@ -46,6 +46,13 @@ class AppLaunchStateTest {
             AppLaunchState.BackendUnavailable,
             resolveLaunchState(responseCode = 200, session = null)
         )
+        assertEquals(
+            AppLaunchState.BackendUnavailable,
+            resolveLaunchState(
+                responseCode = 200,
+                session = SessionDto(authenticated = null, setupRequired = null, user = null)
+            )
+        )
     }
 
     @Test

@@ -140,9 +140,10 @@ class PlaybackService : MediaSessionService() {
         queueReconciliationMutex.withLock {
             val response = runCatching { api.getPlaybackQueue() }.getOrNull()
             val payload = response?.takeIf { it.isSuccessful }?.body() ?: return@withLock
+            val backendQueue = payload.queue ?: return@withLock
             val pending = playbackSyncManager.pendingSnapshot()
             val pendingByEpisode = pending.playbackUpdates.associateBy { it.episodeId }
-            val queue = payload.queue.filterNot { pendingByEpisode[it.id]?.completed == true }
+            val queue = backendQueue.filterNot { pendingByEpisode[it.id]?.completed == true }
             val currentEpisodeId = currentEpisodeId()
             val target = resolveQueuePlaybackTarget(
                 queue = queue.map {

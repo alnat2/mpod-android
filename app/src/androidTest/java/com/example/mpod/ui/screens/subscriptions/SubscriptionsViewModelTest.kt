@@ -183,6 +183,23 @@ class SubscriptionsViewModelTest {
         Unit
     }
 
+    @Test
+    fun malformedSuccessfulReloadPreservesLibraryAndNextReloadRecovers() = runBlocking {
+        awaitState { it.podcasts.singleOrNull()?.id == 41 }
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"podcasts":null}"""))
+
+        viewModel.refresh()
+        val failed = awaitState { it.actionErrorMessage == "Could not load podcasts." }
+
+        assertEquals(41, failed.podcasts.single().id)
+        enqueueLoadedPodcast()
+        viewModel.refresh()
+        val recovered = awaitState {
+            !it.isLoading && it.actionErrorMessage == null && it.podcasts.singleOrNull()?.id == 41
+        }
+        assertEquals(1, recovered.podcasts.size)
+    }
+
     private fun enqueueLoadedPodcast() {
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(

@@ -10,6 +10,9 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.apiErrorMessage
 import com.example.mpod.ui.util.toDurationSeconds
+import com.example.mpod.ui.util.missingApiPayload
+import com.example.mpod.ui.util.requireApiBody
+import com.example.mpod.ui.util.userFacingApiMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +49,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun reloadNow(invalidatePlaybackQueue: Boolean) {
         _state.value = _state.value.copy(isLoading = true, errorMessage = null)
         val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-            HomeUiState(errorMessage = error.message ?: "Could not load playlist.")
+            HomeUiState(errorMessage = error.userFacingApiMessage("Could not load playlist."))
         }
         _state.value = nextState.withTransientStateFrom(_state.value)
         if (invalidatePlaybackQueue && nextState.errorMessage == null) {
@@ -55,18 +58,23 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun loadHomeState(): HomeUiState {
-        val podcasts = api.getPodcasts().requireBody("Could not load podcasts.").podcasts
+        val podcasts = api.getPodcasts()
+            .requireApiBody("Could not load podcasts.")
+            .podcasts
+            ?: missingApiPayload("Could not load podcasts.")
         if (podcasts.isEmpty()) {
             return HomeUiState(hasPodcasts = false)
         }
 
         val playbackQueue = api.getPlaybackQueue()
-            .requireBody("Could not load playback queue.")
+            .requireApiBody("Could not load playback queue.")
+        val queue = playbackQueue.queue
+            ?: missingApiPayload("Could not load playback queue.")
 
         return HomeUiState(
             hasPodcasts = true,
             activeEpisodeId = playbackQueue.activePlayback?.episodeId,
-            queue = playbackQueue.queue.map { it.toHomeEpisode() }
+            queue = queue.map { it.toHomeEpisode() }
         )
     }
 
@@ -226,15 +234,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun <T> Response<T>.requireBody(defaultMessage: String): T {
-        if (isSuccessful) {
-            body()?.let { return it }
-        }
-        throw IllegalStateException(errorBody()?.string().orEmpty().ifBlank { defaultMessage })
-    }
-
     private fun Response<*>?.errorMessage(defaultMessage: String): String {
-        return this?.errorBody()?.string().orEmpty().ifBlank { defaultMessage }
+        return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
     }
 
 }

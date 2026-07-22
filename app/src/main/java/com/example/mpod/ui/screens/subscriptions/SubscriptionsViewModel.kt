@@ -13,6 +13,9 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import com.example.mpod.ui.util.apiErrorMessage
 import com.example.mpod.ui.util.toDurationSeconds
+import com.example.mpod.ui.util.missingApiPayload
+import com.example.mpod.ui.util.requireApiBody
+import com.example.mpod.ui.util.userFacingApiMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,7 +49,7 @@ class SubscriptionsViewModel @Inject constructor(
             )
             val loadResult = runCatching { loadSubscriptionsState() }
             val nextState = loadResult.getOrElse { error ->
-                val message = error.message ?: "Could not load subscriptions."
+                val message = error.userFacingApiMessage("Could not load subscriptions.")
                 if (current.podcasts.isEmpty()) {
                     SubscriptionsUiState(errorMessage = message)
                 } else {
@@ -443,19 +446,25 @@ class SubscriptionsViewModel @Inject constructor(
 
 
     private suspend fun loadSubscriptionsState(): SubscriptionsUiState {
-        val podcasts = api.getPodcasts().requireBody("Could not load podcasts.").podcasts
-        val playlistEpisodeIds = api.getPlaylist()
-            .requireBody("Could not load playlist.")
-            .items
-            .map { it.episodeId }
-            .toSet()
+        val podcasts = api.getPodcasts()
+            .requireApiBody("Could not load podcasts.")
+            .podcasts
+            ?: missingApiPayload("Could not load podcasts.")
+        val playlistEpisodeIds = (
+            api.getPlaylist()
+                .requireApiBody("Could not load playlist.")
+                .items
+                ?.map { it.episodeId }
+                ?: missingApiPayload("Could not load playlist.")
+            ).toSet()
 
         var hasEpisodeLoadFailures = false
         val podcastItems = podcasts.map { podcast ->
             val episodesResult = runCatching {
                 api.getPodcastEpisodes(podcast.id)
-                    .requireBody("Could not load episodes.")
+                    .requireApiBody("Could not load episodes.")
                     .episodes
+                    ?: missingApiPayload("Could not load episodes.")
             }
             val allEpisodes = episodesResult.getOrNull().orEmpty()
             val loadErrorMessage = if (episodesResult.isFailure) {
@@ -515,13 +524,6 @@ class SubscriptionsViewModel @Inject constructor(
             summary = subscriptionShowNotes(),
             inPlaylist = id in playlistEpisodeIds
         )
-    }
-
-    private fun <T> Response<T>.requireBody(defaultMessage: String): T {
-        if (isSuccessful) {
-            body()?.let { return it }
-        }
-        throw IllegalStateException(apiErrorMessage(errorBody()?.string(), defaultMessage))
     }
 
     private fun Response<*>?.errorMessage(defaultMessage: String): String {

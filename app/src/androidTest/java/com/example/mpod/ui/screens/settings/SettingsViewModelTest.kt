@@ -28,19 +28,20 @@ import retrofit2.converter.gson.GsonConverterFactory
 class SettingsViewModelTest {
     private lateinit var server: MockWebServer
     private lateinit var api: MpodApi
-    private var settingsCode = 200
-    private var schedulerFailureFromCall = Int.MAX_VALUE
-    private var proxyCode = 200
-    private var patchCode = 200
-    private var exportCode = 200
-    private var exportBody = "<opml><body><outline text=\"Planet Money\"/></body></opml>"
-    private var exportDelayMillis = 0L
-    private var patchDelayMillis = 0L
-    private var dailyRefreshTime = "03:00"
-    private var proxyEnabled = true
-    private var proxyConfigured = true
-    private var proxyStatus = "ok"
-    private var proxyError: String? = null
+    @Volatile private var settingsCode = 200
+    @Volatile private var schedulerFailureFromCall = Int.MAX_VALUE
+    @Volatile private var proxyCode = 200
+    @Volatile private var patchCode = 200
+    @Volatile private var exportCode = 200
+    @Volatile private var exportBody = "<opml><body><outline text=\"Planet Money\"/></body></opml>"
+    @Volatile private var exportDelayMillis = 0L
+    @Volatile private var patchDelayMillis = 0L
+    @Volatile private var patchBodyOverride: String? = null
+    @Volatile private var dailyRefreshTime = "03:00"
+    @Volatile private var proxyEnabled = true
+    @Volatile private var proxyConfigured = true
+    @Volatile private var proxyStatus = "ok"
+    @Volatile private var proxyError: String? = null
     private val schedulerCalls = AtomicInteger()
     private val patchCalls = AtomicInteger()
     private val exportCalls = AtomicInteger()
@@ -80,7 +81,9 @@ class SettingsViewModelTest {
                             Regex(""""proxyEnabled":(true|false)""")
                                 .find(body)?.groupValues?.get(1)?.toBooleanStrict()
                                 ?.let { proxyEnabled = it }
-                            settingsResponse()
+                            patchBodyOverride?.let {
+                                MockResponse().setResponseCode(200).setBody(it)
+                            } ?: settingsResponse()
                         }
                         response.setHeadersDelay(patchDelayMillis, TimeUnit.MILLISECONDS)
                     }
@@ -230,6 +233,25 @@ class SettingsViewModelTest {
         val recovered = viewModel.awaitState { it.dailyRefreshTime == "04:30" }
         assertNull(recovered.refreshErrorMessage)
         assertEquals(2, patchCalls.get())
+    }
+
+    @Test
+    fun malformedSuccessfulSaveDoesNotInventConfirmationAndReloadRecovers() = runBlocking {
+        val viewModel = newViewModel()
+        viewModel.awaitState { !it.isLoading }
+        patchBodyOverride = "{}"
+
+        viewModel.saveDailyRefreshTime("04:30")
+        val failed = viewModel.awaitState {
+            !it.isSavingRefreshTime && it.refreshErrorMessage == "Could not save refresh time."
+        }
+
+        assertEquals("03:00", failed.dailyRefreshTime)
+        assertEquals(1, patchCalls.get())
+        patchBodyOverride = null
+        viewModel.refresh()
+        val recovered = viewModel.awaitState { !it.isLoading && it.dailyRefreshTime == "04:30" }
+        assertNull(recovered.refreshErrorMessage)
     }
 
     @Test

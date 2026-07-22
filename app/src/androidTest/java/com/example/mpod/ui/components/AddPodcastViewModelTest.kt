@@ -7,6 +7,7 @@ import com.example.mpod.data.network.MpodApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -52,6 +53,9 @@ class AddPodcastViewModelTest {
 
         viewModel.importOpml(opmlUri()) { refreshes += 1 }
         val result = awaitState { it.importResult != null }.importResult
+        withTimeout(5_000) {
+            while (refreshes != 1) yield()
+        }
 
         assertEquals(OpmlImportResultUi(imported = 3, skipped = 2), result)
         assertEquals(1, refreshes)
@@ -75,6 +79,23 @@ class AddPodcastViewModelTest {
         awaitState { it.importResult != null }
 
         assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun unsuccessfulImportPayloadDoesNotInventCompletedImport() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"success":false,"imported":0,"skipped":0}""")
+        )
+        var refreshes = 0
+
+        viewModel.importOpml(opmlUri()) { refreshes += 1 }
+        val failed = awaitState { !it.isSubmitting && it.errorMessage != null }
+
+        assertEquals("Could not import this OPML file.", failed.errorMessage)
+        assertEquals(null, failed.importResult)
+        assertEquals(0, refreshes)
     }
 
     private fun opmlUri(): Uri {

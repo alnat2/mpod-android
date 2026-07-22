@@ -88,6 +88,22 @@ class HomeViewModelTest {
         assertNull(unexpectedServiceInvalidation.await())
     }
 
+    @Test
+    fun malformedSuccessfulLoadShowsStableErrorAndRetryRecovers() = runBlocking {
+        awaitState { it.queue.singleOrNull()?.id == 51 }
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"podcasts":null}"""))
+
+        viewModel.refresh()
+        val failed = awaitState { it.errorMessage == "Could not load podcasts." }
+
+        assertEquals(true, failed.queue.isEmpty())
+        enqueuePodcasts()
+        enqueueQueueWithEpisode()
+        viewModel.refresh()
+        val recovered = awaitState { !it.isLoading && it.queue.singleOrNull()?.id == 51 }
+        assertNull(recovered.errorMessage)
+    }
+
     private fun enqueuePodcasts() {
         server.enqueue(
             MockResponse().setResponseCode(200).setBody(

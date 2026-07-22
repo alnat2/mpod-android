@@ -30,8 +30,8 @@ data class EpisodeListenedRequest(
 )
 
 data class SessionDto(
-    @SerializedName("authenticated") val authenticated: Boolean,
-    @SerializedName("setupRequired") val setupRequired: Boolean,
+    @SerializedName("authenticated") val authenticated: Boolean?,
+    @SerializedName("setupRequired") val setupRequired: Boolean?,
     @SerializedName("user") val user: SessionUserDto?
 )
 
@@ -41,7 +41,7 @@ data class SessionUserDto(
 )
 
 data class PodcastsResponse(
-    @SerializedName("podcasts") val podcasts: List<PodcastDto> = emptyList()
+    @SerializedName("podcasts") val podcasts: List<PodcastDto>?
 )
 
 data class MarkAllListenedResponse(
@@ -60,7 +60,7 @@ data class PodcastDto(
 )
 
 data class EpisodesResponse(
-    @SerializedName("episodes") val episodes: List<EpisodeDto> = emptyList()
+    @SerializedName("episodes") val episodes: List<EpisodeDto>?
 )
 
 data class EpisodeResponse(
@@ -82,7 +82,7 @@ data class EpisodeDto(
 )
 
 data class PlaylistResponse(
-    @SerializedName("items") val items: List<PlaylistItemDto> = emptyList()
+    @SerializedName("items") val items: List<PlaylistItemDto>?
 )
 
 data class PlaylistItemDto(
@@ -116,7 +116,7 @@ data class ActivePlaybackRequest(
 )
 
 data class ActivePlaybackResponse(
-    @SerializedName("activePlayback") val activePlayback: ActivePlaybackDto
+    @SerializedName("activePlayback") val activePlayback: ActivePlaybackDto?
 )
 
 data class PlaybackQueueEpisodeDto(
@@ -136,17 +136,17 @@ data class PlaybackQueueEpisodeDto(
 )
 
 data class PlaybackQueueResponse(
-    @SerializedName("queue") val queue: List<PlaybackQueueEpisodeDto> = emptyList(),
+    @SerializedName("queue") val queue: List<PlaybackQueueEpisodeDto>?,
     @SerializedName("activePlayback") val activePlayback: ActivePlaybackDto?
 )
 
 data class PlaybackUpdateResponse(
-    @SerializedName("playback") val playback: PlaybackStateDto,
+    @SerializedName("playback") val playback: PlaybackStateDto?,
     @SerializedName("nextEpisodeId") val nextEpisodeId: Int?
 )
 
 data class SettingsResponse(
-    @SerializedName("settings") val settings: SettingsDto
+    @SerializedName("settings") val settings: SettingsDto?
 )
 
 data class SettingsDto(

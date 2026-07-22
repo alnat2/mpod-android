@@ -39,12 +39,13 @@ class PlaybackModelsTest {
             """.trimIndent(),
             PlaybackQueueResponse::class.java
         )
+        val queue = requireNotNull(payload.queue)
 
         assertEquals(55, payload.activePlayback?.episodeId)
-        assertEquals(1, payload.queue.size)
-        assertEquals("Podcast", payload.queue.single().podcastTitle)
-        assertEquals(812, payload.queue.single().playback?.positionSeconds)
-        assertNotNull(payload.queue.single().podcastImageUrl)
+        assertEquals(1, queue.size)
+        assertEquals("Podcast", queue.single().podcastTitle)
+        assertEquals(812, queue.single().playback?.positionSeconds)
+        assertNotNull(queue.single().podcastImageUrl)
     }
 
     @Test
@@ -56,5 +57,15 @@ class PlaybackModelsTest {
 
         assertEquals(emptyList<PlaybackQueueEpisodeDto>(), payload.queue)
         assertEquals(null, payload.activePlayback)
+    }
+
+    @Test
+    fun missingQueueIsNotSilentlyConvertedToAnEmptyPlaylist() {
+        val payload = gson.fromJson(
+            """{"activePlayback":null}""",
+            PlaybackQueueResponse::class.java
+        )
+
+        assertEquals(null, payload.queue)
     }
 }

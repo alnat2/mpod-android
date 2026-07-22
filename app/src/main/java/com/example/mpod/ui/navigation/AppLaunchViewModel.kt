@@ -155,9 +155,14 @@ internal fun resolveLaunchState(
         responseCode == null || responseCode !in 200..299 || session == null -> {
             AppLaunchState.BackendUnavailable
         }
-        session.setupRequired -> AppLaunchState.SetupRequired
-        session.authenticated -> AppLaunchState.Authenticated
-        else -> AppLaunchState.Unauthenticated
+        session.setupRequired == true -> AppLaunchState.SetupRequired
+        session.setupRequired == false && session.authenticated == true -> {
+            AppLaunchState.Authenticated
+        }
+        session.setupRequired == false && session.authenticated == false -> {
+            AppLaunchState.Unauthenticated
+        }
+        else -> AppLaunchState.BackendUnavailable
     }
 }
 
