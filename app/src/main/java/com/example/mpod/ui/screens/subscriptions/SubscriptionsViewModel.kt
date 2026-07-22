@@ -75,14 +75,14 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun refreshAll() {
         if (_state.value.isRefreshingAll || _state.value.refreshingPodcastIds.isNotEmpty()) return
+        _state.value = _state.value.copy(
+            isRefreshingAll = true,
+            failedUnsubscribePodcastId = null,
+            failedMarkAllListenedPodcastId = null,
+            failedEpisodeAction = null,
+            actionErrorMessage = null
+        )
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                isRefreshingAll = true,
-                failedUnsubscribePodcastId = null,
-                failedMarkAllListenedPodcastId = null,
-                failedEpisodeAction = null,
-                actionErrorMessage = null
-            )
             try {
                 val response = runCatching { api.refreshAllPodcasts() }.getOrNull()
                 if (response?.isSuccessful == true) {
@@ -123,14 +123,14 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun refreshPodcast(podcastId: Int) {
         if (_state.value.isRefreshingAll || podcastId in _state.value.refreshingPodcastIds) return
+        _state.value = _state.value.copy(
+            refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
+            failedUnsubscribePodcastId = null,
+            failedMarkAllListenedPodcastId = null,
+            failedEpisodeAction = null,
+            actionErrorMessage = null
+        )
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
-                failedUnsubscribePodcastId = null,
-                failedMarkAllListenedPodcastId = null,
-                failedEpisodeAction = null,
-                actionErrorMessage = null
-            )
             try {
                 val response = runCatching { api.refreshPodcast(podcastId) }.getOrNull()
                 if (response?.isSuccessful == true) {
@@ -225,15 +225,15 @@ class SubscriptionsViewModel @Inject constructor(
             return
         }
 
+        _state.value = _state.value.copy(
+            pendingUnsubscribe = null,
+            failedUnsubscribePodcastId = null,
+            failedMarkAllListenedPodcastId = null,
+            failedEpisodeAction = null,
+            unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
+            actionErrorMessage = null
+        )
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                pendingUnsubscribe = null,
-                failedUnsubscribePodcastId = null,
-                failedMarkAllListenedPodcastId = null,
-                failedEpisodeAction = null,
-                unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
-                actionErrorMessage = null
-            )
             val response = runCatching { api.removePodcast(podcastId) }.getOrNull()
             if (response?.isSuccessful == true) {
                 queueInvalidator.invalidate()
@@ -261,17 +261,16 @@ class SubscriptionsViewModel @Inject constructor(
         if (podcast.unlistenedEpisodeCount == 0) return
         if (podcastId in _state.value.markingAllListenedPodcastIds) return
 
+        val previousPodcast = podcast
+        _state.value = _state.value.copy(
+            podcasts = _state.value.podcasts.markAllListenedOptimistically(podcastId),
+            failedUnsubscribePodcastId = null,
+            failedMarkAllListenedPodcastId = null,
+            failedEpisodeAction = null,
+            markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds + podcastId,
+            actionErrorMessage = null
+        )
         viewModelScope.launch {
-            val previousPodcast = podcast
-            _state.value = _state.value.copy(
-                podcasts = _state.value.podcasts.markAllListenedOptimistically(podcastId),
-                failedUnsubscribePodcastId = null,
-                failedMarkAllListenedPodcastId = null,
-                failedEpisodeAction = null,
-                markingAllListenedPodcastIds = _state.value.markingAllListenedPodcastIds + podcastId,
-                actionErrorMessage = null
-            )
-
             when (val outcome = executeMarkAllListened { api.markAllListened(podcastId) }) {
                 is MarkAllListenedOutcome.Success -> {
                     queueInvalidator.invalidate()

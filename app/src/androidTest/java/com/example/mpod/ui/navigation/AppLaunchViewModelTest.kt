@@ -16,6 +16,7 @@ import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class AppLaunchViewModelTest {
     private lateinit var server: MockWebServer
@@ -102,6 +103,28 @@ class AppLaunchViewModelTest {
         sessionInvalidator.invalidate()
 
         awaitState(viewModel, AppLaunchState.Unauthenticated)
+    }
+
+    @Test
+    fun immediateDuplicateLoginDispatchesOneRequest() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"authenticated":false,"setupRequired":false,"user":null}"""
+            )
+        )
+        val viewModel = viewModel()
+        awaitState(viewModel, AppLaunchState.Unauthenticated)
+        server.enqueue(
+            MockResponse().setResponseCode(204)
+                .setHeadersDelay(300, TimeUnit.MILLISECONDS)
+        )
+
+        viewModel.login("listener", "secret")
+        viewModel.login("listener", "secret")
+        awaitState(viewModel, AppLaunchState.Authenticated)
+
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(1, paths.count { it == "/api/auth/login" })
     }
 
     private fun viewModel(): AppLaunchViewModel {

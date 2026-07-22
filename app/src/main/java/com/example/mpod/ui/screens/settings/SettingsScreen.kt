@@ -33,7 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,8 +108,8 @@ fun SettingsScreen(
     onExportOpml: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
-    var feedRefreshTime by remember { mutableStateOf(state.dailyRefreshTime) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {

@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -84,7 +83,8 @@ fun AppNavigation(
     key(startDestination) {
         val navController = rememberNavController()
         var libraryRefreshKey by remember { mutableIntStateOf(0) }
-        var addPodcastInitialMode by remember { mutableStateOf(AddPodcastMode.RssFeedUrl) }
+        val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
+        val addPodcastState by addPodcastViewModel.state.collectAsState()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
         val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
@@ -113,11 +113,11 @@ fun AppNavigation(
                     HomeRoute(
                         refreshKey = libraryRefreshKey,
                         onAddRssFeed = {
-                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
+                            addPodcastViewModel.begin(AddPodcastMode.RssFeedUrl)
                             navController.navigate(Screen.AddPodcast.route)
                         },
                         onImportOpml = {
-                            addPodcastInitialMode = AddPodcastMode.ImportOpmlFile
+                            addPodcastViewModel.begin(AddPodcastMode.ImportOpmlFile)
                             navController.navigate(Screen.AddPodcast.route)
                         }
                     )
@@ -126,11 +126,11 @@ fun AppNavigation(
                     SubscriptionsRoute(
                         refreshKey = libraryRefreshKey,
                         onAddRssFeed = {
-                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
+                            addPodcastViewModel.begin(AddPodcastMode.RssFeedUrl)
                             navController.navigate(Screen.AddPodcast.route)
                         },
                         onImportOpml = {
-                            addPodcastInitialMode = AddPodcastMode.ImportOpmlFile
+                            addPodcastViewModel.begin(AddPodcastMode.ImportOpmlFile)
                             navController.navigate(Screen.AddPodcast.route)
                         }
                     )
@@ -146,8 +146,6 @@ fun AppNavigation(
                     route = Screen.AddPodcast.route,
                     dialogProperties = DialogProperties(usePlatformDefaultWidth = false)
                 ) {
-                    val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
-                    val addPodcastState by addPodcastViewModel.state.collectAsState()
                     val opmlPicker = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.OpenDocument()
                     ) { uri ->
@@ -158,7 +156,10 @@ fun AppNavigation(
                         }
                     }
                     AddPodcastModal(
-                        onDismiss = { navController.popBackStack() },
+                        onDismiss = {
+                            addPodcastViewModel.reset()
+                            navController.popBackStack()
+                        },
                         onAddUrl = { url ->
                             addPodcastViewModel.addRssFeed(url) {
                                 libraryRefreshKey += 1
@@ -168,10 +169,14 @@ fun AppNavigation(
                         onImportOpml = {
                             opmlPicker.launch(arrayOf("text/xml", "application/xml", "text/x-opml", "*/*"))
                         },
-                        initialMode = addPodcastInitialMode,
+                        initialMode = addPodcastState.mode,
                         isSubmitting = addPodcastState.isSubmitting,
                         errorMessage = addPodcastState.errorMessage,
-                        importResult = addPodcastState.importResult
+                        importResult = addPodcastState.importResult,
+                        controlledMode = addPodcastState.mode,
+                        controlledUrl = addPodcastState.rssUrl,
+                        onModeChange = addPodcastViewModel::setMode,
+                        onUrlChange = addPodcastViewModel::setRssUrl
                     )
                 }
             }
@@ -180,7 +185,7 @@ fun AppNavigation(
                     currentRoute = currentRoute,
                     onNavigate = { screen ->
                         if (screen == Screen.AddPodcast) {
-                            addPodcastInitialMode = AddPodcastMode.RssFeedUrl
+                            addPodcastViewModel.begin(AddPodcastMode.RssFeedUrl)
                             navController.navigate(screen.route)
                         } else {
                             navController.navigate(screen.route) {

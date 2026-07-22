@@ -1,6 +1,7 @@
 package com.example.mpod.ui.screens.settings
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
@@ -93,6 +94,30 @@ class SettingsScreenTest {
 
         composeRule.onNodeWithText("04:00").assertIsDisplayed()
         composeRule.onNodeWithText("Save time").assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(0, saves) }
+    }
+
+    @Test
+    fun openTimePickerSurvivesStateRestorationWithoutSaving() {
+        var saves = 0
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(
+                        hasConfirmedSettings = true,
+                        dailyRefreshTime = "04:00"
+                    ),
+                    onSaveDailyRefreshTime = { saves += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeRule.onNodeWithText("OK").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, saves) }
     }
 

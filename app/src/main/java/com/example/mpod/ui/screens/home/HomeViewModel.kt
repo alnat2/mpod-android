@@ -167,12 +167,12 @@ class HomeViewModel @Inject constructor(
             offset = offset
         ) ?: return
 
+        _state.value = _state.value.copy(
+            queue = nextQueue,
+            busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
+            actionErrorMessage = null
+        )
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                queue = nextQueue,
-                busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
-                actionErrorMessage = null
-            )
             val response = runCatching {
                 api.reorderPlaylist(PlaylistReorderRequest(nextQueue.map { it.id }))
             }.getOrNull()

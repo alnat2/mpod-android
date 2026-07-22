@@ -71,6 +71,37 @@ class SubscriptionsViewModelTest {
     }
 
     @Test
+    fun immediateDuplicatesAcrossSubscriptionMutationsDispatchOnce() = runBlocking {
+        awaitState { it.podcasts.singleOrNull()?.unlistenedEpisodeCount == 1 }
+
+        server.enqueue(MockResponse().setResponseCode(500).setBody("Refresh all failed"))
+        viewModel.refreshAll()
+        viewModel.refreshAll()
+        awaitState { !it.isRefreshingAll && it.actionErrorMessage != null }
+
+        server.enqueue(MockResponse().setResponseCode(500).setBody("Refresh failed"))
+        viewModel.refreshPodcast(41)
+        viewModel.refreshPodcast(41)
+        awaitState { it.refreshingPodcastIds.isEmpty() && it.actionErrorMessage != null }
+
+        server.enqueue(MockResponse().setResponseCode(500).setBody("Mark all failed"))
+        viewModel.markAllListened(41)
+        viewModel.markAllListened(41)
+        awaitState { it.failedMarkAllListenedPodcastId == 41 }
+
+        server.enqueue(MockResponse().setResponseCode(500).setBody("Delete failed"))
+        viewModel.unsubscribePodcastNow(41)
+        viewModel.unsubscribePodcastNow(41)
+        awaitState { it.failedUnsubscribePodcastId == 41 }
+
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(1, paths.count { it == "/api/podcasts/refresh-all" })
+        assertEquals(1, paths.count { it == "/api/podcasts/41/refresh" })
+        assertEquals(1, paths.count { it == "/api/podcasts/41/mark-all-listened" })
+        assertEquals(1, paths.count { it == "/api/podcasts/41" })
+    }
+
+    @Test
     fun failedMarkAllRetryRepeatsMarkAllInsteadOfRefreshAll() = runBlocking {
         awaitState { it.podcasts.singleOrNull()?.unlistenedEpisodeCount == 1 }
         server.enqueue(

@@ -59,11 +59,17 @@ fun AddPodcastModal(
     initialMode: AddPodcastMode = AddPodcastMode.RssFeedUrl,
     isSubmitting: Boolean = false,
     errorMessage: String? = null,
-    importResult: OpmlImportResultUi? = null
+    importResult: OpmlImportResultUi? = null,
+    controlledMode: AddPodcastMode? = null,
+    controlledUrl: String? = null,
+    onModeChange: (AddPodcastMode) -> Unit = {},
+    onUrlChange: (String) -> Unit = {}
 ) {
-    var mode by rememberSaveable(initialMode) { mutableStateOf(initialMode) }
-    var url by rememberSaveable { mutableStateOf("") }
+    var localMode by rememberSaveable(initialMode) { mutableStateOf(initialMode) }
+    var localUrl by rememberSaveable { mutableStateOf("") }
     var inputError by rememberSaveable { mutableStateOf<String?>(null) }
+    val mode = controlledMode ?: localMode
+    val url = controlledUrl ?: localUrl
 
     fun submitRssUrl() {
         val trimmedUrl = url.trim()
@@ -86,10 +92,14 @@ fun AddPodcastModal(
         } else {
             AddPodcastMobile(
                 mode = mode,
-                onModeChange = { mode = it },
+                onModeChange = {
+                    localMode = it
+                    onModeChange(it)
+                },
                 url = url,
                 onUrlChange = {
-                    url = it
+                    localUrl = it
+                    onUrlChange(it)
                     inputError = null
                 },
                 isSubmitting = isSubmitting,

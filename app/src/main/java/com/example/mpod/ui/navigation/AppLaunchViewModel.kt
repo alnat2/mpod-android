@@ -30,6 +30,8 @@ class AppLaunchViewModel @Inject constructor(
 
     private val _authUiState = MutableStateFlow(AuthUiState())
     val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
+    private var sessionRefreshInFlight = false
+    private var logoutInFlight = false
 
     init {
         refreshSession()
@@ -43,16 +45,22 @@ class AppLaunchViewModel @Inject constructor(
     }
 
     fun refreshSession() {
+        if (sessionRefreshInFlight) return
+        sessionRefreshInFlight = true
+        _state.value = AppLaunchState.Loading
         viewModelScope.launch {
-            _state.value = AppLaunchState.Loading
-            _state.value = loadLaunchState(api::getSession)
+            try {
+                _state.value = loadLaunchState(api::getSession)
+            } finally {
+                sessionRefreshInFlight = false
+            }
         }
     }
 
     fun login(username: String, password: String) {
-        if (!validateAuthInput(username, password)) return
+        if (_authUiState.value.isSubmitting || !validateAuthInput(username, password)) return
+        _authUiState.value = AuthUiState(isSubmitting = true)
         viewModelScope.launch {
-            _authUiState.value = AuthUiState(isSubmitting = true)
             val response = runCatching {
                 api.login(LoginRequest(username = username, password = password))
             }.getOrNull()
@@ -68,9 +76,9 @@ class AppLaunchViewModel @Inject constructor(
     }
 
     fun register(username: String, password: String) {
-        if (!validateAuthInput(username, password)) return
+        if (_authUiState.value.isSubmitting || !validateAuthInput(username, password)) return
+        _authUiState.value = AuthUiState(isSubmitting = true)
         viewModelScope.launch {
-            _authUiState.value = AuthUiState(isSubmitting = true)
             val response = runCatching {
                 api.register(LoginRequest(username = username, password = password))
             }.getOrNull()
@@ -86,15 +94,21 @@ class AppLaunchViewModel @Inject constructor(
     }
 
     fun logout() {
+        if (logoutInFlight) return
+        logoutInFlight = true
+        context.stopService(Intent(context, PlaybackService::class.java))
+        _state.value = AppLaunchState.Loading
+        _authUiState.value = AuthUiState()
         viewModelScope.launch {
-            context.stopService(Intent(context, PlaybackService::class.java))
-            _state.value = AppLaunchState.Loading
-            _authUiState.value = AuthUiState()
-            val response = runCatching { api.logout() }.getOrNull()
-            when (resolveLogoutOutcome(response?.code())) {
-                LogoutOutcome.RefreshSession -> refreshSession()
-                LogoutOutcome.Unauthenticated -> _state.value = AppLaunchState.Unauthenticated
-                LogoutOutcome.BackendUnavailable -> _state.value = AppLaunchState.BackendUnavailable
+            try {
+                val response = runCatching { api.logout() }.getOrNull()
+                when (resolveLogoutOutcome(response?.code())) {
+                    LogoutOutcome.RefreshSession -> refreshSession()
+                    LogoutOutcome.Unauthenticated -> _state.value = AppLaunchState.Unauthenticated
+                    LogoutOutcome.BackendUnavailable -> _state.value = AppLaunchState.BackendUnavailable
+                }
+            } finally {
+                logoutInFlight = false
             }
         }
     }

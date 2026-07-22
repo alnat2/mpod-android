@@ -5,9 +5,11 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -89,5 +91,24 @@ class AuthScreensTest {
 
         composeRule.onNodeWithText("Enter username and password.").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, submissions) }
+    }
+
+    @Test
+    fun loginDraftSurvivesStateRestorationWithoutSubmitting() {
+        var submissions = 0
+        val restorationTester = StateRestorationTester(composeRule)
+        restorationTester.setContent {
+            MpodTheme {
+                LoginScreen(onSubmit = { _, _ -> submissions += 1 })
+            }
+        }
+
+        composeRule.onNodeWithText("Choose a username").performTextInput("listener")
+        composeRule.onNodeWithText("Create a password").performTextInput("secret")
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithText("listener").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, submissions) }
+        closeSoftKeyboard()
     }
 }

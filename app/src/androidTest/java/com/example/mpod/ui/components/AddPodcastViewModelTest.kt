@@ -3,6 +3,7 @@ package com.example.mpod.ui.components
 import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
+import androidx.lifecycle.SavedStateHandle
 import com.example.mpod.data.network.MpodApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 class AddPodcastViewModelTest {
     private lateinit var server: MockWebServer
     private lateinit var context: Context
+    private lateinit var api: MpodApi
     private lateinit var viewModel: AddPodcastViewModel
 
     @Before
@@ -29,12 +31,13 @@ class AddPodcastViewModelTest {
         server = MockWebServer()
         server.start()
         context = ApplicationProvider.getApplicationContext()
-        val api = Retrofit.Builder()
+        api = Retrofit.Builder()
             .baseUrl(server.url("/"))
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(MpodApi::class.java)
         viewModel = AddPodcastViewModel(context, api)
+        viewModel.reset()
     }
 
     @After
@@ -74,7 +77,6 @@ class AddPodcastViewModelTest {
         val uri = opmlUri()
 
         viewModel.importOpml(uri) {}
-        awaitState { it.isSubmitting }
         viewModel.importOpml(uri) {}
         awaitState { it.importResult != null }
 
@@ -96,6 +98,22 @@ class AddPodcastViewModelTest {
         assertEquals("Could not import this OPML file.", failed.errorMessage)
         assertEquals(null, failed.importResult)
         assertEquals(0, refreshes)
+    }
+
+    @Test
+    fun draftAndModeSurviveViewModelRecreationUntilReset() {
+        val savedStateHandle = SavedStateHandle()
+        val first = AddPodcastViewModel(context, api, savedStateHandle)
+        first.begin(AddPodcastMode.ImportOpmlFile)
+        first.setRssUrl("https://example.com/draft.xml")
+
+        val recreated = AddPodcastViewModel(context, api, savedStateHandle)
+
+        assertEquals(AddPodcastMode.ImportOpmlFile, recreated.state.value.mode)
+        assertEquals("https://example.com/draft.xml", recreated.state.value.rssUrl)
+        recreated.reset()
+        val afterReset = AddPodcastViewModel(context, api, savedStateHandle)
+        assertEquals(AddPodcastUiState(), afterReset.state.value)
     }
 
     private fun opmlUri(): Uri {

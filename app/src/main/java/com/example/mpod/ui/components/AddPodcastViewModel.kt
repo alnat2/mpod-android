@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.SavedStateHandle
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.LimitedContentRequestBody
 import com.example.mpod.data.network.OpmlReadException
@@ -29,34 +30,75 @@ import javax.inject.Inject
 @HiltViewModel
 class AddPodcastViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val api: MpodApi
+    private val api: MpodApi,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
-    private val _state = MutableStateFlow(AddPodcastUiState())
+    private val _state = MutableStateFlow(
+        AddPodcastUiState(
+            mode = savedStateHandle.get<String>(MODE_KEY)
+                ?.let { saved -> runCatching { AddPodcastMode.valueOf(saved) }.getOrNull() }
+                ?: AddPodcastMode.RssFeedUrl,
+            rssUrl = savedStateHandle[RSS_URL_KEY] ?: ""
+        )
+    )
     val state: StateFlow<AddPodcastUiState> = _state.asStateFlow()
+
+    fun begin(mode: AddPodcastMode) {
+        savedStateHandle[MODE_KEY] = mode.name
+        savedStateHandle[RSS_URL_KEY] = ""
+        _state.value = AddPodcastUiState(mode = mode)
+    }
+
+    fun reset() {
+        savedStateHandle.remove<String>(MODE_KEY)
+        savedStateHandle.remove<String>(RSS_URL_KEY)
+        _state.value = AddPodcastUiState()
+    }
+
+    fun setMode(mode: AddPodcastMode) {
+        savedStateHandle[MODE_KEY] = mode.name
+        _state.value = _state.value.copy(
+            mode = mode,
+            errorMessage = null,
+            importResult = null
+        )
+    }
+
+    fun setRssUrl(url: String) {
+        savedStateHandle[RSS_URL_KEY] = url
+        _state.value = _state.value.copy(
+            rssUrl = url,
+            errorMessage = null,
+            importResult = null
+        )
+    }
 
     fun addRssFeed(url: String, onSuccess: () -> Unit) {
         if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
-            _state.value = AddPodcastUiState(errorMessage = "Paste RSS feed URL.")
+            _state.value = _state.value.copy(errorMessage = "Paste RSS feed URL.")
             return
         }
         if (!trimmedUrl.isHttpUrl()) {
-            _state.value = AddPodcastUiState(errorMessage = "Enter a valid http or https RSS feed URL.")
+            _state.value = _state.value.copy(
+                errorMessage = "Enter a valid http or https RSS feed URL."
+            )
             return
         }
 
+        _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
         viewModelScope.launch {
-            _state.value = AddPodcastUiState(isSubmitting = true)
             val response = runCatching {
                 api.createPodcast(CreatePodcastRequest(rssUrl = trimmedUrl))
             }.getOrNull()
 
             if (response?.isSuccessful == true) {
-                _state.value = AddPodcastUiState()
+                reset()
                 onSuccess()
             } else {
-                _state.value = AddPodcastUiState(
+                _state.value = _state.value.copy(
+                    isSubmitting = false,
                     errorMessage = addPodcastErrorMessage(response)
                 )
             }
@@ -65,8 +107,8 @@ class AddPodcastViewModel @Inject constructor(
 
     fun importOpml(uri: Uri, onSuccess: () -> Unit) {
         if (_state.value.isSubmitting) return
+        _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
         viewModelScope.launch {
-            _state.value = AddPodcastUiState(isSubmitting = true)
             val result = runCatching {
                 val filePart = withContext(Dispatchers.IO) {
                     uri.toMultipartPart()
@@ -77,10 +119,14 @@ class AddPodcastViewModel @Inject constructor(
 
             val payload = response?.takeIf { it.isSuccessful }?.body()
             if (payload?.success == true) {
-                _state.value = AddPodcastUiState(importResult = payload.toUiResult())
+                _state.value = _state.value.copy(
+                    isSubmitting = false,
+                    importResult = payload.toUiResult()
+                )
                 onSuccess()
             } else {
-                _state.value = AddPodcastUiState(
+                _state.value = _state.value.copy(
+                    isSubmitting = false,
                     errorMessage = importOpmlErrorMessage(response, result.exceptionOrNull())
                 )
             }
@@ -178,7 +224,9 @@ private inline fun <reified T : Throwable> Throwable?.hasCause(): Boolean {
 data class AddPodcastUiState(
     val isSubmitting: Boolean = false,
     val errorMessage: String? = null,
-    val importResult: OpmlImportResultUi? = null
+    val importResult: OpmlImportResultUi? = null,
+    val mode: AddPodcastMode = AddPodcastMode.RssFeedUrl,
+    val rssUrl: String = ""
 )
 
 data class OpmlImportResultUi(
@@ -190,3 +238,6 @@ private fun OpmlImportResponse.toUiResult() = OpmlImportResultUi(
     imported = imported.coerceAtLeast(0),
     skipped = skipped.coerceAtLeast(0)
 )
+
+private const val MODE_KEY = "add_podcast_mode"
+private const val RSS_URL_KEY = "add_podcast_rss_url"
