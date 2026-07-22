@@ -14,6 +14,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,6 +35,7 @@ class SettingsViewModelTest {
     private var exportCode = 200
     private var exportBody = "<opml><body><outline text=\"Planet Money\"/></body></opml>"
     private var exportDelayMillis = 0L
+    private var patchDelayMillis = 0L
     private var dailyRefreshTime = "03:00"
     private var proxyEnabled = true
     private var proxyConfigured = true
@@ -69,7 +71,7 @@ class SettingsViewModelTest {
                     }
                     request.method == "PATCH" && request.path == "/api/settings" -> {
                         patchCalls.incrementAndGet()
-                        if (patchCode != 200) {
+                        val response = if (patchCode != 200) {
                             errorResponse(patchCode, "Save failed")
                         } else {
                             val body = request.body.readUtf8()
@@ -80,6 +82,7 @@ class SettingsViewModelTest {
                                 ?.let { proxyEnabled = it }
                             settingsResponse()
                         }
+                        response.setHeadersDelay(patchDelayMillis, TimeUnit.MILLISECONDS)
                     }
                     request.method == "GET" && request.path == "/api/podcasts/export-opml" -> {
                         exportCalls.incrementAndGet()
@@ -203,6 +206,30 @@ class SettingsViewModelTest {
 
         assertEquals("04:30", state.dailyRefreshTime)
         assertFalse(state.isSavingRefreshTime)
+    }
+
+    @Test
+    fun timedOutSaveStopsLoadingBlocksDuplicateAndCanRecover() = runBlocking {
+        patchDelayMillis = 1_000
+        val viewModel = SettingsViewModel(
+            InstrumentationRegistry.getInstrumentation().targetContext,
+            apiWithCallTimeout(300)
+        )
+        viewModel.awaitState { !it.isLoading }
+
+        viewModel.saveDailyRefreshTime("04:30")
+        viewModel.saveDailyRefreshTime("04:30")
+        val failed = viewModel.awaitState {
+            !it.isSavingRefreshTime && it.refreshErrorMessage == "Could not save refresh time."
+        }
+
+        assertEquals("03:00", failed.dailyRefreshTime)
+        assertEquals(1, patchCalls.get())
+        patchDelayMillis = 0
+        viewModel.saveDailyRefreshTime("04:30")
+        val recovered = viewModel.awaitState { it.dailyRefreshTime == "04:30" }
+        assertNull(recovered.refreshErrorMessage)
+        assertEquals(2, patchCalls.get())
     }
 
     @Test
@@ -339,6 +366,19 @@ class SettingsViewModelTest {
     private fun newViewModel(): SettingsViewModel {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         return SettingsViewModel(context, api)
+    }
+
+    private fun apiWithCallTimeout(timeoutMillis: Long): MpodApi {
+        return Retrofit.Builder()
+            .baseUrl(server.url("/"))
+            .client(
+                OkHttpClient.Builder()
+                    .callTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
+                    .build()
+            )
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(MpodApi::class.java)
     }
 
     private fun temporaryExportFile(name: String): File {

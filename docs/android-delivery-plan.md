@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-19 (fourth scenario wave verified)
+Last updated: 2026-07-22 (ninth scenario wave verified)
 
 Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
 
@@ -71,7 +71,7 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
-| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery; minified production release resolved a real `5050` session response to Login on Pixel 9 | Lifecycle, expired-session, slow-network, and process-recreation coverage |
+| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery; minified production release resolved a real `5050` session response to Login on Pixel 9; authenticated-action `401` clears the persisted session, stops playback, and replaces the authenticated shell with Login | Remaining slow-network/process-recreation reliability rows in the scenario map |
 | Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | Final release backup/restore smoke check on the production variant |
 | Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
 | Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
@@ -100,8 +100,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 99 local unit tests.
-- 63 connected Android/Compose UI/configuration tests.
+- 105 local unit tests.
+- 87 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -327,6 +327,8 @@ Scenario wave 6 completed on 2026-07-19 for `SET-12`–`SET-15`; `SET-10`–`SET
 Scenario wave 7 completed on 2026-07-21 for `HOM-10` and `SYN-01`–`SYN-04`. A real multi-client pass against `5051` exposed that successful Subscriptions lifecycle reloads did not invalidate shared playback state and that queue reconciliation never reloaded backend playback speed. Successful Home or Subscriptions reconciliation now reloads backend speed and queue together; a pending local speed write remains protected from a stale server read. Pixel 9 kept episode 16 playing while an inactive-client reorder `[16,18,26] → [18,16,26]` and speed `1.3x → 1.5x` were applied on foreground. A second foreground-only external change to `[18,26,16]` and `2x` did not interrupt playback or apply during an eight-second no-event interval; entering Subscriptions then applied both and preserved the still-valid active episode. Finally, marking active episode 16 listened while Android was inactive produced backend queue `[18,26]` with null active; foreground reconciliation selected episode 18 paused, with no stale row or autoplay. The original queue, null active, `1.3x`, listened state, and position 51 were restored. Full gate: 101 unit tests, 82/82 connected tests, debug/release lint, debug APK, and minified release APK. The scenario map is now 82/130 Verified (63%).
 
 Scenario wave 8 completed on 2026-07-21 for `PLY-11`, `PLY-13`, and `PLY-19`; `PLY-09` has complete contract/emulator evidence but remains Specified until its required physical-phone pass. A temporary authenticated 20/60/20-second MP3 podcast exercised online auto-next, final-item completion, and app-only network denial. During the outage, B was already playing from buffer while backend still reported active A and A's completed update was durable in `PendingPlaybackSync`. Recovery originally skipped to C/paused because the paused-threshold decision read `player.isPlaying` only after a suspended network request; a request submitted while playing could therefore be misclassified during a transient buffering state. PlaybackService now requires both submission-time and response-time non-playing state before paused-threshold reconciliation. After the fix, pending A cleared, backend removed A and selected B, and B remained the playing MediaSession item. Completing sole C then exposed a second defect: backend and MediaSession were empty while Home retained C. Backend-confirmed completions now emit a separate Home refresh event without looping back into service invalidation, and Home immediately showed `Playlist is empty`. Queue reconciliation also no longer uploads a redundant paused current position. Full gate: 103 unit tests, 83/83 connected tests, debug/release lint, debug APK, and minified release APK. The scenario map is now 85/130 Verified (65%).
+
+Scenario wave 9 completed on 2026-07-22 for `REL-03`. Android now handles a `401` from any authenticated action as an application-wide session expiry: the persistent cookie is cleared, playback is stopped, and the authenticated navigation shell is replaced by Login. Login/register rejection remains an ordinary credential error and does not masquerade as expiry. On Pixel 9 against real `5051`, the backend invalidated an already persisted app session while Settings stayed open; attempting to save `04:05` opened Login, emptied `CookiePrefs`, and an independent authenticated request confirmed the backend value remained `04:00`. Re-login succeeded and the crash buffer was empty. The core OkHttp client also now has a single 30-second call deadline with matching connect/read/write limits. A controlled delayed-save test proves timeout termination, duplicate blocking, unchanged confirmed state, and recovery, but `REL-13` remains Specified until a real slow `5051` path can be exercised without disrupting the shared backend. Full gate: 105 unit tests, 87/87 connected tests, debug/release lint, debug APK, and minified release APK. The scenario map is now 86/130 Verified (66%).
 
 Two backend follow-ups were recorded in the scenario map. One successful podcast deletion left an orphan episode row in `/api/playlist`, invisible in `/api/playback/queue`, and that row blocked the next reorder until explicit deletion. Separately, the documented 15-second completion expression treats position zero as completed for episodes no longer than 15 seconds; Android avoids an unsolicited zero-position reconciliation write, but the server/product rule still needs an explicit shared decision.
 

@@ -64,6 +64,12 @@ class PersistentCookieJar(context: Context) : CookieJar {
             .filter { it.matches(url) && it.expiresAt > System.currentTimeMillis() }
     }
 
+    @Synchronized
+    fun clear() {
+        cookieStore.clear()
+        preferences.edit(commit = true) { clear() }
+    }
+
     private fun HttpUrl.storageKey(): String {
         return "$scheme://$host:$port/"
     }

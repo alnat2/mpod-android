@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -24,11 +25,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(cookieJar: PersistentCookieJar): OkHttpClient {
+    fun provideOkHttpClient(
+        cookieJar: PersistentCookieJar,
+        sessionExpiryInterceptor: SessionExpiryInterceptor
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
         return OkHttpClient.Builder()
+            .connectTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .addInterceptor(sessionExpiryInterceptor)
             .addInterceptor(logging)
             .cookieJar(cookieJar)
             .build()
@@ -53,3 +62,5 @@ object NetworkModule {
         return retrofit.create(MpodApi::class.java)
     }
 }
+
+internal const val CORE_NETWORK_TIMEOUT_SECONDS = 30L

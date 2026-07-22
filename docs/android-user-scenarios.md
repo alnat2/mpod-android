@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 ## Purpose
 
@@ -222,7 +222,7 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 |---|---|---|---|---|
 | REL-01 | Rotate during a non-submitted form or modal | Entered data and modal intent are not silently corrupted or submitted twice | U,L | Specified |
 | REL-02 | Rotate/background during a submitted mutation | No duplicate backend mutation or false result occurs; completion/retry is truthful | C,E,L | Specified |
-| REL-03 | Backend returns 401 during an authenticated action | App exits stale authenticated state and reaches Login without leaking the failed mutation | C,E,L | Specified |
+| REL-03 | Backend returns 401 during an authenticated action | App exits stale authenticated state and reaches Login without leaking the failed mutation | C,E,L | Verified |
 | REL-04 | Backend returns structured 4xx/5xx or malformed/empty success payload | User sees a truthful recoverable outcome; app does not crash or invent success | C,U,E | Specified |
 | REL-05 | Network is offline, slow, times out, then returns | Core screen remains usable or recoverable; retry does not duplicate mutations | C,E,L | Specified |
 | REL-06 | Process is recreated with pending destructive/mutating UI | Backend remains authoritative; no mutation occurs merely because stale UI state was restored | C,E,L | Specified |
@@ -274,6 +274,8 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W6-PARTIAL | 2026-07-19 | `SET-10`, `SET-11` remain Specified | Pixel 9 emulator clean-data launch followed system Dark; explicit Light and Dark each survived force-stop, and the emulator/test data were restored to system Light/System. Physical-device evidence is intentionally deferred to the final phone pass, so these rows were not promoted |
 | EV-W7 | 2026-07-21 | `HOM-10`, `SYN-01`–`SYN-04` | Pixel 9 and real `5051` multi-client checks: background queue reorder and speed change were applied on foreground while the valid active episode kept playing; foreground backend changes caused no immediate interruption or polling update, then entering Subscriptions applied both; externally marking the active episode listened cleared backend active/queue state and Android reconciled to the next episode paused without autoplay. Android now reconciles backend speed with queue invalidations from Home and Subscriptions while preserving a pending local speed write. Backend queue `[16,18,26]`, null active, speed `1.3x`, listened flags, and playback position were restored. Full gate: 101 unit, 82 connected, debug/release lint and APK assembly |
 | EV-W8 | 2026-07-21 | `PLY-11`, `PLY-13`, `PLY-19`; partial `PLY-09` | Authenticated 20/60/20-second MP3 fixture on Pixel 9 and real `5051`. Online natural completion moved from A to B playing. With network denied only to mpod, B started from buffer while backend remained active A and A completion persisted on disk; after recovery pending cleared, backend removed A and selected B, and MediaSession continued B instead of being hijacked. A race that classified a playing request from post-response state was fixed by retaining submission-time state. Finishing sole C cleared backend active/queue and MediaSession; a stale Home card exposed and fixed missing service-to-Home completion invalidation. Redundant paused reconciliation writes are suppressed. Temporary podcasts were removed and Planet Money queue `[16,18,26]`, null active, positions `51/242`, and speed `1.3x` were restored. `PLY-09` remains Specified only because its required physical-phone evidence is deferred. Full gate: 103 unit, 83 connected, debug/release lint and APK assembly |
+| EV-W9 | 2026-07-22 | `REL-03` | A real persisted Android session was invalidated through `POST /api/auth/logout` on test backend `5051` while Settings remained open. Saving a locally selected `04:05` received an authenticated `401`; Android immediately stopped playback, cleared the persisted cookie, replaced the authenticated shell with Login, and did not retain the failed mutation. An independent authenticated backend session confirmed `dailyRefreshTime` remained `04:00`. Login succeeded again afterward and the crash buffer was empty. Policy, real-interceptor, launch-navigation, and cookie-clearing tests protect the path. Full gate: 105 unit, 87 connected, debug/release lint and APK assembly |
+| EV-W9-PARTIAL | 2026-07-22 | `REL-13` remains Specified | The shared core client now has one explicit 30-second call deadline with matching connect/read/write limits. Instrumentation verifies the production client values and a controlled delayed Settings save verifies truthful timeout termination, duplicate-submit blocking, unchanged confirmed state, and successful retry. A real 30-second `5051` path was not manufactured by pausing or disrupting the shared backend, so the required E2E evidence is still incomplete and the row was not promoted |
 
 ## Execution order
 

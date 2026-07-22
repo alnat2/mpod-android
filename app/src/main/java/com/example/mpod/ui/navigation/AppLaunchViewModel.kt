@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.network.MpodApi
+import com.example.mpod.data.network.AuthSessionInvalidator
 import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.playback.PlaybackService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,6 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import retrofit2.Response
@@ -20,7 +22,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AppLaunchViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val api: MpodApi
+    private val api: MpodApi,
+    private val sessionInvalidator: AuthSessionInvalidator
 ) : ViewModel() {
     private val _state = MutableStateFlow<AppLaunchState>(AppLaunchState.Loading)
     val state: StateFlow<AppLaunchState> = _state.asStateFlow()
@@ -30,6 +33,13 @@ class AppLaunchViewModel @Inject constructor(
 
     init {
         refreshSession()
+        viewModelScope.launch {
+            sessionInvalidator.events.collectLatest {
+                context.stopService(Intent(context, PlaybackService::class.java))
+                _authUiState.value = AuthUiState()
+                _state.value = AppLaunchState.Unauthenticated
+            }
+        }
     }
 
     fun refreshSession() {
