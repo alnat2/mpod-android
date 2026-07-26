@@ -64,7 +64,7 @@ class AppLaunchViewModelTest {
     }
 
     @Test
-    fun failedLogoutCanRetryTheStillAuthenticatedSession() = runBlocking {
+    fun failedLogoutCanRetryStillAuthenticatedSessionAndDispatchesOnce() = runBlocking {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -74,6 +74,7 @@ class AppLaunchViewModelTest {
         awaitState(viewModel, AppLaunchState.Authenticated)
 
         server.enqueue(MockResponse().setResponseCode(503))
+        viewModel.logout()
         viewModel.logout()
         awaitState(viewModel, AppLaunchState.BackendUnavailable)
 
@@ -85,8 +86,39 @@ class AppLaunchViewModelTest {
         viewModel.refreshSession()
 
         awaitState(viewModel, AppLaunchState.Authenticated)
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(
+            listOf("/api/auth/session", "/api/auth/logout", "/api/auth/session"),
+            paths
+        )
+    }
+
+    @Test
+    fun transportFailedLogoutCanRetryTheStillAuthenticatedSession() = runBlocking {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"authenticated":true,"setupRequired":false,"user":null}""")
+        )
+        val viewModel = viewModel()
+        awaitState(viewModel, AppLaunchState.Authenticated)
         assertEquals("/api/auth/session", server.takeRequest().path)
-        assertEquals("/api/auth/logout", server.takeRequest().path)
+
+        val port = server.port
+        server.shutdown()
+        viewModel.logout()
+        awaitState(viewModel, AppLaunchState.BackendUnavailable)
+
+        server = MockWebServer()
+        server.start(port)
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"authenticated":true,"setupRequired":false,"user":null}""")
+        )
+        viewModel.refreshSession()
+
+        awaitState(viewModel, AppLaunchState.Authenticated)
         assertEquals("/api/auth/session", server.takeRequest().path)
     }
 
