@@ -18,6 +18,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class SubscriptionsViewModelTest {
     private lateinit var server: MockWebServer
+    private lateinit var api: MpodApi
     private lateinit var viewModel: SubscriptionsViewModel
     private lateinit var queueInvalidator: PlaybackQueueInvalidator
 
@@ -25,7 +26,7 @@ class SubscriptionsViewModelTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        val api = Retrofit.Builder()
+        api = Retrofit.Builder()
             .baseUrl(server.url("/"))
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -39,6 +40,34 @@ class SubscriptionsViewModelTest {
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun initialLoadFailureCanRetryIntoAuthoritativeLibrary() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        server.enqueue(
+            MockResponse().setResponseCode(503).setBody(
+                """{"error":{"message":"Subscriptions unavailable"}}"""
+            )
+        )
+        val failedViewModel = SubscriptionsViewModel(api, PlaybackQueueInvalidator())
+
+        val failed = withTimeout(5_000) {
+            failedViewModel.state.first {
+                !it.isLoading && it.errorMessage == "Subscriptions unavailable"
+            }
+        }
+        assertEquals(emptyList<SubscriptionPodcastUi>(), failed.podcasts)
+
+        enqueueLoadedPodcast()
+        failedViewModel.refresh()
+        val recovered = withTimeout(5_000) {
+            failedViewModel.state.first {
+                !it.isLoading && it.errorMessage == null &&
+                    it.podcasts.singleOrNull()?.id == 41
+            }
+        }
+        assertEquals("Test podcast", recovered.podcasts.single().title)
     }
 
     @Test
