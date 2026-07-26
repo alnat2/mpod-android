@@ -12,6 +12,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.CommandButton
+import androidx.media3.session.DefaultMediaNotificationProvider
 import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.PersistentCookieJar
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import com.google.common.collect.ImmutableList
 import java.time.Instant
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -58,6 +61,7 @@ class PlaybackService : MediaSessionService() {
     @UnstableApi
     override fun onCreate() {
         super.onCreate()
+        setMediaNotificationProvider(PlayPauseOnlyMediaNotificationProvider(this))
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setConnectTimeoutMs(NETWORK_TIMEOUT_MS)
             .setReadTimeoutMs(NETWORK_TIMEOUT_MS)
@@ -469,6 +473,26 @@ class PlaybackService : MediaSessionService() {
     companion object {
         const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
     }
+}
+
+@UnstableApi
+private class PlayPauseOnlyMediaNotificationProvider(
+    context: android.content.Context
+) : DefaultMediaNotificationProvider(context) {
+    override fun getMediaButtons(
+        session: MediaSession,
+        playerCommands: Player.Commands,
+        customLayout: ImmutableList<CommandButton>,
+        showPauseButton: Boolean
+    ): ImmutableList<CommandButton> =
+        ImmutableList.copyOf(
+            super.getMediaButtons(
+                session,
+                playerCommands,
+                customLayout,
+                showPauseButton
+            ).filter { it.playerCommand == Player.COMMAND_PLAY_PAUSE }
+        )
 }
 
 @UnstableApi

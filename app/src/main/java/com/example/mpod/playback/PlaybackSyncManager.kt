@@ -151,7 +151,7 @@ internal class PlaybackSyncManager(
     suspend fun submitPlayback(request: PlaybackUpdateRequest): PlaybackUpdateResponse? {
         val result = syncMutex.withLock {
             store.putPlayback(request)
-            val pending = store.snapshot().playbackFor(request.episodeId)!!
+            val pending = store.snapshot().playbackFor(request.episodeId) ?: request
             when (val attempt = transport.updatePlayback(pending)) {
                 is SyncAttempt.Success -> {
                     store.clearPlaybackIf(pending.episodeId, pending.clientUpdatedAt)

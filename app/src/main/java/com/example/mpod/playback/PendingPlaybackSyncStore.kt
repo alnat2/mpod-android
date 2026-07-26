@@ -3,7 +3,6 @@ package com.example.mpod.playback
 import android.content.Context
 import com.example.mpod.data.network.model.PlaybackUpdateRequest
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 
 internal data class PendingPlaybackSync(
     val activeEpisodeId: Int? = null,
@@ -82,8 +81,8 @@ internal class SharedPreferencesPendingPlaybackSyncStore(
     private fun readPlaybackUpdates(): MutableMap<Int, PlaybackUpdateRequest> {
         val json = preferences.getString(PLAYBACK_UPDATES_KEY, null) ?: return mutableMapOf()
         return runCatching {
-            val type = object : TypeToken<List<PlaybackUpdateRequest>>() {}.type
-            gson.fromJson<List<PlaybackUpdateRequest>>(json, type)
+            gson.fromJson(json, Array<PlaybackUpdateRequest>::class.java)
+                .asList()
                 .associateByTo(mutableMapOf()) { it.episodeId }
         }.getOrDefault(mutableMapOf())
     }

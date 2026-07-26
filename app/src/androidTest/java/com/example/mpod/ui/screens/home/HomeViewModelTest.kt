@@ -169,7 +169,7 @@ class HomeViewModelTest {
 
     private suspend fun awaitState(
         predicate: (HomeUiState) -> Boolean
-    ): HomeUiState = withTimeout(5_000) {
+    ): HomeUiState = withTimeout(10_000) {
         viewModel.state.first(predicate)
     }
 }

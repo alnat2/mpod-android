@@ -52,6 +52,25 @@ class PlaybackSyncManagerTest {
     }
 
     @Test
+    fun missingPersistedPlaybackFallsBackToRequestInsteadOfCrashing() = runBlocking {
+        val store = DroppingPendingPlaybackSyncStore()
+        val request = request(episodeId = 7, positionSeconds = 42)
+        val transport = FakePlaybackSyncTransport().apply {
+            playbackResults += SyncAttempt.Success(
+                responseFor(episodeId = 7, positionSeconds = 42)
+            )
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = PlaybackSyncManager(transport, store, scope)
+
+        val response = manager.submitPlayback(request)
+
+        assertEquals(7, response?.playback?.episodeId)
+        assertEquals(listOf(request), transport.playbackRequests)
+        scope.cancel()
+    }
+
+    @Test
     fun delayedCompletionNotifiesServiceAfterRetry() = runBlocking {
         val store = InMemoryPendingPlaybackSyncStore()
         val completion = request(episodeId = 4, positionSeconds = 100, completed = true)
@@ -228,6 +247,16 @@ private class InMemoryPendingPlaybackSyncStore : PendingPlaybackSyncStore {
     override fun clearSpeedIf(label: String) {
         if (speedLabel == label) speedLabel = null
     }
+}
+
+private class DroppingPendingPlaybackSyncStore : PendingPlaybackSyncStore {
+    override fun snapshot() = PendingPlaybackSync()
+    override fun putActive(episodeId: Int) = Unit
+    override fun clearActiveIf(episodeId: Int) = Unit
+    override fun putPlayback(request: PlaybackUpdateRequest) = Unit
+    override fun clearPlaybackIf(episodeId: Int, clientUpdatedAt: String) = Unit
+    override fun putSpeed(label: String) = Unit
+    override fun clearSpeedIf(label: String) = Unit
 }
 
 private class FakePlaybackSyncTransport : PlaybackSyncTransport {
