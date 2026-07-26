@@ -71,6 +71,52 @@ class SubscriptionsViewModelTest {
     }
 
     @Test
+    fun oneEpisodeEndpointFailureStaysScopedAndRetryRecoversBothPodcasts() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        enqueueTwoPodcasts()
+        server.enqueue(
+            MockResponse().setResponseCode(503).setBody(
+                """{"error":{"message":"Episodes unavailable"}}"""
+            )
+        )
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"episodes":[{"id":52,"podcastId":42,"title":"Healthy episode","isListened":false}]}"""
+            )
+        )
+
+        viewModel.refresh()
+        val partial = awaitState {
+            !it.isLoading && it.podcasts.size == 2 &&
+                it.podcasts.first().episodesUnavailable &&
+                it.podcasts.last().episodes.singleOrNull()?.id == 52
+        }
+        assertEquals("Some podcast episodes could not be loaded.", partial.actionErrorMessage)
+        assertEquals("Healthy episode", partial.podcasts.last().episodes.single().title)
+
+        enqueueTwoPodcasts()
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"episodes":[{"id":51,"podcastId":41,"title":"Recovered episode","isListened":false}]}"""
+            )
+        )
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"episodes":[{"id":52,"podcastId":42,"title":"Healthy episode","isListened":false}]}"""
+            )
+        )
+        viewModel.retryLastAction()
+
+        val recovered = awaitState {
+            !it.isLoading && it.actionErrorMessage == null &&
+                it.podcasts.size == 2 &&
+                it.podcasts.none { podcast -> podcast.episodesUnavailable }
+        }
+        assertEquals("Recovered episode", recovered.podcasts.first().episodes.single().title)
+        assertEquals("Healthy episode", recovered.podcasts.last().episodes.single().title)
+    }
+
+    @Test
     fun failedUnsubscribeRetryRepeatsDeleteInsteadOfRefreshAll() = runBlocking {
         awaitState { it.podcasts.size == 1 }
         server.enqueue(
@@ -272,6 +318,15 @@ class SubscriptionsViewModelTest {
                 """{"episodes":[{"id":51,"podcastId":41,"title":"Episode","isListened":false}]}"""
             )
         )
+    }
+
+    private fun enqueueTwoPodcasts() {
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"podcasts":[{"id":41,"title":"Failed podcast","description":"Test","rssUrl":"https://example.com/failed.xml"},{"id":42,"title":"Healthy podcast","description":"Test","rssUrl":"https://example.com/healthy.xml"}]}"""
+            )
+        )
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"items":[]}"""))
     }
 
     private suspend fun awaitState(
