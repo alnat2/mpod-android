@@ -73,7 +73,9 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
             .also { it.addListener(playerListener) }
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, player)
+            .setCallback(mediaSessionCallback)
+            .build()
 
         playbackSyncManager = PlaybackSyncManager(
             transport = ApiPlaybackSyncTransport(api),
@@ -101,6 +103,20 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+
+    @UnstableApi
+    private val mediaSessionCallback = object : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+            if (session.isMediaNotificationController(controller)) {
+                result.setAvailablePlayerCommands(mediaNotificationPlayerCommands())
+            }
+            return result.build()
+        }
+    }
 
     override fun onDestroy() {
         syncJob?.cancel()
@@ -454,6 +470,18 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
     }
 }
+
+@UnstableApi
+internal fun mediaNotificationPlayerCommands(): Player.Commands =
+    MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+        .buildUpon()
+        .removeAll(
+            Player.COMMAND_SEEK_TO_PREVIOUS,
+            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            Player.COMMAND_SEEK_TO_NEXT,
+            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM
+        )
+        .build()
 
 internal fun resolveRetriedCompletionNextEpisode(
     playbackEnded: Boolean,
