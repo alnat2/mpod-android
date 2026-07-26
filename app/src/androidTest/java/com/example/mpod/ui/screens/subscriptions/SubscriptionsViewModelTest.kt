@@ -15,6 +15,7 @@ import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class SubscriptionsViewModelTest {
     private lateinit var server: MockWebServer
@@ -114,6 +115,59 @@ class SubscriptionsViewModelTest {
         }
         assertEquals("Recovered episode", recovered.podcasts.first().episodes.single().title)
         assertEquals("Healthy episode", recovered.podcasts.last().episodes.single().title)
+    }
+
+    @Test
+    fun immediateDuplicateRefreshDispatchesOneLoadChain() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeadersDelay(300, TimeUnit.MILLISECONDS)
+                .setBody(
+                    """{"podcasts":[{"id":41,"title":"Test podcast","description":"Test","rssUrl":"https://example.com/feed.xml"}]}"""
+                )
+        )
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"items":[]}"""))
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"episodes":[{"id":51,"podcastId":41,"title":"Reloaded episode","isListened":false}]}"""
+            )
+        )
+
+        viewModel.refresh()
+        viewModel.refresh()
+        awaitState {
+            it.podcasts.singleOrNull()?.episodes?.singleOrNull()?.title == "Reloaded episode"
+        }
+
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(2, paths.count { it == "/api/podcasts" })
+        assertEquals(2, paths.count { it == "/api/playlist" })
+        assertEquals(2, paths.count { it == "/api/podcasts/41/episodes" })
+    }
+
+    @Test
+    fun failedRefreshAllJobKeepsLoadedLibraryUsable() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        server.enqueue(MockResponse().setResponseCode(202))
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"scheduler":{"state":"failed","lastError":"Beta feed refresh failed"}}"""
+            )
+        )
+
+        viewModel.refreshAll()
+        val failed = withTimeout(5_000) {
+            viewModel.state.first {
+                !it.isRefreshingAll && it.actionErrorMessage == "Beta feed refresh failed"
+            }
+        }
+
+        assertEquals(41, failed.podcasts.single().id)
+        assertEquals("Episode", failed.podcasts.single().episodes.single().title)
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(1, paths.count { it == "/api/podcasts/refresh-all" })
+        assertEquals(1, paths.count { it == "/api/jobs/status" })
     }
 
     @Test

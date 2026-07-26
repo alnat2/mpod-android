@@ -69,6 +69,31 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun immediateDuplicateRefreshDispatchesOneLoadChain() = runBlocking {
+        awaitState { it.queue.singleOrNull()?.id == 51 }
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeadersDelay(300, TimeUnit.MILLISECONDS)
+                .setBody(
+                    """{"podcasts":[{"id":41,"title":"Podcast","rssUrl":"https://example.com/feed.xml"}]}"""
+                )
+        )
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"queue":[{"id":51,"podcastId":41,"title":"Reloaded episode","podcastTitle":"Podcast","downloaded":false,"isListened":false}],"activePlayback":{"episodeId":51,"lastUpdated":"2026-07-19T00:00:00Z"}}"""
+            )
+        )
+
+        viewModel.refresh()
+        viewModel.refresh()
+        awaitState { it.queue.singleOrNull()?.title == "Reloaded episode" }
+
+        val paths = List(server.requestCount) { server.takeRequest().path }
+        assertEquals(2, paths.count { it == "/api/podcasts" })
+        assertEquals(2, paths.count { it == "/api/playback/queue" })
+    }
+
+    @Test
     fun immediateDuplicateReorderDispatchesOneRequestAndRollsBack() = runBlocking {
         awaitState { it.queue.singleOrNull()?.id == 51 }
         enqueuePodcasts()

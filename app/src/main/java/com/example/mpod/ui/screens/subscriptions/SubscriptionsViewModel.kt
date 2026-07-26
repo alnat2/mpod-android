@@ -34,42 +34,49 @@ class SubscriptionsViewModel @Inject constructor(
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
     private var pendingUnsubscribeJob: Job? = null
+    private var refreshInFlight = false
 
     init {
         refresh()
     }
 
     fun refresh() {
+        if (refreshInFlight) return
+        refreshInFlight = true
         viewModelScope.launch {
-            val current = _state.value
-            _state.value = current.copy(
-                isLoading = current.podcasts.isEmpty(),
-                errorMessage = null,
-                actionErrorMessage = null
-            )
-            val loadResult = runCatching { loadSubscriptionsState() }
-            val nextState = loadResult.getOrElse { error ->
-                val message = error.userFacingApiMessage("Could not load subscriptions.")
-                if (current.podcasts.isEmpty()) {
-                    SubscriptionsUiState(errorMessage = message)
-                } else {
-                    current.copy(
-                        isLoading = false,
-                        actionErrorMessage = message
-                    )
-                }
-            }
-            val mergedState = nextState.withTransientStateFrom(_state.value)
-            _state.value = if (loadResult.isSuccess) {
-                mergedState.copy(
-                    failedUnsubscribePodcastId = null,
-                    failedMarkAllListenedPodcastId = null,
-                    failedEpisodeAction = null
+            try {
+                val current = _state.value
+                _state.value = current.copy(
+                    isLoading = current.podcasts.isEmpty(),
+                    errorMessage = null,
+                    actionErrorMessage = null
                 )
-            } else {
-                mergedState
+                val loadResult = runCatching { loadSubscriptionsState() }
+                val nextState = loadResult.getOrElse { error ->
+                    val message = error.userFacingApiMessage("Could not load subscriptions.")
+                    if (current.podcasts.isEmpty()) {
+                        SubscriptionsUiState(errorMessage = message)
+                    } else {
+                        current.copy(
+                            isLoading = false,
+                            actionErrorMessage = message
+                        )
+                    }
+                }
+                val mergedState = nextState.withTransientStateFrom(_state.value)
+                _state.value = if (loadResult.isSuccess) {
+                    mergedState.copy(
+                        failedUnsubscribePodcastId = null,
+                        failedMarkAllListenedPodcastId = null,
+                        failedEpisodeAction = null
+                    )
+                } else {
+                    mergedState
+                }
+                if (loadResult.isSuccess) queueInvalidator.invalidate()
+            } finally {
+                refreshInFlight = false
             }
-            if (loadResult.isSuccess) queueInvalidator.invalidate()
         }
     }
 

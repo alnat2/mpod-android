@@ -30,6 +30,7 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
+    private var refreshInFlight = false
 
     init {
         refresh()
@@ -41,8 +42,14 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (refreshInFlight) return
+        refreshInFlight = true
         viewModelScope.launch {
-            reloadNow(invalidatePlaybackQueue = true)
+            try {
+                reloadNow(invalidatePlaybackQueue = true)
+            } finally {
+                refreshInFlight = false
+            }
         }
     }
 
