@@ -27,6 +27,7 @@ Explicit chat decisions override stale Figma states. In particular, Home has no 
 | Status | Meaning |
 |---|---|
 | Specified | Expected outcome is known, but the complete evidence has not been audited against this map |
+| Deferred | The product owner explicitly removed the scenario from the current release scope pending a redesign |
 | Open | A product decision is required before implementation or acceptance |
 | Failed | The complete scenario was executed and did not reach the expected result |
 | Verified | The complete required evidence passed against the test backend |
@@ -186,15 +187,15 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| DLD-01 | Download an episode successfully | Progress/busy state is truthful; backend stores the server file and menu becomes Downloaded | C,U,E | Specified |
-| DLD-02 | Tap Download again or select another episode while one download is running | Only one download runs at a time; all other Download actions are disabled until it finishes or fails, and no duplicate/parallel request is started | U,E | Specified |
-| DLD-03 | Download fails | A dismissible failure is shown for the correct episode; normal Download action can retry | C,U,E | Specified |
-| DLD-04 | Play an episode whose server download exists | Playback succeeds through the backend audio endpoint and uses backend file/source rules | E,D | Specified |
-| DLD-05 | Mark a downloaded episode listened | Backend clears downloaded state and deletes or reconciles the server file under lifecycle rules | C,E | Specified |
-| DLD-06 | Remove a downloaded episode from playlist | Backend applies the documented cleanup rule without corrupting unrelated files | C,E | Specified |
-| DLD-07 | Mark a cleaned episode unlistened | File is not recreated and UI does not claim it remains downloaded | C,E | Specified |
-| DLD-08 | Unsubscribe a podcast with downloaded episodes | Backend removes the podcast and applies cleanup to all affected server files | C,E | Specified |
-| DLD-09 | Interrupt/background/kill app during a download | A surviving backend request may complete; otherwise Android returns to a failed/retryable Download state and never claims a complete file; no Cancel action is required for MVP | E,L | Specified |
+| DLD-01 | Download an episode successfully | Progress/busy state is truthful; backend stores the server file and menu becomes Downloaded | C,U,E | Deferred |
+| DLD-02 | Tap Download again or select another episode while one download is running | Only one download runs at a time; all other Download actions are disabled until it finishes or fails, and no duplicate/parallel request is started | U,E | Deferred |
+| DLD-03 | Download fails | A dismissible failure is shown for the correct episode; normal Download action can retry | C,U,E | Deferred |
+| DLD-04 | Play an episode whose server download exists | Playback succeeds through the backend audio endpoint and uses backend file/source rules | E,D | Deferred |
+| DLD-05 | Mark a downloaded episode listened | Backend clears downloaded state and deletes or reconciles the server file under lifecycle rules | C,E | Deferred |
+| DLD-06 | Remove a downloaded episode from playlist | Backend applies the documented cleanup rule without corrupting unrelated files | C,E | Deferred |
+| DLD-07 | Mark a cleaned episode unlistened | File is not recreated and UI does not claim it remains downloaded | C,E | Deferred |
+| DLD-08 | Unsubscribe a podcast with downloaded episodes | Backend removes the podcast and applies cleanup to all affected server files | C,E | Deferred |
+| DLD-09 | Interrupt/background/kill app during a download | A surviving backend request may complete; otherwise Android returns to a failed/retryable Download state and never claims a complete file; no Cancel action is required for MVP | E,L | Deferred |
 
 ## P1 — Settings and export
 
@@ -228,7 +229,7 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 | REL-06 | Process is recreated with pending destructive/mutating UI | Backend remains authoritative; no mutation occurs merely because stale UI state was restored | C,E,L | Verified |
 | REL-07 | Library/queue contains long titles and enough rows to scroll | Core actions remain reachable and operate on the intended item | U,E,D | Verified |
 | REL-10 | Build the release APK against production and run the approved smoke path | Release uses server `5050`; login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback work without a critical defect | C,R,D | Verified |
-| REL-12 | Complete regression gate and release handoff | All PRD scenarios and regression checks pass; release APK version/checksum/commit/backend and known limitations are recorded | C,U,E,D,R | Specified |
+| REL-12 | Complete regression gate and release handoff | All release-scope PRD scenarios and regression checks pass; explicitly deferred redesigns plus release APK version/checksum/commit/backend and known limitations are recorded | C,U,E,D,R | Verified |
 | REL-13 | Backend accepts a connection but a core request exceeds the 30-second network timeout | Loading remains visible and duplicate submission is blocked; timeout ends in the screen/action-specific error state rather than an infinite spinner; the documented reload/retry path can recover | C,U,E,L | Verified |
 
 ## Resolved scenario decisions
@@ -241,7 +242,7 @@ The product owner confirmed on 2026-07-19:
 4. Downloads have no user-facing Cancel action in the MVP. An interrupted request either completes or returns to a retryable Download state without false success.
 5. Settings has no Retry buttons. Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
 6. Web/Android synchronization is event-driven for the MVP: launch, foreground, entry to Home or Subscriptions, and manual Refresh reconcile shared state. There is no continuous polling and no immediate interruption of current audio before reconciliation.
-7. Until Downloads is redesigned, Android permits one download at a time and disables other Download actions while it is running. Parallel download behavior is outside the current MVP design.
+7. Downloads are explicitly deferred from the current release acceptance pending redesign. Until that redesign, the existing Android behavior permits one download at a time and disables other Download actions while it is running; `DLD-01`–`DLD-09` must not be represented as Verified.
 8. Release acceptance uses one release APK. A separate test application, a second application ID, Test/Production coexistence, and upgrade/co-installation checks are not mpod requirements. After all PRD scenarios and regression tests pass, release is switched to production server `5050`, assembled, and smoke-tested for login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback. With no critical defects, the APK is ready for release.
 
 There are no known unanswered product questions blocking the functional scenario audit.
@@ -289,6 +290,7 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-W21 | 2026-07-26 | `APP-12`, `PLY-15` | On the physical phone, Logout removed mpod's MediaSession and opened Login. A force-stop/cold relaunch stayed on Login. Clearing the test package and launching cold again also stayed on Login; no cookie/session preferences returned, while the backup/transfer XML exclusion remains protected by connected coverage. Test login was then restored with the agreed `t/123`. For audio focus, mpod played episode 18 while Chrome opened a LAN-only 20-second WAV fixture. A real Chrome Play gesture acquired full `AUDIOFOCUS_GAIN`; Chrome MediaSession became playing and mpod immediately became paused at the retained position with no error. Pausing Chrome and returning to mpod did not incorrectly auto-resume after that permanent focus loss. The temporary audio server was stopped; Chrome itself was not force-stopped. |
 | EV-W22 | 2026-07-26 | `PLY-16` | On the physical Android 15 phone, `HL S3` was the active A2DP route, Bluetooth reported `mIsPlaying:true`, STREAM_MUSIC selected `bt_a2dp`, and mpod MediaSession played episode 18 at 1.3x. The product owner physically disconnected the headphones. Bluetooth became disconnected with no active device and STREAM_MUSIC returned to speaker, but mpod immediately entered PAUSED at retained position `799174`; Home showed Play and no player error. Audio therefore did not continue unexpectedly through the speaker and the player remained recoverable. |
 | EV-W23 | 2026-07-26 | `REL-10` | The minified `com.prod.mpod` release ran the approved authenticated smoke path on Xiaomi `23021RAA2Y`, Android 15, against production `5050`. Login restored the real eight-podcast library; Home restored the four-item queue and 1.3x speed. Subscriptions, Settings refresh/proxy/theme data, playback, speed change/restore, MediaSession, and background playback passed. Sustained playback exposed an R8-only crash: Gson lost the anonymous generic `TypeToken`, pending playback reloaded empty, and `submitPlayback` dereferenced the missing value. Persistence now deserializes a concrete array and sync falls back to the submitted request; the rebuilt minified APK played through repeated 15-second sync intervals without a new crash. Production also exposed that restricting the notification controller did not restrict DefaultMediaNotificationProvider actions for a multi-item queue; a provider-level filter now publishes exactly one Play/Pause action. Completing `Children in warzones` removed it from the backend queue, changed the count from four to three, and selected `Podlodka #486 – Spec-Driven Development` next without autoplay. Full gate after the fixes: 110/110 unit, 107/107 connected, debug/release lint, debug/test APKs, and minified release APK. `REL-10` is Verified; `REL-12` remains for immutable artifact metadata and handoff. |
+| EV-W24 | 2026-07-26 | `REL-12` | Final acceptance artifact `app/build/outputs/apk/release/app-release.apk` was rebuilt from Android revision `67ad83ff3c650b830bb8b1b3d58aadaf83e7bf82`, installed successfully on the physical phone, retained the authenticated production session, and reopened the authoritative subscription state. Package `com.prod.mpod`, version `1.0.11 (12)`, min SDK 34, target SDK 36, size 5,879,637 bytes, SHA-256 `a693235de4645ae925d9be9e198ea75e4865c0b249bd0b521338b97d65b60e44`, production endpoint `192.168.0.222:5050`, backend baseline `ac8a679f3dd38cbd800cb535f3b7eff5bc61b312`, APK Signature Scheme v2. Known limitations: the acceptance APK is signed by the Android Debug certificate and is not a distribution-signing artifact; transport remains project-approved LAN HTTP; `DLD-01`–`DLD-09` are explicitly deferred pending redesign. All 118 in-scope scenarios are Verified and nine are Deferred; no scenario remains Specified, Open, or Failed. |
 
 ## Execution order
 

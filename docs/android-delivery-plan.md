@@ -359,6 +359,8 @@ Scenario wave 22 completed `PLY-16` on the physical phone. With `HL S3` active, 
 
 Scenario wave 23 completed `REL-10` on the physical Android 15 phone against production `5050`. The authenticated minified release loaded the eight-podcast library, restored Home and 1.3x playback, passed speed, Settings, MediaSession, background playback, and authoritative episode completion. The smoke pass found an R8-only playback-sync crash caused by anonymous generic Gson metadata being stripped, plus notification Previous/Next actions that the earlier controller-only restriction did not remove for multi-item queues. Pending playback persistence now uses a concrete array type, missing persistence cannot crash submission, and the notification provider itself filters to Play/Pause. The rebuilt minified APK survived repeated sync intervals, reported one notification action, and completed the six-minute episode into the correct three-item queue and paused next item. Full gate: 110/110 unit, 107/107 connected, debug/release lint, debug/test APKs, and minified release APK. The scenario map is now 117/127 Verified (92%); the nine deferred download rows remain pending redesign, and only `REL-12` remains for final artifact metadata and handoff.
 
+Scenario wave 24 completed `REL-12`. The exact acceptance APK was rebuilt from committed Android revision `67ad83ff3c650b830bb8b1b3d58aadaf83e7bf82`, installed over production on the physical phone, and reopened the retained authenticated library. Artifact: package `com.prod.mpod`, version `1.0.11 (12)`, min SDK 34, target SDK 36, 5,879,637 bytes, SHA-256 `a693235de4645ae925d9be9e198ea75e4865c0b249bd0b521338b97d65b60e44`, endpoint `192.168.0.222:5050`, backend baseline `ac8a679f3dd38cbd800cb535f3b7eff5bc61b312`, APK Signature Scheme v2. The Android Debug certificate remains a documented acceptance-only limitation, LAN HTTP remains the approved project transport, and all nine Download rows are explicitly Deferred pending the owner-planned redesign. The final map is 118/127 Verified and 9/127 Deferred, with no Specified, Open, or Failed rows in the current release scope.
+
 Two backend follow-ups were recorded in the scenario map. One successful podcast deletion left an orphan episode row in `/api/playlist`, invisible in `/api/playback/queue`, and that row blocked the next reorder until explicit deletion. Separately, the documented 15-second completion expression treats position zero as completed for episodes no longer than 15 seconds; Android avoids an unsolicited zero-position reconciliation write, but the server/product rule still needs an explicit shared decision.
 
 For each scenario wave: match reusable evidence, execute the missing real path, record the result, fix failures in scenario-scoped commits, and rerun the scenario plus affected dependencies.
@@ -385,7 +387,7 @@ Goal: produce one release APK from the verified MVP and perform the project-appr
 
 Required scope:
 
-- Complete every PRD scenario and the full regression gate successfully.
+- Complete every release-scope PRD scenario and the full regression gate successfully; record every explicitly deferred redesign without presenting it as verified.
 - Switch the release configuration to production server `5050` and assemble the release APK.
 - On production, smoke-test login, subscriptions, playback, playback speed, episode completion, Settings, MediaSession, and background playback.
 - Record APK checksum, version, commit, production backend, checks performed, and every known limitation.
