@@ -250,7 +250,8 @@ fun SubscriptionsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .padding(horizontal = 2.dp),
+                                .padding(horizontal = 2.dp)
+                                .testTag("subscriptions_episode_list"),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             item {

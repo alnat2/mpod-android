@@ -3,6 +3,7 @@ package com.example.mpod.ui.screens.subscriptions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -376,6 +378,47 @@ class SubscriptionsScreenTest {
             assertEquals(1, rssAdds)
             assertEquals(1, opmlImports)
         }
+    }
+
+    @Test
+    fun longEpisodeListKeepsTheLastEpisodeActionBoundToItsId() {
+        val longTitle =
+            "Episode 80 with an intentionally long title that must not hide its actions"
+        val episodes = (1..80).map { index ->
+            SubscriptionEpisodeUi(
+                id = 1_000 + index,
+                title = if (index == 80) longTitle else "Episode $index",
+                durationSeconds = 60,
+                publishedAt = "2026-07-14T10:00:00Z",
+                isListened = false,
+                downloaded = false,
+                summary = null,
+                inPlaylist = false
+            )
+        }
+        val longPodcast = podcast(1, "Long podcast title", "Unused").copy(
+            totalEpisodeCount = episodes.size,
+            unlistenedEpisodeCount = episodes.size,
+            episodes = episodes
+        )
+        var selectedEpisodeId: Int? = null
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(podcasts = listOf(longPodcast)),
+                    onAddEpisodeToPlaylist = { selectedEpisodeId = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("subscriptions_episode_list")
+            .performScrollToNode(hasContentDescription("Options for $longTitle"))
+        composeRule.onNodeWithContentDescription("Options for $longTitle")
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithText("Add to playlist").performClick()
+
+        composeRule.runOnIdle { assertEquals(1_080, selectedEpisodeId) }
     }
 
     private fun populatedState(): SubscriptionsUiState {
