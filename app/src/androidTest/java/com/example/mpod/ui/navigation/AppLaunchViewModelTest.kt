@@ -50,7 +50,11 @@ class AppLaunchViewModelTest {
         val viewModel = viewModel()
 
         awaitState(viewModel, AppLaunchState.SetupRequired)
-        server.enqueue(MockResponse().setResponseCode(204))
+        server.enqueue(
+            MockResponse().setResponseCode(204)
+                .setHeadersDelay(300, TimeUnit.MILLISECONDS)
+        )
+        viewModel.register("owner", "password")
         viewModel.register("owner", "password")
 
         awaitState(viewModel, AppLaunchState.Authenticated)
@@ -61,6 +65,7 @@ class AppLaunchViewModelTest {
         val body = JSONObject(register.body.readUtf8())
         assertEquals("owner", body.getString("username"))
         assertEquals("password", body.getString("password"))
+        assertEquals(2, server.requestCount)
     }
 
     @Test
