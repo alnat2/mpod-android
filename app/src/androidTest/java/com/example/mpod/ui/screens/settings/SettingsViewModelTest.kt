@@ -124,7 +124,11 @@ class SettingsViewModelTest {
         val state = viewModel.awaitState { !it.isLoading }
 
         assertNull(state.refreshErrorMessage)
-        assertEquals("Status: completed · last refresh 2026-07-19 08:30", state.schedulerStatusText)
+        assertEquals(
+            "Status: completed · last refresh " +
+                formatSchedulerTimestamp("2026-07-19T08:30:00Z"),
+            state.schedulerStatusText
+        )
         assertEquals("Proxy status unavailable", state.proxyErrorMessage)
         assertTrue(state.hasConfirmedSettings)
     }

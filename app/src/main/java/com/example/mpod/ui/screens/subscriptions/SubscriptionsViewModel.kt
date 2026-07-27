@@ -2,6 +2,7 @@ package com.example.mpod.ui.screens.subscriptions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mpod.data.network.BackendConfig
 import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.model.EpisodeListenedRequest
 import com.example.mpod.data.network.model.EpisodeDto
@@ -29,7 +30,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val api: MpodApi,
-    private val queueInvalidator: PlaybackQueueInvalidator
+    private val queueInvalidator: PlaybackQueueInvalidator,
+    private val backendConfig: BackendConfig = BackendConfig()
 ) : ViewModel() {
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
@@ -510,7 +512,11 @@ class SubscriptionsViewModel @Inject constructor(
             id = id,
             title = cleanFeedText(title).ifBlank { "Untitled podcast" },
             description = cleanFeedText(description).ifBlank { rssUrl.orEmpty() },
-            imageUrl = imageUrl,
+            imageUrl = podcastArtworkUrl(
+                backendBaseUrl = backendConfig.baseUrl,
+                podcastId = id,
+                sourceImageUrl = imageUrl
+            ),
             totalEpisodeCount = totalEpisodeCount,
             unlistenedEpisodeCount = unlistenedEpisodeCount,
             episodes = episodes,
@@ -729,6 +735,14 @@ private fun List<SubscriptionPodcastUi>.withPodcastError(
         if (podcast.id == podcastId) podcast.copy(errorMessage = errorMessage) else podcast
     }
 }
+
+internal fun podcastArtworkUrl(
+    backendBaseUrl: String,
+    podcastId: Int,
+    sourceImageUrl: String?
+): String? = sourceImageUrl
+    ?.takeIf { it.isNotBlank() }
+    ?.let { "${backendBaseUrl.trimEnd('/')}/api/podcasts/$podcastId/image" }
 
 data class SubscriptionPodcastUi(
     val id: Int,

@@ -24,6 +24,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import retrofit2.Response
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -306,7 +309,7 @@ class SettingsViewModel @Inject constructor(
         return if (lastRefresh == null) {
             "Status: $state · last refresh never"
         } else {
-            val compact = lastRefresh.replace('T', ' ').take(16)
+            val compact = formatSchedulerTimestamp(lastRefresh)
             "Status: $state · last refresh $compact"
         }
     }
@@ -314,6 +317,19 @@ class SettingsViewModel @Inject constructor(
     private fun Response<*>?.errorMessage(defaultMessage: String): String {
         return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
     }
+}
+
+private val schedulerTimestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+internal fun formatSchedulerTimestamp(
+    rawTimestamp: String,
+    zoneId: ZoneId = ZoneId.systemDefault()
+): String = runCatching {
+    Instant.parse(rawTimestamp)
+        .atZone(zoneId)
+        .format(schedulerTimestampFormatter)
+}.getOrElse {
+    rawTimestamp.replace('T', ' ').take(16)
 }
 
 data class SettingsUiState(

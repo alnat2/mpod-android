@@ -270,32 +270,15 @@ fun SettingsScreen(
                 }
         )
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = "Current app build: ${installedAppBuildInfo.versionName} " +
-                    "(${installedAppBuildInfo.versionCode}) · ${installedAppBuildInfo.environment}",
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                text = "Package: ${installedAppBuildInfo.applicationId}",
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                text = "Server: ${installedAppBuildInfo.backendAddress} · " +
-                    "Backend: ${state.appBuild ?: "unknown"}",
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
+        Text(
+            text = "Current app build: ${installedAppBuildInfo.versionName} " +
+                "(${installedAppBuildInfo.versionCode}) · ${installedAppBuildInfo.environment}",
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 
     if (showTimePicker) {
