@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 import javax.inject.Inject
 
@@ -453,7 +455,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
 
-    private suspend fun loadSubscriptionsState(): SubscriptionsUiState {
+    private suspend fun loadSubscriptionsState(): SubscriptionsUiState = withContext(Dispatchers.IO) {
         val podcasts = api.getPodcasts()
             .requireApiBody("Could not load podcasts.")
             .podcasts
@@ -491,7 +493,7 @@ class SubscriptionsViewModel @Inject constructor(
             )
         }
 
-        return SubscriptionsUiState(
+        SubscriptionsUiState(
             actionErrorMessage = if (hasEpisodeLoadFailures) {
                 "Some podcast episodes could not be loaded."
             } else {

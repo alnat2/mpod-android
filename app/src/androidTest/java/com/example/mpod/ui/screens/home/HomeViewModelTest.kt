@@ -141,9 +141,9 @@ class HomeViewModelTest {
         server.enqueue(MockResponse().setResponseCode(200).setBody("""{"podcasts":null}"""))
 
         viewModel.refresh()
-        val failed = awaitState { it.errorMessage == "Could not load podcasts." }
+        val failed = awaitState { it.actionErrorMessage == "Could not load podcasts." }
 
-        assertEquals(true, failed.queue.isEmpty())
+        assertEquals(51, failed.queue.singleOrNull()?.id)
         enqueuePodcasts()
         enqueueQueueWithEpisode()
         viewModel.refresh()

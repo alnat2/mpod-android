@@ -8,6 +8,45 @@ import org.junit.Test
 
 class PlaybackQueueReconciliationTest {
     @Test
+    fun identicalQueueAndCurrentEpisodeDoNotRebuildPlayer() {
+        assertFalse(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1, 2, 3),
+                backendQueueEpisodeIds = listOf(1, 2, 3),
+                currentEpisodeId = 2,
+                targetEpisodeId = 2,
+                preferredEpisodeId = null
+            )
+        )
+    }
+
+    @Test
+    fun changedQueueRebuildsPlayer() {
+        assertTrue(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1, 2, 3),
+                backendQueueEpisodeIds = listOf(1, 3),
+                currentEpisodeId = 1,
+                targetEpisodeId = 1,
+                preferredEpisodeId = null
+            )
+        )
+    }
+
+    @Test
+    fun explicitEpisodeSelectionRebuildsPlayerEvenWhenQueueMatches() {
+        assertTrue(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1, 2, 3),
+                backendQueueEpisodeIds = listOf(1, 2, 3),
+                currentEpisodeId = 2,
+                targetEpisodeId = 2,
+                preferredEpisodeId = 2
+            )
+        )
+    }
+
+    @Test
     fun emptyQueueHasNoPlaybackTarget() {
         assertNull(
             resolveQueuePlaybackTarget(

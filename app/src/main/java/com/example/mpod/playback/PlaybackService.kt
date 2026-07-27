@@ -186,6 +186,7 @@ class PlaybackService : MediaSessionService() {
             )
 
             if (target == null) {
+                if (player.mediaItemCount == 0) return@withLock
                 syncJob?.cancel()
                 syncJob = null
                 player.removeListener(playerListener)
@@ -196,10 +197,31 @@ class PlaybackService : MediaSessionService() {
                 return@withLock
             }
 
+            val backendQueueEpisodeIds = queue.map { it.id }
+            val currentQueueEpisodeIds = (0 until player.mediaItemCount).mapNotNull { index ->
+                player.getMediaItemAt(index).mediaId.toIntOrNull()
+            }
+            val requiresRebuild = requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = currentQueueEpisodeIds,
+                backendQueueEpisodeIds = backendQueueEpisodeIds,
+                currentEpisodeId = currentEpisodeId,
+                targetEpisodeId = target.episodeId,
+                preferredEpisodeId = preferredEpisodeId
+            )
+            if (!requiresRebuild) {
+                if (target.playWhenReady) {
+                    startPeriodicSync()
+                } else {
+                    syncJob?.cancel()
+                    syncJob = null
+                }
+                return@withLock
+            }
+
             if (
                 shouldSyncCurrentBeforeQueueReconciliation(
                     currentEpisodeId = currentEpisodeId,
-                    queuedEpisodeIds = queue.map { it.id }.toSet(),
+                    queuedEpisodeIds = backendQueueEpisodeIds.toSet(),
                     isPlaying = player.isPlaying
                 )
             ) {

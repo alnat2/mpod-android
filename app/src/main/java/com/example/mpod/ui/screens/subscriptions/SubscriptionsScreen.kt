@@ -122,7 +122,9 @@ fun SubscriptionsScreen(
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
     var visibility by remember { mutableStateOf(SubscriptionVisibility.Unlistened) }
-    val podcasts = state.podcasts.visibleFor(visibility)
+    val podcasts = remember(state.podcasts, visibility) {
+        state.podcasts.visibleFor(visibility)
+    }
     val refreshErrorMessage = state.actionErrorMessage
     var showNotesEpisode by remember { mutableStateOf<Pair<SubscriptionPodcastUi, SubscriptionEpisodeUi>?>(null) }
     val toggleVisibility = {

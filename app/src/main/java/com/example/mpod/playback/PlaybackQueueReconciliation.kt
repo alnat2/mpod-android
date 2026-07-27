@@ -11,6 +11,18 @@ internal data class QueuePlaybackTarget(
     val playWhenReady: Boolean
 )
 
+internal fun requiresPlayerQueueRebuild(
+    currentQueueEpisodeIds: List<Int>,
+    backendQueueEpisodeIds: List<Int>,
+    currentEpisodeId: Int?,
+    targetEpisodeId: Int,
+    preferredEpisodeId: Int?
+): Boolean {
+    return preferredEpisodeId != null ||
+        currentQueueEpisodeIds != backendQueueEpisodeIds ||
+        currentEpisodeId != targetEpisodeId
+}
+
 internal fun resolveQueuePlaybackTarget(
     queue: List<QueueEpisodeState>,
     backendActiveEpisodeId: Int?,

@@ -54,12 +54,27 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun reloadNow(invalidatePlaybackQueue: Boolean) {
-        _state.value = _state.value.copy(isLoading = true, errorMessage = null)
-        val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-            HomeUiState(errorMessage = error.userFacingApiMessage("Could not load playlist."))
+        val current = _state.value
+        _state.value = current.copy(
+            isLoading = current.isLoading,
+            errorMessage = null,
+            actionErrorMessage = null
+        )
+        val loadResult = runCatching { loadHomeState() }
+        val nextState = loadResult.getOrElse { error ->
+            val message = error.userFacingApiMessage("Could not load playlist.")
+            if (current.isLoading) {
+                HomeUiState(errorMessage = message)
+            } else {
+                current.copy(
+                    isLoading = false,
+                    errorMessage = null,
+                    actionErrorMessage = message
+                )
+            }
         }
         _state.value = nextState.withTransientStateFrom(_state.value)
-        if (invalidatePlaybackQueue && nextState.errorMessage == null) {
+        if (invalidatePlaybackQueue && loadResult.isSuccess) {
             queueInvalidator.invalidate()
         }
     }
