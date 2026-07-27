@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-26 (eighteenth scenario wave verified)
+Last updated: 2026-07-27 (post-acceptance maintenance recorded)
 
-Current Android baseline: `1.0.11 (12)`, Stage 3 completed; Stage 4 is functional readiness
+Current Android baseline: `1.0.11 (12)`; Stage 6 release acceptance completed, with subsequent owner-reviewed maintenance through `a72145b`
 
 ## Purpose
 
@@ -60,13 +60,14 @@ Figma references:
 | Implemented | Production code exists, but required verification is incomplete |
 | Verified | Required automated and manual checks passed on the test backend |
 | Accepted | Product owner checked the build and accepted the behavior |
+| Deferred | The product owner explicitly removed the work from the current release scope pending redesign |
 | Blocked | A named external dependency or unanswered product decision prevents progress |
 
 Statuses are evidence-based. `Implemented` must never be used as a synonym for `Verified` or `Accepted`.
 
-## Current product baseline
+## Historical implementation baseline
 
-The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-15. This accepts the starting point for further work; it does not make the build a release candidate or automatically mark every individual feature as release-verified.
+The table below records the implementation baseline accepted on 2026-07-15 and the gaps that drove the later scenario waves. It is retained as history, not as the current backlog. Current release status is authoritative in `docs/android-user-scenarios.md`: 118 release-scope scenarios are Verified, nine Download scenarios are Deferred by product-owner decision, and no scenario is Specified, Open, or Failed.
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
@@ -99,8 +100,8 @@ The product owner accepted `1.0.4 (5)` as the current test baseline on 2026-07-1
 
 Current automated suite:
 
-- 105 local unit tests.
-- 87 connected Android/Compose UI/configuration tests.
+- 117 local unit tests.
+- 107 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -113,15 +114,13 @@ ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 
 Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
 
-### Important coverage gaps
+### Current known limitations and deferred work
 
-- CI enforces unit tests, lint, and debug app/test APK assembly on every push and pull request. Connected Android 14 tests run for pull requests and manual workflow dispatch. The first upstream push run completed successfully on commit `1da88a1` (GitHub Actions run `29487361492`).
-- ViewModel and Retrofit failure/retry coverage remains sparse outside the now directly covered Add-podcast flow.
-- PlaybackService has durable-sync automation and real completion/auto-next evidence, but still lacks the Stage 5 Media3 reliability matrix for audio focus, route changes, audio-network loss, and service/process termination.
-- Downloads and Settings backend saves still lack complete end-to-end evidence; their focused checks remain in Stage 4.
-- Process death, rotation, background/foreground, expired session, slow network, and timeout scenarios are not systematically covered. The critical valid-session offline cold-start and Retry recovery path has targeted unit, Compose, and Pixel 9 evidence.
-- Accessibility, font scaling, display scaling, and 12/24-hour locale matrices are incomplete.
-- The physical-phone pass is manual and does not yet use a written repeatable release checklist.
+- `DLD-01`–`DLD-09` remain explicitly Deferred pending the planned download redesign; they are not represented as release-verified.
+- The immutable production acceptance artifact remains the APK from `67ad83f`, documented in wave 24. Current source/test baseline `a72145b` contains later owner-reviewed maintenance and must not be described using the older artifact checksum.
+- Final distribution signing credentials, TLS/network-security changes, and release packaging remain intentionally deferred. The accepted APK uses the documented Android Debug certificate and approved LAN HTTP transport.
+- Exhaustive TalkBack, font/display scaling, and non-blocking visual/performance polish remain post-acceptance work unless a concrete functional defect is observed.
+- Backend follow-ups `BE-FU-01` and `BE-FU-02` remain recorded in the scenario map; neither is an open Android release-scope scenario.
 
 ## Risk-based regression policy
 
@@ -360,6 +359,8 @@ Scenario wave 22 completed `PLY-16` on the physical phone. With `HL S3` active, 
 Scenario wave 23 completed `REL-10` on the physical Android 15 phone against production `5050`. The authenticated minified release loaded the eight-podcast library, restored Home and 1.3x playback, passed speed, Settings, MediaSession, background playback, and authoritative episode completion. The smoke pass found an R8-only playback-sync crash caused by anonymous generic Gson metadata being stripped, plus notification Previous/Next actions that the earlier controller-only restriction did not remove for multi-item queues. Pending playback persistence now uses a concrete array type, missing persistence cannot crash submission, and the notification provider itself filters to Play/Pause. The rebuilt minified APK survived repeated sync intervals, reported one notification action, and completed the six-minute episode into the correct three-item queue and paused next item. Full gate: 110/110 unit, 107/107 connected, debug/release lint, debug/test APKs, and minified release APK. The scenario map is now 117/127 Verified (92%); the nine deferred download rows remain pending redesign, and only `REL-12` remains for final artifact metadata and handoff.
 
 Scenario wave 24 completed `REL-12`. The exact acceptance APK was rebuilt from committed Android revision `67ad83ff3c650b830bb8b1b3d58aadaf83e7bf82`, installed over production on the physical phone, and reopened the retained authenticated library. Artifact: package `com.prod.mpod`, version `1.0.11 (12)`, min SDK 34, target SDK 36, 5,879,637 bytes, SHA-256 `a693235de4645ae925d9be9e198ea75e4865c0b249bd0b521338b97d65b60e44`, endpoint `192.168.0.222:5050`, backend baseline `ac8a679f3dd38cbd800cb535f3b7eff5bc61b312`, APK Signature Scheme v2. The Android Debug certificate remains a documented acceptance-only limitation, LAN HTTP remains the approved project transport, and all nine Download rows are explicitly Deferred pending the owner-planned redesign. The final map is 118/127 Verified and 9/127 Deferred, with no Specified, Open, or Failed rows in the current release scope.
+
+Post-acceptance maintenance on 2026-07-27 fixed defects found during product-owner review. Commit `7810855` routes podcast covers through the authenticated backend image endpoint and shared cookie-aware image loader, displays scheduler timestamps in the device time zone, and restores the approved Settings footer to only `Current app build`. Commit `a72145b` prevents unchanged Home/Subscriptions reconciliation from rebuilding and preparing the ExoPlayer queue, moves large subscription loads off the UI dispatcher, removes unnecessary primary-navigation transitions, memoizes episode filtering, and preserves loaded Home content during background reloads. The full gate passed at 117/117 unit tests, 107/107 connected tests, debug/release lint, and debug/release assembly. On Pixel 9 emulator, MediaSession remained continuously `PLAYING` with advancing position across repeated Home/Subscriptions/Settings navigation; the product owner subsequently reviewed the corrected application and reported the changes acceptable. These commits update the current source/test baseline but do not change the immutable checksum or revision recorded for the wave-24 production acceptance APK.
 
 Two backend follow-ups were recorded in the scenario map. One successful podcast deletion left an orphan episode row in `/api/playlist`, invisible in `/api/playback/queue`, and that row blocked the next reorder until explicit deletion. Separately, the documented 15-second completion expression treats position zero as completed for episodes no longer than 15 seconds; Android avoids an unsolicited zero-position reconciliation write, but the server/product rule still needs an explicit shared decision.
 
