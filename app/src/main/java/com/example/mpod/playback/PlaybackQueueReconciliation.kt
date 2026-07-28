@@ -43,7 +43,7 @@ internal fun resolveQueuePlaybackTarget(
         ?: queue.first().episodeId
 
     val positionMs = when {
-        preferred != null -> 0L
+        preferred != null -> queueById.getValue(preferred).savedPositionMs
         currentStillQueued && targetEpisodeId == currentEpisodeId -> currentPositionMs
         else -> queueById.getValue(targetEpisodeId).savedPositionMs
     }.coerceAtLeast(0L)

@@ -370,25 +370,9 @@ class PlaybackService : MediaSessionService() {
         durationSeconds: Int,
         didSeek: Boolean = false
     ) {
-        val wasPlayingWhenSubmitted =
-            player.isPlaying && currentEpisodeId() == episodeId
-        val response = playbackSyncManager.submitPlayback(
+        playbackSyncManager.submitPlayback(
             playbackRequest(episodeId, positionSeconds, durationSeconds, didSeek = didSeek)
         )
-        val shouldReconcileCompletion = shouldReconcilePausedThresholdCompletion(
-            completedByPosition = countsAsBackendCompletion(positionSeconds, durationSeconds),
-            wasPlayingWhenSubmitted = wasPlayingWhenSubmitted,
-            isPlayingNow = player.isPlaying,
-            completedEpisodeId = episodeId,
-            currentEpisodeId = currentEpisodeId()
-        )
-        if (response != null && shouldReconcileCompletion) {
-            reconcileQueueWithBackend(
-                preferredEpisodeId = response.nextEpisodeId ?: episodeAfter(episodeId),
-                forcePlayPreferred = false
-            )
-            queueInvalidator.refreshHome()
-        }
     }
 
     private suspend fun completeEpisode(episodeId: Int): PlaybackUpdateResponse? {
@@ -425,21 +409,6 @@ class PlaybackService : MediaSessionService() {
         queueInvalidator.refreshHome()
     }
 
-    private fun playbackRequest(
-        episodeId: Int,
-        positionSeconds: Int,
-        durationSeconds: Int,
-        completed: Boolean = false,
-        didSeek: Boolean = false
-    ) = PlaybackUpdateRequest(
-        episodeId = episodeId,
-        positionSeconds = positionSeconds.coerceAtLeast(0),
-        durationSeconds = durationSeconds.coerceAtLeast(0),
-        completed = completed,
-        didSeek = didSeek,
-        clientUpdatedAt = Instant.now().toString()
-    )
-
     private fun currentEpisodeId(): Int? = player.currentMediaItem?.mediaId?.toIntOrNull()
 
     private fun currentDurationSeconds(): Int {
@@ -456,17 +425,6 @@ class PlaybackService : MediaSessionService() {
         return item?.mediaMetadata?.extras?.getInt(EXTRA_DURATION_SECONDS, 0)
             ?.coerceAtLeast(0)
             ?: 0
-    }
-
-    private fun episodeAfter(episodeId: Int): Int? {
-        val currentIndex = (0 until player.mediaItemCount)
-            .firstOrNull { player.getMediaItemAt(it).mediaId == episodeId.toString() }
-            ?: return null
-        return (currentIndex + 1)
-            .takeIf { it < player.mediaItemCount }
-            ?.let(player::getMediaItemAt)
-            ?.mediaId
-            ?.toIntOrNull()
     }
 
     private fun PlaybackQueueEpisodeDto.toMediaItem(): MediaItem {
@@ -546,24 +504,21 @@ internal fun shouldSyncCurrentBeforeQueueReconciliation(
     isPlaying: Boolean
 ): Boolean = isPlaying && currentEpisodeId != null && currentEpisodeId in queuedEpisodeIds
 
-internal fun countsAsBackendCompletion(
+internal fun playbackRequest(
+    episodeId: Int,
     positionSeconds: Int,
-    durationSeconds: Int
-): Boolean {
-    if (durationSeconds <= 0) return false
-    return positionSeconds.coerceAtLeast(0) >= durationSeconds - 15
-}
-
-internal fun shouldReconcilePausedThresholdCompletion(
-    completedByPosition: Boolean,
-    wasPlayingWhenSubmitted: Boolean,
-    isPlayingNow: Boolean,
-    completedEpisodeId: Int,
-    currentEpisodeId: Int?
-): Boolean = completedByPosition &&
-    !wasPlayingWhenSubmitted &&
-    !isPlayingNow &&
-    currentEpisodeId == completedEpisodeId
+    durationSeconds: Int,
+    completed: Boolean = false,
+    didSeek: Boolean = false,
+    clientUpdatedAt: String = Instant.now().toString()
+) = PlaybackUpdateRequest(
+    episodeId = episodeId,
+    positionSeconds = positionSeconds.coerceAtLeast(0),
+    durationSeconds = durationSeconds.coerceAtLeast(0),
+    completed = completed,
+    didSeek = didSeek,
+    clientUpdatedAt = clientUpdatedAt
+)
 
 internal fun String?.toPlaybackSpeedOrNull(): Float? = when (this) {
     "Speed 0.5x" -> 0.5f

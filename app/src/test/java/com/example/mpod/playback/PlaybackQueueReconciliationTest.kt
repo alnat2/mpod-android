@@ -105,9 +105,26 @@ class PlaybackQueueReconciliationTest {
     }
 
     @Test
-    fun completionFallbackStartsPreferredEpisodeFromBeginning() {
+    fun completionFallbackRestoresPreferredEpisodeSavedPosition() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(2 to 12_000, 3 to 8_000),
+            backendActiveEpisodeId = null,
+            currentEpisodeId = 1,
+            currentPositionMs = 45_000,
+            currentPlayWhenReady = false,
+            preferredEpisodeId = 3,
+            forcePlayPreferred = true
+        )
+
+        assertEquals(3, target?.episodeId)
+        assertEquals(8_000L, target?.positionMs)
+        assertTrue(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun completionFallbackWithoutPlaybackStateStartsPreferredEpisodeFromBeginning() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 12_000, 3 to 0),
             backendActiveEpisodeId = null,
             currentEpisodeId = 1,
             currentPositionMs = 45_000,

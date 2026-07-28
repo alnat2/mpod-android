@@ -1,7 +1,7 @@
 package com.example.mpod.playback
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -119,59 +119,45 @@ class PlaybackServiceDecisionsTest {
     }
 
     @Test
-    fun `backend completion window starts exactly fifteen seconds before duration`() {
-        assertEquals(false, countsAsBackendCompletion(positionSeconds = 84, durationSeconds = 100))
-        assertEquals(true, countsAsBackendCompletion(positionSeconds = 85, durationSeconds = 100))
-        assertEquals(true, countsAsBackendCompletion(positionSeconds = 4, durationSeconds = 6))
-        assertEquals(false, countsAsBackendCompletion(positionSeconds = 4, durationSeconds = 0))
+    fun `ordinary progress at duration remains an explicit non completion`() {
+        val request = playbackRequest(
+            episodeId = 7,
+            positionSeconds = 100,
+            durationSeconds = 100,
+            clientUpdatedAt = "2026-07-28T20:00:00Z"
+        )
+
+        assertEquals(100, request.positionSeconds)
+        assertEquals(false, request.completed)
     }
 
     @Test
-    fun `paused threshold completion requires queue reconciliation`() {
-        assertEquals(
-            true,
-            shouldReconcilePausedThresholdCompletion(
-                completedByPosition = true,
-                wasPlayingWhenSubmitted = false,
-                isPlayingNow = false,
-                completedEpisodeId = 7,
-                currentEpisodeId = 7
-            )
+    fun `near end seek remains progress without completion side effects`() {
+        val request = playbackRequest(
+            episodeId = 7,
+            positionSeconds = 99,
+            durationSeconds = 100,
+            didSeek = true,
+            clientUpdatedAt = "2026-07-28T20:00:00Z"
         )
+
+        assertTrue(request.didSeek)
+        assertEquals(false, request.completed)
     }
 
     @Test
-    fun `threshold completion does not hijack continuing or newer playback`() {
-        assertFalse(
-            shouldReconcilePausedThresholdCompletion(
-                completedByPosition = true,
-                wasPlayingWhenSubmitted = true,
-                isPlayingNow = true,
-                completedEpisodeId = 7,
-                currentEpisodeId = 7
-            )
+    fun `natural audio completion creates explicit completion request`() {
+        val request = playbackRequest(
+            episodeId = 7,
+            positionSeconds = 99,
+            durationSeconds = 100,
+            completed = true,
+            clientUpdatedAt = "2026-07-28T20:00:00Z"
         )
-        assertFalse(
-            shouldReconcilePausedThresholdCompletion(
-                completedByPosition = true,
-                wasPlayingWhenSubmitted = false,
-                isPlayingNow = false,
-                completedEpisodeId = 7,
-                currentEpisodeId = 9
-            )
-        )
+
+        assertTrue(request.completed)
+        assertEquals(99, request.positionSeconds)
+        assertEquals(100, request.durationSeconds)
     }
 
-    @Test
-    fun `playing threshold write cannot become paused completion while awaiting backend`() {
-        assertFalse(
-            shouldReconcilePausedThresholdCompletion(
-                completedByPosition = true,
-                wasPlayingWhenSubmitted = true,
-                isPlayingNow = false,
-                completedEpisodeId = 7,
-                currentEpisodeId = 7
-            )
-        )
-    }
 }
