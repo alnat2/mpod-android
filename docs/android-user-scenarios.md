@@ -20,7 +20,7 @@ Expected behavior is taken from these sources, in order:
 
 When a required behavior is absent or the sources disagree, the scenario is marked `Open`. It must not be implemented from an assumption.
 
-Explicit chat decisions override stale Figma states. In particular, Home has no header actions, the player exists only on Home, subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation, and the authenticated start destination is Subscriptions. Podcast artwork is informational: the MVP has no tap action or separate podcast-detail destination.
+Explicit chat decisions override stale Figma states. In particular, the existing Home/Now playing destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation, and the authenticated start destination is Subscriptions. Podcast artwork is informational: the MVP has no tap action or separate podcast-detail destination.
 
 ## Scenario status
 
@@ -70,7 +70,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
 | NAV-01 | Authenticate or restore a session | Subscriptions is the initial selected destination | U,E | Verified |
-| NAV-02 | Switch among Home, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful | U,E | Verified |
+| NAV-02 | Switch among Player, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful; Player opens the existing Home/Now playing route | U,E | Verified |
 | NAV-03 | Tap Add podcast from bottom navigation | Add modal opens above the current destination; closing it returns without an unintended mutation | U,E | Verified |
 | NAV-04 | Press Android Back from a modal or secondary state | The top modal/state closes before leaving the application | U,E | Verified |
 | NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong authenticated destination or duplicate screen | U,L | Verified |
@@ -215,7 +215,7 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 | SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Verified |
 | SET-13 | Cancel export destination selection | No file/error/success is falsely reported | U,E | Verified |
 | SET-14 | Export request or destination write fails | Specific recoverable error is shown and existing destination content is not falsely reported as valid | C,U,E,L | Verified |
-| SET-15 | View build/environment information | Displayed build identifies the installed APK sufficiently to distinguish test and production variants | U,E,R | Verified |
+| SET-15 | View the application version | Settings shows only the user-facing `versionName`; internal `versionCode`, environment, package, server, and backend revision are not displayed | U,E,R | Verified |
 
 ## P0/P1 — cross-cutting reliability and delivery
 
@@ -244,6 +244,8 @@ The product owner confirmed on 2026-07-19:
 6. Web/Android synchronization is event-driven for the MVP: launch, foreground, entry to Home or Subscriptions, and manual Refresh reconcile shared state. There is no continuous polling and no immediate interruption of current audio before reconciliation.
 7. Downloads are explicitly deferred from the current release acceptance pending redesign. Until that redesign, the existing Android behavior permits one download at a time and disables other Download actions while it is running; `DLD-01`–`DLD-09` must not be represented as Verified.
 8. Release acceptance uses one release APK. A separate test application, a second application ID, Test/Production coexistence, and upgrade/co-installation checks are not mpod requirements. After all PRD scenarios and regression tests pass, release is switched to production server `5050`, assembled, and smoke-tested for login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback. With no critical defects, the APK is ready for release.
+9. Settings displays only the user-facing application version (`Current app build: <versionName>`). Android `versionCode` remains an internal monotonically increasing update number and is not shown together with environment, package, server, or backend metadata.
+10. The first bottom-navigation item is labeled `Player`, uses the updated Figma icon, and continues opening the existing Home/Now playing destination; it is not a new route or screen.
 
 There are no known unanswered product questions blocking the functional scenario audit.
 

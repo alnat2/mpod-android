@@ -74,7 +74,7 @@ class MpodAccessibilityTest {
             }
         }
 
-        composeRule.onNodeWithText("Home").assertIsSelected()
+        composeRule.onNodeWithText("Player").assertIsSelected()
         composeRule.onNodeWithText("Settings").assertIsNotSelected()
     }
 
@@ -90,7 +90,7 @@ class MpodAccessibilityTest {
             }
         }
 
-        composeRule.onNodeWithText("Home").performClick()
+        composeRule.onNodeWithText("Player").performClick()
         composeRule.onNodeWithText("Subscriptions").performClick()
         composeRule.onNodeWithText("Settings").performClick()
         composeRule.onNodeWithText("Add podcast").performClick()

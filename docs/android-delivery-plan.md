@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-27 (post-acceptance maintenance recorded)
 
-Current Android baseline: `1.0.11 (12)`; Stage 6 release acceptance completed, with subsequent owner-reviewed maintenance through `a72145b`
+Current Android source baseline: `1.0.12 (13)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
 ## Purpose
 
@@ -37,7 +37,7 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Release package | One release APK with package `com.prod.mpod`; no separate test application or APK-coexistence requirement |
 | Backend storage | Downloads remain on the mpod server, as in the web application |
 | Default authenticated route | Subscriptions |
-| Primary navigation | Home, Subscriptions, Settings, Add podcast |
+| Primary navigation | Player (existing Home/Now playing route), Subscriptions, Settings, Add podcast |
 | Theme | Follow the system by default; Settings exposes the approved Light/Dark switch behavior |
 | Active episode | Stored by the backend and restored without autoplay |
 | Mark all listened | Executes immediately, without a confirmation dialog |

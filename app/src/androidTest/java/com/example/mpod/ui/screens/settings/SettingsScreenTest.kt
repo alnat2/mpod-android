@@ -196,7 +196,7 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun settingsShowsInstalledAndBackendBuildIdentity() {
+    fun settingsShowsOnlyUserFacingVersionName() {
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
@@ -212,7 +212,8 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Current app build: 1.2.3 (42) · Test").assertIsDisplayed()
+        composeRule.onNodeWithText("Current app build: 1.2.3").assertIsDisplayed()
+        composeRule.onNodeWithText("Current app build: 1.2.3 (42) · Test").assertDoesNotExist()
         composeRule.onNodeWithText("Package: com.prod.mpod.test").assertDoesNotExist()
         composeRule.onNodeWithText("Server: 192.168.0.222:5051 · Backend: abc1234")
             .assertDoesNotExist()

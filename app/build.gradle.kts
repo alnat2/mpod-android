@@ -13,8 +13,8 @@ android {
         applicationId = "com.prod.mpod"
         minSdk = 34
         targetSdk = 36
-        val ciVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 12
-        val ciVersionName = project.findProperty("versionName")?.toString() ?: "1.0.11"
+        val ciVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 13
+        val ciVersionName = project.findProperty("versionName")?.toString() ?: "1.0.12"
 
         versionCode = ciVersionCode
         versionName = ciVersionName

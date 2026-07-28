@@ -271,8 +271,7 @@ fun SettingsScreen(
         )
 
         Text(
-            text = "Current app build: ${installedAppBuildInfo.versionName} " +
-                "(${installedAppBuildInfo.versionCode}) · ${installedAppBuildInfo.environment}",
+            text = "Current app build: ${installedAppBuildInfo.versionName}",
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,

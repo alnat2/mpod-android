@@ -1,5 +1,7 @@
-<vector android:width="20dp" android:height="20dp" android:viewportWidth="20" android:viewportHeight="20" xmlns:android="http://schemas.android.com/apk/res/android">
-  <path android:pathData="M10.833 17.0834C11.4335 17.0834 11.6672 17.0797 11.6672 17.0797C14.5142 17.0592 16.0836 16.925 17.1186 16.046C18.3402 15.0087 18.3402 13.3391 18.3402 10C18.3402 6.66089 18.3402 4.99133 17.1186 3.954C15.8971 2.91667 13.9311 2.91667 9.99901 2.91667C6.06695 2.91667 4.10092 2.91667 2.87938 3.954C1.94373 4.74856 1.72475 5.91406 1.67351 7.91667" android:strokeColor="#71717b" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
-  <path android:pathData="M2.49219 16.25H2.49968" android:strokeColor="#71717b" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
-  <path android:pathData="M1.67351 13.1124C3.75124 13.1124 5.64895 15 5.64895 17.083M8.34017 17.083C8.34017 13.3334 5.00277 10.4167 1.71119 10.4167" android:strokeColor="#71717b" android:strokeWidth="2" android:strokeLineCap="round" android:fillColor="#00000000"/>
+<vector android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28" xmlns:android="http://schemas.android.com/apk/res/android">
+  <group android:translateX="1.3333" android:translateY="3.0833">
+    <path android:pathData="M13.8235 20.8333C14.6641 20.8333 14.9912 20.8282 14.9912 20.8282C18.977 20.7995 21.1742 20.6116 22.6232 19.3811C24.3333 17.9288 24.3333 15.5914 24.3333 10.9167C24.3333 6.24191 24.3333 3.90452 22.6232 2.45226C20.913 1 18.1606 1 12.6557 1C7.15083 1 4.39838 1 2.68824 2.45226C1.37831 3.56465 1.07175 5.19635 1.00001 8" android:strokeColor="#5EA500" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+    <path android:pathData="M2.14617 19.6667H2.15664" android:strokeColor="#5EA500" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>
+    <path android:pathData="M1.00001 15.274C3.90883 15.274 6.56562 17.9167 6.56562 20.8329M10.3333 20.8329C10.3333 15.5833 5.66097 11.5 1.05276 11.5" android:strokeColor="#5EA500" android:strokeWidth="2" android:strokeLineCap="round" android:fillColor="#00000000"/>
+  </group>
 </vector>

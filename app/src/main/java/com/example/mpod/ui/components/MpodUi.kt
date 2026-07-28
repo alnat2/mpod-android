@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -417,7 +418,7 @@ fun MpodBottomNav(
     modifier: Modifier = Modifier
 ) {
     val items = listOf(
-        Triple(Screen.Home, "Home", R.drawable.ic_icon),
+        Triple(Screen.Home, "Player", R.drawable.ic_icon),
         Triple(Screen.Subscriptions, "Subscriptions", R.drawable.ic_icon_1),
         Triple(Screen.Settings, "Settings", R.drawable.ic_icon_2),
         Triple(Screen.AddPodcast, "Add podcast", R.drawable.ic_icon_3)
@@ -461,7 +462,7 @@ fun MpodBottomNav(
                             painter = painterResource(id = iconRes),
                             contentDescription = null,
                             tint = color,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.requiredSize(28.dp)
                         )
                     }
                     Spacer(modifier = Modifier.height(3.dp))
