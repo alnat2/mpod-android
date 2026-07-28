@@ -100,7 +100,7 @@ The table below records the implementation baseline accepted on 2026-07-15 and t
 
 Current automated suite:
 
-- 117 local unit tests.
+- 119 local unit tests.
 - 107 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
@@ -112,13 +112,15 @@ Current verified command set:
 ANDROID_SERIAL=emulator-5554 ./gradlew connectedDebugAndroidTest
 ```
 
+GitHub uses one release workflow on pushes to `main`/`master` and manual dispatch. It runs under JetBrains Runtime 21, executes the unit suite, compiles the Android-test APK, runs Debug/Release lint, and only then assembles and uploads the Release APK. Product version values come from `app/build.gradle.kts`; GitHub run numbers do not override `versionName` or `versionCode`. Connected device tests remain an explicit local/manual gate because the separate emulator workflow was removed by product-owner decision on 2026-07-28.
+
 Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
 
 ### Current known limitations and deferred work
 
 - `DLD-01`–`DLD-09` remain explicitly Deferred pending the planned download redesign; they are not represented as release-verified.
 - The immutable production acceptance artifact remains the APK from `67ad83f`, documented in wave 24. Current source/test baseline `a72145b` contains later owner-reviewed maintenance and must not be described using the older artifact checksum.
-- Final distribution signing credentials, TLS/network-security changes, and release packaging remain intentionally deferred. The accepted APK uses the documented Android Debug certificate and approved LAN HTTP transport.
+- Final distribution signing credentials, TLS/network-security changes, and release packaging remain intentionally deferred. The accepted APK uses the documented Android Debug certificate and approved LAN HTTP transport. Production HTTP request logging is disabled at build time; Debug retains BASIC request logging.
 - Exhaustive TalkBack, font/display scaling, and non-blocking visual/performance polish remain post-acceptance work unless a concrete functional defect is observed.
 - Backend follow-ups `BE-FU-01` and `BE-FU-02` remain recorded in the scenario map; neither is an open Android release-scope scenario.
 
@@ -361,6 +363,8 @@ Scenario wave 23 completed `REL-10` on the physical Android 15 phone against pro
 Scenario wave 24 completed `REL-12`. The exact acceptance APK was rebuilt from committed Android revision `67ad83ff3c650b830bb8b1b3d58aadaf83e7bf82`, installed over production on the physical phone, and reopened the retained authenticated library. Artifact: package `com.prod.mpod`, version `1.0.11 (12)`, min SDK 34, target SDK 36, 5,879,637 bytes, SHA-256 `a693235de4645ae925d9be9e198ea75e4865c0b249bd0b521338b97d65b60e44`, endpoint `192.168.0.222:5050`, backend baseline `ac8a679f3dd38cbd800cb535f3b7eff5bc61b312`, APK Signature Scheme v2. The Android Debug certificate remains a documented acceptance-only limitation, LAN HTTP remains the approved project transport, and all nine Download rows are explicitly Deferred pending the owner-planned redesign. The final map is 118/127 Verified and 9/127 Deferred, with no Specified, Open, or Failed rows in the current release scope.
 
 Post-acceptance maintenance on 2026-07-27 fixed defects found during product-owner review. Commit `7810855` routes podcast covers through the authenticated backend image endpoint and shared cookie-aware image loader, displays scheduler timestamps in the device time zone, and restores the approved Settings footer to only `Current app build`. Commit `a72145b` prevents unchanged Home/Subscriptions reconciliation from rebuilding and preparing the ExoPlayer queue, moves large subscription loads off the UI dispatcher, removes unnecessary primary-navigation transitions, memoizes episode filtering, and preserves loaded Home content during background reloads. The full gate passed at 117/117 unit tests, 107/107 connected tests, debug/release lint, and debug/release assembly. On Pixel 9 emulator, MediaSession remained continuously `PLAYING` with advancing position across repeated Home/Subscriptions/Settings navigation; the product owner subsequently reviewed the corrected application and reported the changes acceptable. These commits update the current source/test baseline but do not change the immutable checksum or revision recorded for the wave-24 production acceptance APK.
+
+Build maintenance on 2026-07-28 consolidated GitHub automation into one Release workflow. GitHub and local release builds now use JetBrains Runtime 21 and the checked-in `1.0.12 (13)` version instead of deriving product versions from `github.run_number`. The workflow preserves unit tests, Android-test APK compilation, Debug/Release lint, report upload, and minified Release assembly; the separate Android quality/emulator workflow was removed by product-owner decision. Production no longer constructs the OkHttp BASIC logging interceptor, while Debug retains it; focused unit tests protect both outcomes. The exact workflow commands passed locally under Android Studio JBR 21: 119/119 unit tests, Android-test APK compilation, Debug/Release lint, and minified Release assembly. Static inspection of the resulting `com.prod.mpod` APK confirmed `1.0.12 (13)`, no debuggable manifest flag, and no `HttpLoggingInterceptor` symbol after R8.
 
 Two backend follow-ups were recorded in the scenario map. One successful podcast deletion left an orphan episode row in `/api/playlist`, invisible in `/api/playback/queue`, and that row blocked the next reorder until explicit deletion. Separately, the documented 15-second completion expression treats position zero as completed for episodes no longer than 15 seconds; Android avoids an unsolicited zero-position reconciliation write, but the server/product rule still needs an explicit shared decision.
 

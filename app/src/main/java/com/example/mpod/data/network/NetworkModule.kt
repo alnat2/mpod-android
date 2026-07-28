@@ -1,6 +1,7 @@
 package com.example.mpod.data.network
 
 import android.content.Context
+import com.example.mpod.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,16 +30,13 @@ object NetworkModule {
         cookieJar: PersistentCookieJar,
         sessionExpiryInterceptor: SessionExpiryInterceptor
     ): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
-        }
         return OkHttpClient.Builder()
             .connectTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .callTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(sessionExpiryInterceptor)
-            .addInterceptor(logging)
+            .addDebugHttpLogging(BuildConfig.DEBUG)
             .cookieJar(cookieJar)
             .build()
     }
@@ -60,6 +58,16 @@ object NetworkModule {
     @Singleton
     fun provideMpodApi(retrofit: Retrofit): MpodApi {
         return retrofit.create(MpodApi::class.java)
+    }
+}
+
+internal fun OkHttpClient.Builder.addDebugHttpLogging(enabled: Boolean): OkHttpClient.Builder = apply {
+    if (enabled) {
+        addInterceptor(
+            HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BASIC
+            }
+        )
     }
 }
 

@@ -1,33 +1,60 @@
-name: Android CI Build
+name: Android release
 
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Позволяет запускать сборку вручную из интерфейса GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Verify and build release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v6
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Set up JetBrains Runtime 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: jetbrains
+          java-version: "21"
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
 
-    - name: Build Release APK
-      run: ./gradlew assembleRelease -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
+      - name: Run unit tests and compile Android tests
+        run: ./gradlew testDebugUnitTest assembleDebugAndroidTest --console=plain
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: mpod-release-apk
-        path: app/build/outputs/apk/**/*.apk
+      - name: Run Android lint
+        run: ./gradlew lintDebug lintRelease --console=plain
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --console=plain
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpod-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
