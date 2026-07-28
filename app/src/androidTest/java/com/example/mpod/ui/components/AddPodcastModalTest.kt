@@ -72,7 +72,7 @@ class AddPodcastModalTest {
         }
 
         composeRule.onNodeWithText("Import OPML File").performClick()
-        composeRule.onNodeWithText("Import OPML").performClick()
+        composeRule.onNodeWithText("Add Feed").performClick()
         composeRule.onNodeWithText("Cancel").performClick()
 
         composeRule.runOnIdle {
@@ -96,7 +96,7 @@ class AddPodcastModalTest {
         }
 
         composeRule.onNodeWithText("Import OPML File").performClick()
-        composeRule.onNodeWithText("Choose OPML file").assertIsDisplayed()
+        composeRule.onNodeWithText("Click to browse\nfrom your computer").assertIsDisplayed()
         composeRule.onNodeWithText("RSS Feed URL").performClick()
         composeRule.onNodeWithText("Paste RSS feed URL").assertIsDisplayed()
 
@@ -126,7 +126,7 @@ class AddPodcastModalTest {
         composeRule.onNodeWithText("Cancel").assertIsNotEnabled()
         composeRule.onNodeWithText("RSS Feed URL").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription("Close").assertIsNotEnabled()
-        composeRule.onNodeWithText("Choose file").assertIsNotEnabled()
+        composeRule.onNodeWithText("Browse files").assertIsNotEnabled()
     }
 
     @Test
@@ -193,7 +193,7 @@ class AddPodcastModalTest {
         composeRule.onNodeWithText("Import OPML File").performClick()
         restorationTester.emulateSavedInstanceStateRestore()
 
-        composeRule.onNodeWithText("Choose OPML file").assertIsDisplayed()
+        composeRule.onNodeWithText("Click to browse\nfrom your computer").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, imports) }
     }
 }

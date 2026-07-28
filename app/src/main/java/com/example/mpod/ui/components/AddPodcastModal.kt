@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -37,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -278,8 +278,7 @@ fun AddPodcastMobile(
             } else {
                 FileDropzone(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(232.dp),
+                        .fillMaxWidth(),
                     enabled = !isSubmitting,
                     onBrowse = onImportOpml
                 )
@@ -310,11 +309,7 @@ fun AddPodcastMobile(
                 onClick = onDismiss
             )
             MpodButton(
-                text = when {
-                    isSubmitting -> "Please wait..."
-                    mode == AddPodcastMode.RssFeedUrl -> "Add Feed"
-                    else -> "Import OPML"
-                },
+                text = if (isSubmitting) "Please wait..." else "Add Feed",
                 modifier = Modifier.weight(1f),
                 enabled = !isSubmitting,
                 onClick = if (mode == AddPodcastMode.RssFeedUrl) onAddUrl else onImportOpml
@@ -341,40 +336,23 @@ fun FileDropzone(
             .then(if (enabled) Modifier else Modifier.alpha(0.65f))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Choose OPML file",
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Icon(
-                painter = painterResource(id = R.drawable.ic_file_upload),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(80.dp)
-            )
-            Text(
-                text = "Tap to browse files on this device",
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = "Click to browse\nfrom your computer",
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
         MpodButton(
-            text = "Choose file",
+            text = "Browse files",
             primary = false,
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.primary,
             elevation = 0.dp,
             height = 36.dp,
-            modifier = Modifier.width(140.dp),
             enabled = enabled,
             onClick = onBrowse
         )
