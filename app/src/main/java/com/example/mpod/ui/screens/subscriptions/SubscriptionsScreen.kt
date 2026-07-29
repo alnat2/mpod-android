@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
@@ -20,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,9 +34,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -220,9 +223,28 @@ fun SubscriptionsScreen(
                         onViewClick = toggleVisibility
                     )
 
-                    val pagerState = rememberPagerState(pageCount = { podcasts.size })
-                    val selectedPodcast = podcasts.getOrNull(pagerState.currentPage) ?: podcasts.first()
-
+                    val loopsContinuously = podcasts.size > 1
+                    val pagerState = key(loopsContinuously) {
+                        rememberPagerState(
+                            initialPage = 0,
+                            pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
+                        )
+                    }
+                    LaunchedEffect(pagerState, podcasts.size) {
+                        if (loopsContinuously) {
+                            pagerState.scrollToPage(1)
+                            snapshotFlow { pagerState.settledPage }
+                                .collect { settledPage ->
+                                    when (settledPage) {
+                                        0 -> pagerState.scrollToPage(podcasts.size)
+                                        podcasts.size + 1 -> pagerState.scrollToPage(1)
+                                    }
+                                }
+                        }
+                    }
+                    val selectedPodcast = podcasts[
+                        podcastIndexForCarouselPage(pagerState.currentPage, podcasts.size)
+                    ]
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -231,22 +253,31 @@ fun SubscriptionsScreen(
                         val carouselWidth = maxWidth + 40.dp
                         HorizontalPager(
                             state = pagerState,
-                            key = { page -> podcasts[page].id },
+                            key = { page -> page },
                             contentPadding = PaddingValues(horizontal = 20.dp),
                             pageSize = PageSize.Fixed(maxWidth),
                             pageSpacing = 12.dp,
+                            flingBehavior = PagerDefaults.flingBehavior(
+                                state = pagerState,
+                                pagerSnapDistance = PagerSnapDistance.atMost(1)
+                            ),
                             modifier = Modifier
                                 .requiredWidth(carouselWidth)
-                                .offset(x = (-20).dp)
                                 .height(160.dp)
                                 .testTag("subscriptions_podcast_pager")
                         ) {
-                            val podcast = podcasts[it]
+                            val podcast = podcasts[podcastIndexForCarouselPage(it, podcasts.size)]
                             val isSelected = it == pagerState.currentPage
+                            val cardPosition = when (it) {
+                                pagerState.currentPage -> "selected"
+                                pagerState.currentPage - 1 -> "previous"
+                                pagerState.currentPage + 1 -> "next"
+                                else -> "page_$it"
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .testTag("subscription_podcast_card_${podcast.id}")
+                                    .testTag("subscription_podcast_card_$cardPosition")
                             ) {
                                 PodcastCard(
                                     title = podcast.title,
@@ -280,7 +311,6 @@ fun SubscriptionsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .padding(horizontal = 2.dp)
                                 .testTag("subscriptions_episode_list"),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -290,7 +320,8 @@ fun SubscriptionsScreen(
                                     summary = podcastEpisodeSummary(selectedPodcast),
                                     enabled = selectedPodcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
                                     isLoading = isMarkingAll,
-                                    onMarkAllListened = { onMarkAllListened(selectedPodcast.id) }
+                                    onMarkAllListened = { onMarkAllListened(selectedPodcast.id) },
+                                    modifier = Modifier.testTag("subscriptions_episode_header")
                                 )
                             }
                             items(selectedPodcast.episodes, key = { episode -> episode.id }) { episode ->
@@ -305,6 +336,7 @@ fun SubscriptionsScreen(
                                     isDownloading = episode.id in state.downloadingEpisodeIds,
                                     actionsEnabled = episode.id !in state.busyEpisodeIds,
                                     showDragHandle = false,
+                                    modifier = Modifier.testTag("subscription_episode_row_${episode.id}"),
                                     onAction = { action ->
                                         when (action) {
                                             EpisodeRowAction.Play -> Unit
@@ -376,6 +408,15 @@ fun SubscriptionsScreen(
                 )
             }
         }
+    }
+}
+
+private fun podcastIndexForCarouselPage(page: Int, podcastCount: Int): Int {
+    if (podcastCount == 1) return 0
+    return when (page) {
+        0 -> podcastCount - 1
+        podcastCount + 1 -> 0
+        else -> page - 1
     }
 }
 

@@ -1,5 +1,7 @@
 package com.example.mpod.ui.screens.subscriptions
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,8 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeLeft
-import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipe
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Rule
 import org.junit.Assert.assertEquals
@@ -26,7 +27,7 @@ class SubscriptionsScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun carouselShowsEdgeOfNextPodcastWithoutShrinkingSelectedCard() {
+    fun carouselShowsBothNeighborsAndAlignsEpisodesWithSelectedCard() {
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(state = populatedState())
@@ -36,19 +37,35 @@ class SubscriptionsScreenTest {
         val pagerBounds = composeRule.onNodeWithTag("subscriptions_podcast_pager")
             .fetchSemanticsNode()
             .boundsInRoot
-        val selectedCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_1")
+        val selectedCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_selected")
             .fetchSemanticsNode()
             .boundsInRoot
-        val nextCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_2")
+        val previousCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_previous")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val nextCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_next")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val episodeHeaderBounds = composeRule.onNodeWithTag("subscriptions_episode_header")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val episodeRowBounds = composeRule.onNodeWithTag("subscription_episode_row_1")
             .fetchSemanticsNode()
             .boundsInRoot
 
         val leftInset = selectedCardBounds.left - pagerBounds.left
         val rightInset = pagerBounds.right - selectedCardBounds.right
+        assertEquals(0f, pagerBounds.left, 1f)
         assertTrue(leftInset > 0f)
         assertEquals(leftInset, rightInset, 1f)
+        assertTrue(previousCardBounds.right > pagerBounds.left)
+        assertTrue(previousCardBounds.width > 0f)
         assertTrue(nextCardBounds.left < pagerBounds.right)
         assertTrue(nextCardBounds.width > 0f)
+        assertEquals(selectedCardBounds.left, episodeHeaderBounds.left, 1f)
+        assertEquals(selectedCardBounds.right, episodeHeaderBounds.right, 1f)
+        assertEquals(selectedCardBounds.left, episodeRowBounds.left, 1f)
+        assertEquals(selectedCardBounds.right, episodeRowBounds.right, 1f)
         composeRule.onAllNodesWithText("Unsubscribe").assertCountEquals(1)
     }
 
@@ -63,17 +80,46 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithText("First episode").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("First podcast fallback cover").assertIsDisplayed()
 
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Second episode").assertIsDisplayed()
         composeRule.onAllNodesWithText("First episode").assertCountEquals(0)
 
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeRight() }
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToPreviousPodcast()
+        }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("First episode").assertIsDisplayed()
         composeRule.onAllNodesWithText("Second episode").assertCountEquals(0)
+    }
+
+    @Test
+    fun swipingBackwardFromFirstPodcastWrapsToLastAndCanReturn() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(state = populatedState())
+            }
+        }
+
+        composeRule.onNodeWithText("First episode").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToPreviousPodcast()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Second episode").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("First episode").assertIsDisplayed()
     }
 
     @Test
@@ -86,7 +132,9 @@ class SubscriptionsScreenTest {
 
         composeRule.onAllNodesWithContentDescription("Drag").assertCountEquals(0)
 
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithContentDescription("Drag").assertCountEquals(0)
@@ -237,7 +285,9 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithText(
             "Episodes could not be loaded. Use Refresh on the podcast card to try again."
         ).assertIsDisplayed()
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Healthy episode").assertIsDisplayed()
     }
@@ -253,7 +303,9 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithText("Refreshing").assertIsDisplayed()
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput { swipeLeft() }
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Refresh").assertIsDisplayed()
     }
@@ -460,6 +512,22 @@ class SubscriptionsScreenTest {
                 podcast(id = 1, title = "First podcast", episodeTitle = "First episode"),
                 podcast(id = 2, title = "Second podcast", episodeTitle = "Second episode")
             )
+        )
+    }
+
+    private fun TouchInjectionScope.swipeToNextPodcast() {
+        swipe(
+            start = Offset(width * 0.8f, height / 2f),
+            end = Offset(width * 0.2f, height / 2f),
+            durationMillis = 600L
+        )
+    }
+
+    private fun TouchInjectionScope.swipeToPreviousPodcast() {
+        swipe(
+            start = Offset(width * 0.2f, height / 2f),
+            end = Offset(width * 0.8f, height / 2f),
+            durationMillis = 600L
         )
     }
 
