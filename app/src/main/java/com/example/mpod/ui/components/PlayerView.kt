@@ -61,10 +61,9 @@ fun PlayerView(
     val displayedProgress = draggedProgress ?: progress.coerceIn(0f, 1f)
 
     if (showSpeedSheet) {
-        ModalBottomSheet(
+        MpodBottomSheet(
             onDismissRequest = { showSpeedSheet = false },
-            sheetState = speedSheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+            sheetState = speedSheetState
         ) {
             Column(
                 modifier = Modifier
