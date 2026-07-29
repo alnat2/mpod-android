@@ -256,7 +256,7 @@ fun PlayerView(
                         ),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(if (isPlaying) 22.dp else 21.dp, 22.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
@@ -264,7 +264,6 @@ fun PlayerView(
                     icon = R.drawable.ic_huge_forward_02_wide,
                     label = "-15",
                     contentDescription = "Rewind 15 seconds",
-                    iconModifier = Modifier.rotate(180f),
                     onClick = onSeekBackward
                 )
 
@@ -272,6 +271,7 @@ fun PlayerView(
                     icon = R.drawable.ic_huge_forward_02_wide,
                     label = "+30",
                     contentDescription = "Forward 30 seconds",
+                    iconModifier = Modifier.rotate(180f),
                     onClick = onSeekForward
                 )
             }
