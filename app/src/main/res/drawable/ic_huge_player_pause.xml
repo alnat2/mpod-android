@@ -1,0 +1,17 @@
+<!-- Hugeicons PauseIcon with its intrinsic 16x16 glyph normalized to the player 21x22 visual size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="21dp"
+    android:height="22dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M1,4C1,2.58579 1,1.87868 1.43934,1.43934C1.87868,1 2.58579,1 4,1C5.41421,1 6.12132,1 6.56066,1.43934C7,1.87868 7,2.58579 7,4V14C7,15.4142 7,16.1213 6.56066,16.5607C6.12132,17 5.41421,17 4,17C2.58579,17 1.87868,17 1.43934,16.5607C1,16.1213 1,15.4142 1,14V4Z"
+        android:strokeColor="#FFF7FEE7"
+        android:strokeWidth="1.63636" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M11,4C11,2.58579 11,1.87868 11.4393,1.43934C11.8787,1 12.5858,1 14,1C15.4142,1 16.1213,1 16.5607,1.43934C17,1.87868 17,2.58579 17,4V14C17,15.4142 17,16.1213 16.5607,16.5607C16.1213,17 15.4142,17 14,17C12.5858,17 11.8787,17 11.4393,16.5607C11,16.1213 11,15.4142 11,14V4Z"
+        android:strokeColor="#FFF7FEE7"
+        android:strokeWidth="1.63636" />
+</vector>

@@ -265,7 +265,7 @@ fun PlayerView(
                             Icon(
                                 painter = painterResource(
                                     id = if (isPlaying) {
-                                        R.drawable.ic_huge_pause
+                                        R.drawable.ic_huge_player_pause
                                     } else {
                                         R.drawable.ic_huge_player_play
                                     }
