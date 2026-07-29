@@ -13,11 +13,8 @@ android {
         applicationId = "com.prod.mpod"
         minSdk = 34
         targetSdk = 36
-        val ciVersionCode = project.findProperty("versionCode")?.toString()?.toIntOrNull() ?: 13
-        val ciVersionName = project.findProperty("versionName")?.toString() ?: "1.0.12"
-
-        versionCode = ciVersionCode
-        versionName = ciVersionName
+        versionCode = 14
+        versionName = "1.0.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
