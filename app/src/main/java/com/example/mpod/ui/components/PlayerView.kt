@@ -95,7 +95,7 @@ fun PlayerView(
         }
     }
 
-    // Figma component version 2: 320x285, border 1dp, radius 16dp, shadow-xs.
+    // Figma component version 2: content-height card, border 1dp, radius 16dp, shadow-xs.
     OutlinedCard(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -103,7 +103,6 @@ fun PlayerView(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 285.dp)
             .figmaDropShadow(radius = 16.dp)
     ) {
         Column(
@@ -147,159 +146,178 @@ fun PlayerView(
                 )
             }
 
-            // Progress group: time is above the seek bar in component version 2.
+            // Figma content structure: progress/actions group (8dp), then notes (12dp).
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = elapsedLabel,
-                        fontFamily = InterFontFamily,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = durationLabel,
-                        fontFamily = InterFontFamily,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(16.dp)
-                        .testTag("player_seek_bar")
-                        .semantics {
-                            contentDescription = "Playback position"
-                            progressBarRangeInfo = ProgressBarRangeInfo(
-                                current = displayedProgress,
-                                range = 0f..1f
-                            )
-                            setProgress { targetProgress ->
-                                onSeekTo(targetProgress.coerceIn(0f, 1f))
-                                true
-                            }
-                        }
-                        .pointerInput(onSeekTo) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                var targetProgress =
-                                    (down.position.x / size.width).coerceIn(0f, 1f)
-                                draggedProgress = targetProgress
-
-                                do {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == down.id }
-                                        ?: break
-                                    targetProgress =
-                                        (change.position.x / size.width).coerceIn(0f, 1f)
-                                    draggedProgress = targetProgress
-                                    change.consume()
-                                } while (change.pressed)
-
-                                draggedProgress = null
-                                onSeekTo(targetProgress)
-                            }
-                        }
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(displayedProgress)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                }
-            }
-
-            // Component version 2 order: speed, play, rewind 15, forward 30.
-            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                PlayerLabelControl(
-                    icon = R.drawable.ic_huge_gauge,
-                    label = speedLabel,
-                    contentDescription = "Playback speed ${speedLabel}x",
-                    onClick = { showSpeedSheet = true }
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Progress group: 18dp time row, 8dp gap, 16dp bar, 8dp bottom padding.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(18.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = elapsedLabel,
+                                fontFamily = InterFontFamily,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = durationLabel,
+                                fontFamily = InterFontFamily,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .shadow(
-                            elevation = 4.dp,
-                            shape = CircleShape,
-                            ambientColor = Color(0x1A000000),
-                            spotColor = Color(0x1A000000)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(16.dp)
+                                .testTag("player_seek_bar")
+                                .semantics {
+                                    contentDescription = "Playback position"
+                                    progressBarRangeInfo = ProgressBarRangeInfo(
+                                        current = displayedProgress,
+                                        range = 0f..1f
+                                    )
+                                    setProgress { targetProgress ->
+                                        onSeekTo(targetProgress.coerceIn(0f, 1f))
+                                        true
+                                    }
+                                }
+                                .pointerInput(onSeekTo) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        var targetProgress =
+                                            (down.position.x / size.width).coerceIn(0f, 1f)
+                                        draggedProgress = targetProgress
+
+                                        do {
+                                            val event = awaitPointerEvent()
+                                            val change = event.changes.firstOrNull { it.id == down.id }
+                                                ?: break
+                                            targetProgress =
+                                                (change.position.x / size.width).coerceIn(0f, 1f)
+                                            draggedProgress = targetProgress
+                                            change.consume()
+                                        } while (change.pressed)
+
+                                        draggedProgress = null
+                                        onSeekTo(targetProgress)
+                                    }
+                                }
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(displayedProgress)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                            )
+                        }
+                    }
+
+                    // Component version 2 order: speed, play, rewind 15, forward 30.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_gauge,
+                            label = speedLabel,
+                            contentDescription = "Playback speed ${speedLabel}x",
+                            onClick = { showSpeedSheet = true }
                         )
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
-                        .clickable(role = Role.Button, onClick = onPlayClick)
+
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .shadow(
+                                    elevation = 4.dp,
+                                    shape = CircleShape,
+                                    ambientColor = Color(0x1A000000),
+                                    spotColor = Color(0x1A000000)
+                                )
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
+                                .clickable(role = Role.Button, onClick = onPlayClick)
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isPlaying) {
+                                        R.drawable.ic_huge_pause
+                                    } else {
+                                        R.drawable.ic_huge_player_play
+                                    }
+                                ),
+                                contentDescription = null,
+                                tint = Color(0xFFF7FEE7),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_forward_02_wide,
+                            label = "-15",
+                            contentDescription = "Rewind 15 seconds",
+                            onClick = onSeekBackward
+                        )
+
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_forward_02_wide,
+                            label = "+30",
+                            contentDescription = "Forward 30 seconds",
+                            iconModifier = Modifier.rotate(180f),
+                            onClick = onSeekForward
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = "Show notes"
+                            role = Role.Button
+                        }
+                        .clickable(role = Role.Button, onClick = onNotesClick),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        painter = painterResource(
-                            id = if (isPlaying) R.drawable.ic_huge_pause else R.drawable.ic_huge_play
-                        ),
+                        painter = painterResource(id = R.drawable.ic_huge_note),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Show notes",
+                        fontFamily = InterFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                PlayerLabelControl(
-                    icon = R.drawable.ic_huge_forward_02_wide,
-                    label = "-15",
-                    contentDescription = "Rewind 15 seconds",
-                    onClick = onSeekBackward
-                )
-
-                PlayerLabelControl(
-                    icon = R.drawable.ic_huge_forward_02_wide,
-                    label = "+30",
-                    contentDescription = "Forward 30 seconds",
-                    iconModifier = Modifier.rotate(180f),
-                    onClick = onSeekForward
-                )
-            }
-
-            Row(
-                modifier = Modifier
-                    .semantics {
-                        contentDescription = "Show notes"
-                        role = Role.Button
-                    }
-                    .clickable(role = Role.Button, onClick = onNotesClick),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_huge_note),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = "Show notes",
-                    fontFamily = InterFontFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

@@ -1,0 +1,13 @@
+<!-- Exact Android Vector conversion of the Hugeicons Play export in Figma node 1000:6577. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="21dp"
+    android:height="22dp"
+    android:viewportWidth="21"
+    android:viewportHeight="22">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M19.8515,12.1279C19.3718,13.9186 17.1048,15.184 12.5707,17.7147C8.1875,20.1612 5.99592,21.3844 4.22977,20.8927C3.49959,20.6895 2.8343,20.3034 2.29776,19.7715C1,18.4852 1,15.9901 1,11C1,6.00983 1,3.51477 2.29776,2.2284C2.8343,1.69656 3.49959,1.31048 4.22977,1.10719C5.99592,0.615499 8.1875,1.83873 12.5707,4.2852C17.1048,6.81593 19.3718,8.08129 19.8515,9.87201C20.0495,10.6111 20.0495,11.3888 19.8515,12.1279Z"
+        android:strokeColor="#FFF7FEE7"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+</vector>
