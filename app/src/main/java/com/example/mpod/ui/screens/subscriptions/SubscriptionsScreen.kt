@@ -410,7 +410,7 @@ private fun SubscriptionsEmptyState(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_podcast_empty),
+                    painter = painterResource(R.drawable.ic_huge_podcast),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurface
@@ -563,9 +563,9 @@ internal enum class SubscriptionVisibility {
 
 internal fun visibilityIconRes(visibility: SubscriptionVisibility): Int {
     return if (visibility == SubscriptionVisibility.All) {
-        R.drawable.ic_view_off
+        R.drawable.ic_huge_view_off
     } else {
-        R.drawable.ic_view
+        R.drawable.ic_huge_view
     }
 }
 

@@ -78,7 +78,7 @@ fun AuthCardMobile(
                 value = password,
                 onValueChange = onPasswordChange,
                 placeholder = passwordPlaceholder,
-                trailingIconRes = if (passwordVisible) R.drawable.ic_view else R.drawable.ic_view_off,
+                trailingIconRes = if (passwordVisible) R.drawable.ic_huge_view else R.drawable.ic_huge_view_off,
                 trailingIconContentDescription = if (passwordVisible) "Hide password" else "Show password",
                 onTrailingIconClick = { passwordVisible = !passwordVisible },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

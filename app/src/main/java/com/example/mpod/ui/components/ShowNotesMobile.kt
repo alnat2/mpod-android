@@ -112,7 +112,7 @@ fun ShowNotesMobile(
                 )
             }
             SquareIconButton(
-                iconRes = R.drawable.ic_multiplication_sign,
+                iconRes = R.drawable.ic_huge_multiplication_sign,
                 contentDescription = "Close show notes",
                 size = 36.dp,
                 iconSize = 16.dp,

@@ -1,3 +1,4 @@
+<!-- Hugeicons: RssIcon -->
 <vector android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28" xmlns:android="http://schemas.android.com/apk/res/android">
   <group android:translateX="1.3333" android:translateY="3.0833">
     <path android:pathData="M13.8235 20.8333C14.6641 20.8333 14.9912 20.8282 14.9912 20.8282C18.977 20.7995 21.1742 20.6116 22.6232 19.3811C24.3333 17.9288 24.3333 15.5914 24.3333 10.9167C24.3333 6.24191 24.3333 3.90452 22.6232 2.45226C20.913 1 18.1606 1 12.6557 1C7.15083 1 4.39838 1 2.68824 2.45226C1.37831 3.56465 1.07175 5.19635 1.00001 8" android:strokeColor="#5EA500" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000"/>

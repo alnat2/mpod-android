@@ -257,7 +257,7 @@ private fun MobileComponentCatalog() {
         value = "",
         onValueChange = {},
         placeholder = "Create a password",
-        trailingIconRes = com.example.mpod.R.drawable.ic_view,
+        trailingIconRes = com.example.mpod.R.drawable.ic_huge_view,
         trailingIconContentDescription = "Show password"
     )
 

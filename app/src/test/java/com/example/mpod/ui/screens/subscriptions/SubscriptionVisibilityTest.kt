@@ -8,8 +8,8 @@ import org.junit.Test
 class SubscriptionVisibilityTest {
     @Test
     fun visibilityModeUsesMatchingViewIcon() {
-        assertEquals(R.drawable.ic_view, visibilityIconRes(SubscriptionVisibility.Unlistened))
-        assertEquals(R.drawable.ic_view_off, visibilityIconRes(SubscriptionVisibility.All))
+        assertEquals(R.drawable.ic_huge_view, visibilityIconRes(SubscriptionVisibility.Unlistened))
+        assertEquals(R.drawable.ic_huge_view_off, visibilityIconRes(SubscriptionVisibility.All))
     }
 
     @Test

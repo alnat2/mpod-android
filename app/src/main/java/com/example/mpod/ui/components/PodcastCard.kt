@@ -141,7 +141,7 @@ fun PodcastCard(
                 text = if (isRefreshing) "Refreshing" else "Refresh",
                 primary = false,
                 outlined = true,
-                iconRes = R.drawable.ic_refresh_dot,
+                iconRes = R.drawable.ic_huge_refresh_dot,
                 iconRotating = isRefreshing,
                 containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -279,7 +279,7 @@ fun RefreshButtonLabel() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.ic_refresh_dot),
+            painter = painterResource(id = R.drawable.ic_huge_refresh_dot),
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onBackground

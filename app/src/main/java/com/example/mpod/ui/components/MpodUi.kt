@@ -70,7 +70,7 @@ fun PageHeader(
     onRefreshClick: (() -> Unit)? = null,
     isRefreshing: Boolean = false,
     viewActionDescription: String = "View",
-    viewIconRes: Int = R.drawable.ic_view,
+    viewIconRes: Int = R.drawable.ic_huge_view,
     onViewClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -106,7 +106,7 @@ fun PageHeader(
         if (showActions) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SquareIconButton(
-                    iconRes = R.drawable.ic_refresh_dot,
+                    iconRes = R.drawable.ic_huge_refresh_dot,
                     contentDescription = "Refresh",
                     iconRotating = isRefreshing,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -418,10 +418,10 @@ fun MpodBottomNav(
     modifier: Modifier = Modifier
 ) {
     val items = listOf(
-        Triple(Screen.Home, "Player", R.drawable.ic_icon),
-        Triple(Screen.Subscriptions, "Subscriptions", R.drawable.ic_icon_1),
-        Triple(Screen.Settings, "Settings", R.drawable.ic_icon_2),
-        Triple(Screen.AddPodcast, "Add podcast", R.drawable.ic_icon_3)
+        Triple(Screen.Home, "Player", R.drawable.ic_huge_playlist_02),
+        Triple(Screen.Subscriptions, "Subscriptions", R.drawable.ic_huge_rss),
+        Triple(Screen.Settings, "Settings", R.drawable.ic_huge_settings_05),
+        Triple(Screen.AddPodcast, "Add podcast", R.drawable.ic_huge_plus_sign_square)
     )
 
     Column(

@@ -33,7 +33,7 @@ class MpodAccessibilityTest {
             MpodTheme {
                 Column(modifier = androidx.compose.ui.Modifier.width(360.dp)) {
                     SquareIconButton(
-                        iconRes = com.example.mpod.R.drawable.ic_refresh_dot,
+                        iconRes = com.example.mpod.R.drawable.ic_huge_refresh_dot,
                         contentDescription = "Refresh subscriptions",
                         onClick = {}
                     )

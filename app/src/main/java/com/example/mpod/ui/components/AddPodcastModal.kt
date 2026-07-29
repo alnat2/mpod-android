@@ -203,7 +203,7 @@ fun AddPodcastMobile(
                 overflow = TextOverflow.Ellipsis
             )
             Icon(
-                painter = painterResource(id = R.drawable.ic_multiplication_sign),
+                painter = painterResource(id = R.drawable.ic_huge_multiplication_sign),
                 contentDescription = "Close",
                 tint = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier

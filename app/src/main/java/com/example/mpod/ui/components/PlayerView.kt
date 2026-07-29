@@ -230,7 +230,7 @@ fun PlayerView(
                 verticalAlignment = Alignment.Bottom
             ) {
                 PlayerLabelControl(
-                    icon = R.drawable.ic_player_speed,
+                    icon = R.drawable.ic_huge_gauge,
                     label = speedLabel,
                     contentDescription = "Playback speed ${speedLabel}x",
                     onClick = { showSpeedSheet = true }
@@ -252,7 +252,7 @@ fun PlayerView(
                 ) {
                     Icon(
                         painter = painterResource(
-                            id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_player_play
+                            id = if (isPlaying) R.drawable.ic_huge_pause else R.drawable.ic_huge_play
                         ),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
@@ -261,7 +261,7 @@ fun PlayerView(
                 }
 
                 PlayerLabelControl(
-                    icon = R.drawable.ic_player_skip,
+                    icon = R.drawable.ic_huge_forward_02_wide,
                     label = "-15",
                     contentDescription = "Rewind 15 seconds",
                     iconModifier = Modifier.rotate(180f),
@@ -269,7 +269,7 @@ fun PlayerView(
                 )
 
                 PlayerLabelControl(
-                    icon = R.drawable.ic_player_skip,
+                    icon = R.drawable.ic_huge_forward_02_wide,
                     label = "+30",
                     contentDescription = "Forward 30 seconds",
                     onClick = onSeekForward
@@ -287,7 +287,7 @@ fun PlayerView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_player_note),
+                    painter = painterResource(id = R.drawable.ic_huge_note),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)

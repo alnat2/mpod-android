@@ -120,7 +120,7 @@ fun EpisodeRow(
     ) {
         if (showDragHandle) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_drag),
+                painter = painterResource(id = R.drawable.ic_huge_drag_drop_vertical),
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

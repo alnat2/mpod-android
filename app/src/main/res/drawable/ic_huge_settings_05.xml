@@ -1,3 +1,4 @@
+<!-- Hugeicons: Settings05Icon -->
 <vector android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28" xmlns:android="http://schemas.android.com/apk/res/android">
   <group android:translateX="1.9167" android:translateY="1.9167">
     <path android:pathData="M1 12.0833C1 6.8586 1 4.24623 2.62312 2.62312C4.24623 1 6.8586 1 12.0833 1C17.3081 1 19.9204 1 21.5436 2.62312C23.1667 4.24623 23.1667 6.8586 23.1667 12.0833C23.1667 17.3081 23.1667 19.9204 21.5436 21.5436C19.9204 23.1667 17.3081 23.1667 12.0833 23.1667C6.8586 23.1667 4.24623 23.1667 2.62312 21.5436C1 19.9204 1 17.3081 1 12.0833Z" android:strokeColor="#71717B" android:strokeWidth="2" android:strokeLineJoin="round" android:fillColor="#00000000"/>

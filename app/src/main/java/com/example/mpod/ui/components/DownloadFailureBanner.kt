@@ -47,7 +47,7 @@ fun DownloadFailureBanner(
             modifier = Modifier.weight(1f)
         )
         Icon(
-            painter = painterResource(R.drawable.ic_multiplication_sign),
+            painter = painterResource(R.drawable.ic_huge_multiplication_sign),
             contentDescription = "Dismiss download error",
             tint = destructive,
             modifier = Modifier
