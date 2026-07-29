@@ -5,6 +5,18 @@ import org.junit.Test
 
 class UiFormattersTest {
     @Test
+    fun remainingTimeSubtractsElapsedPositionAndClampsAtZero() {
+        assertEquals(
+            "30:49",
+            formatRemainingTime(
+                durationSeconds = 54 * 60 + 3,
+                positionSeconds = 23 * 60 + 14
+            )
+        )
+        assertEquals("0:00", formatRemainingTime(durationSeconds = 60, positionSeconds = 75))
+    }
+
+    @Test
     fun cleanFeedTextRemovesTagsAndDecodesCommonEntities() {
         assertEquals(
             "Planet Money & The Indicator: what's next?",

@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## Purpose
 
@@ -159,7 +159,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | PLY-05 | Seek backward by less than the backend acceptance threshold | UI and subsequent reload reconcile to the documented backend rule instead of making a false persistence claim | C,E | Verified |
 | PLY-06 | Change playback speed | Each supported value 0.5/0.75/1/1.3/1.5/2 takes effect and persists through backend settings | C,U,E | Verified |
 | PLY-07 | Relaunch with a saved playback speed | Confirmed speed is restored before playback; pending newer local value is not overwritten | C,E,L | Verified |
-| PLY-08 | Play continuously | Progress syncs periodically without flooding or moving backward unexpectedly | C,E | Verified |
+| PLY-08 | Play continuously | The left player label shows increasing elapsed time, the right label shows decreasing remaining time as `max(duration - position, 0)`, and progress syncs periodically without flooding or moving backward unexpectedly | C,U,E | Verified |
 | PLY-09 | Finish an episode naturally | Backend marks completion, cleans queue/download state, and eligible next episode starts automatically | C,E,D | Verified |
 | PLY-10 | Pause or seek inside the final 15 seconds | Position is stored as ordinary progress only; the episode remains unlistened and in the playlist because the client did not report natural completion | C,E | Verified |
 | PLY-11 | Finish the last playlist item | Completed item disappears; backend `nextEpisodeId` selects the topmost earlier unlistened item in playlist order and Android starts it at saved progress or `0:00` when playback state is absent; without a fallback the player becomes truthfully empty/non-playing | C,E | Verified |
@@ -248,6 +248,7 @@ The product owner confirmed on 2026-07-19:
 10. The first bottom-navigation item is labeled `Player`, uses the updated Figma icon, and continues opening the existing Home/Now playing destination; it is not a new route or screen.
 11. Playback completion is explicit. Ordinary progress, including a pause or seek inside the final 15 seconds or at the reported duration, never marks an episode listened and never removes it from the playlist. Android sends `completed: true` only from Media3 natural-completion events.
 12. When completion of the last playlist item returns `nextEpisodeId`, Android starts that backend-selected episode. Existing playback state is resumed; if no playback state exists, playback starts at `0:00`.
+13. Player time labels are explicit: the left label is elapsed playback position; the right label is remaining time calculated as `max(durationSeconds - positionSeconds, 0)`. The right label is not the episode's fixed total duration.
 
 There are no known unanswered product questions blocking the functional scenario audit.
 

@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-27 (post-acceptance maintenance recorded)
+Last updated: 2026-07-29 (post-acceptance maintenance recorded)
 
 Current Android source baseline: `1.0.12 (13)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
@@ -43,6 +43,7 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Mark all listened | Executes immediately, without a confirmation dialog |
 | Subscription episode playback | No separate Play action exists for episodes outside the playlist |
 | Design | Android screens and mobile components in the mpod Figma file |
+| Player time labels | Left is elapsed position; right is remaining time, clamped as `max(durationSeconds - positionSeconds, 0)` |
 
 Delivery order decision confirmed on 2026-07-16: a complete, reliable working application takes priority over visual polish and extended accessibility work. Figma fine-tuning, exhaustive font/display scaling, TalkBack review, and performance profiling do not block the working test build unless they make a core action unreadable, unreachable, or unusable.
 

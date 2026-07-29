@@ -32,6 +32,9 @@ fun formatProgressTime(seconds: Int): String {
     return "$minutes:${remainingSeconds.toString().padStart(2, '0')}"
 }
 
+fun formatRemainingTime(durationSeconds: Int, positionSeconds: Int): String =
+    formatProgressTime((durationSeconds - positionSeconds).coerceAtLeast(0))
+
 fun formatPublishedDate(value: String?): String? {
     val date = value?.take(10)?.takeIf { it.length == 10 } ?: return null
     val year = date.substring(2, 4)

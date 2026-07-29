@@ -57,6 +57,7 @@ import com.example.mpod.playback.PlaybackService
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.util.formatEpisodeDuration
 import com.example.mpod.ui.util.formatProgressTime
+import com.example.mpod.ui.util.formatRemainingTime
 import com.example.mpod.ui.util.formatTotalDuration
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -326,7 +327,10 @@ fun HomeScreen(
                             title = currentEpisode.title,
                             podcastTitle = currentEpisode.podcastTitle,
                             elapsedLabel = formatProgressTime(playbackState.positionSeconds),
-                            durationLabel = formatProgressTime(playbackState.durationSeconds),
+                            durationLabel = formatRemainingTime(
+                                durationSeconds = playbackState.durationSeconds,
+                                positionSeconds = playbackState.positionSeconds
+                            ),
                             progress = playbackState.progress,
                             isPlaying = playbackState.isPlaying,
                             speedLabel = playbackState.speedLabel,
