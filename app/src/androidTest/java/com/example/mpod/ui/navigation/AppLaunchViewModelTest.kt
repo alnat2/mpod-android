@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.mpod.data.network.AuthSessionInvalidator
 import com.example.mpod.data.network.MpodApi
+import com.example.mpod.ui.screens.subscriptions.SubscriptionsSessionCache
+import com.example.mpod.ui.screens.subscriptions.SubscriptionsUiState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -12,6 +14,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
@@ -22,12 +25,14 @@ class AppLaunchViewModelTest {
     private lateinit var server: MockWebServer
     private lateinit var api: MpodApi
     private lateinit var sessionInvalidator: AuthSessionInvalidator
+    private lateinit var subscriptionsSessionCache: SubscriptionsSessionCache
 
     @Before
     fun setUp() {
         server = MockWebServer()
         server.start()
         sessionInvalidator = AuthSessionInvalidator()
+        subscriptionsSessionCache = SubscriptionsSessionCache()
         api = Retrofit.Builder()
             .baseUrl(server.url("/"))
             .addConverterFactory(GsonConverterFactory.create())
@@ -137,9 +142,11 @@ class AppLaunchViewModelTest {
         val viewModel = viewModel()
         awaitState(viewModel, AppLaunchState.Authenticated)
 
+        subscriptionsSessionCache.write(SubscriptionsUiState())
         sessionInvalidator.invalidate()
 
         awaitState(viewModel, AppLaunchState.Unauthenticated)
+        assertNull(subscriptionsSessionCache.read())
     }
 
     @Test
@@ -166,7 +173,12 @@ class AppLaunchViewModelTest {
 
     private fun viewModel(): AppLaunchViewModel {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        return AppLaunchViewModel(context, api, sessionInvalidator)
+        return AppLaunchViewModel(
+            context = context,
+            api = api,
+            sessionInvalidator = sessionInvalidator,
+            subscriptionsSessionCache = subscriptionsSessionCache
+        )
     }
 
     private suspend fun awaitState(

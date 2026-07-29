@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-29 (post-acceptance maintenance recorded)
 
-Current Android source baseline: `1.0.13 (14)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
+Current Android source baseline: `1.0.14 (15)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
 ## Purpose
 
@@ -42,6 +42,7 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Active episode | Stored by the backend and restored without autoplay |
 | Mark all listened | Executes immediately, without a confirmation dialog |
 | Subscription episode playback | No separate Play action exists for episodes outside the playlist |
+| Subscriptions loading | First load shows a neutral loading state; later entries show the session-cached library immediately and silently reconcile with backend; a confirmed empty state is never inferred from the initial empty collection |
 | Design | Android screens and mobile components in the mpod Figma file |
 | Player time labels | Left is elapsed position; right is remaining time, clamped as `max(durationSeconds - positionSeconds, 0)` |
 
@@ -70,7 +71,7 @@ Statuses are evidence-based. `Implemented` must never be used as a synonym for `
 
 ## Historical implementation baseline
 
-The table below records the implementation baseline accepted on 2026-07-15 and the gaps that drove the later scenario waves. It is retained as history, not as the current backlog. Current release status is authoritative in `docs/android-user-scenarios.md`: 118 release-scope scenarios are Verified, nine Download scenarios are Deferred by product-owner decision, and no scenario is Specified, Open, or Failed.
+The table below records the implementation baseline accepted on 2026-07-15 and the gaps that drove the later scenario waves. It is retained as history, not as the current backlog. Current release status is authoritative in `docs/android-user-scenarios.md`: 119 release-scope scenarios are Verified, nine Download scenarios are Deferred by product-owner decision, and no scenario is Specified, Open, or Failed.
 
 | Area | Current status | Existing evidence | Remaining work before release |
 |---|---|---|---|
@@ -103,8 +104,8 @@ The table below records the implementation baseline accepted on 2026-07-15 and t
 
 Current automated suite:
 
-- 119 local unit tests.
-- 107 connected Android/Compose UI/configuration tests.
+- 122 local unit tests.
+- 109 connected Android/Compose UI/configuration tests.
 - Debug and release Android lint.
 - Debug app, Android-test APK, and minified release APK assembly.
 
@@ -123,7 +124,7 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - Every production APK installed for product-owner testing or handed off as a new build receives a new patch `versionName`.
 - `versionCode` increases by exactly one for every such build and is never reused, even when the preceding APK was not publicly released.
 - A version bump is committed with the changes included in that APK, so an installed version can be traced to one source revision.
-- Current build: `1.0.13 (14)`.
+- Current build: `1.0.14 (15)`.
 
 Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
 
@@ -378,6 +379,8 @@ Post-acceptance maintenance on 2026-07-27 fixed defects found during product-own
 Build maintenance on 2026-07-28 consolidated GitHub automation into one Release workflow. GitHub and local release builds now use JetBrains Runtime 21 and the checked-in `1.0.12 (13)` version instead of deriving product versions from `github.run_number`. The workflow preserves unit tests, Android-test APK compilation, Debug/Release lint, report upload, and minified Release assembly; the separate Android quality/emulator workflow was removed by product-owner decision. Production no longer constructs the OkHttp BASIC logging interceptor, while Debug retains it; focused unit tests protect both outcomes. The exact workflow commands passed locally under Android Studio JBR 21: 119/119 unit tests, Android-test APK compilation, Debug/Release lint, and minified Release assembly. Static inspection of the resulting `com.prod.mpod` APK confirmed `1.0.12 (13)`, no debuggable manifest flag, and no `HttpLoggingInterceptor` symbol after R8.
 
 Playback contract maintenance on 2026-07-28 follows backend commit `6c0ce47`. Test backend `5051` was still running `e831ed9`; a direct 20/30-second `completed:false` probe reproduced the obsolete automatic completion, so only the test container was rebuilt to `6c0ce47` and production `5050` was not touched. The repeated direct probe and Pixel 9 E2E retained near-end progress without listened/playlist side effects. Last-item completion selected the backend fallback from zero when no state existed. A saved-position case exposed that Android forced preferred completion targets to zero; target resolution now restores backend playback state, and the repeated fixture opened at exactly `2:00`. The same pass fixed Play/Pause during buffering by using `playWhenReady` as the playback intent, and removed all remaining client-side 15-second reconciliation logic. Full gate: 121/121 unit tests, 107/107 connected tests, Debug/Release lint, and minified Release assembly.
+
+Subscriptions continuity maintenance on 2026-07-29 implements an in-memory, authenticated-session-scoped stale-while-revalidate policy. A cold load renders `Loading subscriptions` and cannot briefly claim `No podcasts`; after the first authoritative response, revisiting or recreating the screen renders the cached podcast/episode content immediately while reconciliation runs silently. A background refresh failure keeps that content usable and exposes the scoped error, while logout, successful login/register, and global session expiry clear the cache so data cannot cross sessions. Two focused ViewModel regressions cover recreation and refresh failure, the session-expiry regression covers cache clearing, and a real Pixel 9 emulator pass with a two-second network delay verified both the cold loading frame and cached Settings → Subscriptions return without an empty-library frame. The full 122/122 unit and 109/109 connected gates, Debug/Release lint, and minified Release assembly passed.
 
 One backend follow-up remains recorded in the scenario map: a successful podcast deletion left an orphan episode row in `/api/playlist`, invisible in `/api/playback/queue`, and that row blocked the next reorder until explicit deletion. The former completion-threshold follow-up `BE-FU-02` is resolved by `6c0ce47`.
 

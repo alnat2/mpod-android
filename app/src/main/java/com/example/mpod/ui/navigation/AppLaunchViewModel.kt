@@ -8,6 +8,7 @@ import com.example.mpod.data.network.MpodApi
 import com.example.mpod.data.network.AuthSessionInvalidator
 import com.example.mpod.data.network.model.LoginRequest
 import com.example.mpod.playback.PlaybackService
+import com.example.mpod.ui.screens.subscriptions.SubscriptionsSessionCache
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ import javax.inject.Inject
 class AppLaunchViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val api: MpodApi,
-    private val sessionInvalidator: AuthSessionInvalidator
+    private val sessionInvalidator: AuthSessionInvalidator,
+    private val subscriptionsSessionCache: SubscriptionsSessionCache = SubscriptionsSessionCache()
 ) : ViewModel() {
     private val _state = MutableStateFlow<AppLaunchState>(AppLaunchState.Loading)
     val state: StateFlow<AppLaunchState> = _state.asStateFlow()
@@ -37,6 +39,7 @@ class AppLaunchViewModel @Inject constructor(
         refreshSession()
         viewModelScope.launch {
             sessionInvalidator.events.collectLatest {
+                subscriptionsSessionCache.clear()
                 context.stopService(Intent(context, PlaybackService::class.java))
                 _authUiState.value = AuthUiState()
                 _state.value = AppLaunchState.Unauthenticated
@@ -65,6 +68,7 @@ class AppLaunchViewModel @Inject constructor(
                 api.login(LoginRequest(username = username, password = password))
             }.getOrNull()
             if (response?.isSuccessful == true) {
+                subscriptionsSessionCache.clear()
                 _authUiState.value = AuthUiState()
                 _state.value = AppLaunchState.Authenticated
             } else {
@@ -83,6 +87,7 @@ class AppLaunchViewModel @Inject constructor(
                 api.register(LoginRequest(username = username, password = password))
             }.getOrNull()
             if (response?.isSuccessful == true) {
+                subscriptionsSessionCache.clear()
                 _authUiState.value = AuthUiState()
                 _state.value = AppLaunchState.Authenticated
             } else {
@@ -96,6 +101,7 @@ class AppLaunchViewModel @Inject constructor(
     fun logout() {
         if (logoutInFlight) return
         logoutInFlight = true
+        subscriptionsSessionCache.clear()
         context.stopService(Intent(context, PlaybackService::class.java))
         _state.value = AppLaunchState.Loading
         _authUiState.value = AuthUiState()

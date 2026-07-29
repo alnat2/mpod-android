@@ -149,7 +149,7 @@ fun SubscriptionsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             when {
-                state.isLoading -> {
+                state.isLoading || (!state.hasLoadedOnce && state.errorMessage == null) -> {
                     PageHeader(title = "Subscriptions")
                     SubscriptionsStatusCard(message = "Loading subscriptions")
                 }

@@ -33,9 +33,22 @@ import javax.inject.Inject
 class SubscriptionsViewModel @Inject constructor(
     private val api: MpodApi,
     private val queueInvalidator: PlaybackQueueInvalidator,
-    private val backendConfig: BackendConfig = BackendConfig()
+    private val backendConfig: BackendConfig = BackendConfig(),
+    private val sessionCache: SubscriptionsSessionCache = SubscriptionsSessionCache()
 ) : ViewModel() {
-    private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
+    private val _state = MutableStateFlow(
+        sessionCache.read()?.let { snapshot ->
+            SubscriptionsUiState(
+                hasLoadedOnce = true,
+                isRefreshing = true,
+                actionErrorMessage = snapshot.actionErrorMessage,
+                podcasts = snapshot.podcasts
+            )
+        } ?: SubscriptionsUiState(
+            hasLoadedOnce = false,
+            isLoading = true
+        )
+    )
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
     private var pendingUnsubscribeJob: Job? = null
     private var refreshInFlight = false
@@ -51,18 +64,23 @@ class SubscriptionsViewModel @Inject constructor(
             try {
                 val current = _state.value
                 _state.value = current.copy(
-                    isLoading = current.podcasts.isEmpty(),
+                    isLoading = !current.hasLoadedOnce,
+                    isRefreshing = current.hasLoadedOnce,
                     errorMessage = null,
                     actionErrorMessage = null
                 )
                 val loadResult = runCatching { loadSubscriptionsState() }
                 val nextState = loadResult.getOrElse { error ->
                     val message = error.userFacingApiMessage("Could not load subscriptions.")
-                    if (current.podcasts.isEmpty()) {
-                        SubscriptionsUiState(errorMessage = message)
+                    if (!current.hasLoadedOnce) {
+                        SubscriptionsUiState(
+                            hasLoadedOnce = false,
+                            errorMessage = message
+                        )
                     } else {
                         current.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             actionErrorMessage = message
                         )
                     }
@@ -70,6 +88,7 @@ class SubscriptionsViewModel @Inject constructor(
                 val mergedState = nextState.withTransientStateFrom(_state.value)
                 _state.value = if (loadResult.isSuccess) {
                     mergedState.copy(
+                        isRefreshing = false,
                         failedUnsubscribePodcastId = null,
                         failedMarkAllListenedPodcastId = null,
                         failedEpisodeAction = null
@@ -494,13 +513,14 @@ class SubscriptionsViewModel @Inject constructor(
         }
 
         SubscriptionsUiState(
+            hasLoadedOnce = true,
             actionErrorMessage = if (hasEpisodeLoadFailures) {
                 "Some podcast episodes could not be loaded."
             } else {
                 null
             },
             podcasts = podcastItems
-        )
+        ).also(sessionCache::write)
     }
 
     private fun PodcastDto.toSubscriptionPodcast(
@@ -552,7 +572,9 @@ internal fun EpisodeDto.subscriptionShowNotes(): String? {
 }
 
 data class SubscriptionsUiState(
+    val hasLoadedOnce: Boolean = true,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val downloadFailure: SubscriptionDownloadFailureUi? = null,

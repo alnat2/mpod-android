@@ -22,6 +22,7 @@ class SubscriptionsViewModelTest {
     private lateinit var api: MpodApi
     private lateinit var viewModel: SubscriptionsViewModel
     private lateinit var queueInvalidator: PlaybackQueueInvalidator
+    private lateinit var sessionCache: SubscriptionsSessionCache
 
     @Before
     fun setUp() {
@@ -35,7 +36,12 @@ class SubscriptionsViewModelTest {
 
         enqueueLoadedPodcast()
         queueInvalidator = PlaybackQueueInvalidator()
-        viewModel = SubscriptionsViewModel(api, queueInvalidator)
+        sessionCache = SubscriptionsSessionCache()
+        viewModel = SubscriptionsViewModel(
+            api = api,
+            queueInvalidator = queueInvalidator,
+            sessionCache = sessionCache
+        )
     }
 
     @After
@@ -69,6 +75,68 @@ class SubscriptionsViewModelTest {
             }
         }
         assertEquals("Test podcast", recovered.podcasts.single().title)
+    }
+
+    @Test
+    fun recreatedViewModelShowsCachedLibraryWhileRefreshingInBackground() = runBlocking {
+        val loaded = awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        assertEquals("Episode", loaded.podcasts.single().episodes.single().title)
+        server.enqueue(
+            MockResponse().setResponseCode(200)
+                .setHeadersDelay(300, TimeUnit.MILLISECONDS)
+                .setBody(
+                    """{"podcasts":[{"id":41,"title":"Test podcast","description":"Test","rssUrl":"https://example.com/feed.xml"}]}"""
+                )
+        )
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"items":[]}"""))
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(
+                """{"episodes":[{"id":51,"podcastId":41,"title":"Updated episode","isListened":false}]}"""
+            )
+        )
+
+        val recreated = SubscriptionsViewModel(
+            api = api,
+            queueInvalidator = PlaybackQueueInvalidator(),
+            sessionCache = sessionCache
+        )
+
+        val cached = recreated.state.value
+        assertEquals(true, cached.hasLoadedOnce)
+        assertEquals(false, cached.isLoading)
+        assertEquals(true, cached.isRefreshing)
+        assertEquals("Episode", cached.podcasts.single().episodes.single().title)
+        val refreshed = withTimeout(5_000) {
+            recreated.state.first {
+                !it.isRefreshing &&
+                    it.podcasts.singleOrNull()?.episodes?.singleOrNull()?.title == "Updated episode"
+            }
+        }
+        assertEquals("Updated episode", refreshed.podcasts.single().episodes.single().title)
+    }
+
+    @Test
+    fun backgroundRefreshFailureKeepsCachedLibraryVisible() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        server.enqueue(
+            MockResponse().setResponseCode(503).setBody(
+                """{"error":{"message":"Subscriptions unavailable"}}"""
+            )
+        )
+
+        val recreated = SubscriptionsViewModel(
+            api = api,
+            queueInvalidator = PlaybackQueueInvalidator(),
+            sessionCache = sessionCache
+        )
+        val failed = withTimeout(5_000) {
+            recreated.state.first {
+                !it.isRefreshing && it.actionErrorMessage == "Subscriptions unavailable"
+            }
+        }
+
+        assertEquals(null, failed.errorMessage)
+        assertEquals("Episode", failed.podcasts.single().episodes.single().title)
     }
 
     @Test
