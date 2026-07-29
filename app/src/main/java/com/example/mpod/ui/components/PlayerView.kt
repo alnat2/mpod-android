@@ -2,7 +2,6 @@ package com.example.mpod.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -16,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -95,7 +95,7 @@ fun PlayerView(
         }
     }
 
-    // Figma: 320x246, border 1dp, radius 16dp, shadow-xs.
+    // Figma component version 2: 320x285, border 1dp, radius 16dp, shadow-xs.
     OutlinedCard(
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
@@ -103,15 +103,14 @@ fun PlayerView(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 246.dp)
+            .heightIn(min = 285.dp)
             .figmaDropShadow(radius = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Title and Subtitle — gap 8dp
@@ -148,12 +147,33 @@ fun PlayerView(
                 )
             }
 
-            // Progress Bar group — gap 8dp
+            // Progress group: time is above the seek bar in component version 2.
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // Figma: height 16dp, muted bg, radius full
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = elapsedLabel,
+                        fontFamily = InterFontFamily,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = durationLabel,
+                        fontFamily = InterFontFamily,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -201,63 +221,21 @@ fun PlayerView(
                             .background(MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 }
-                // Figma: xs/Regular, 12sp, muted-foreground, space-between
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(elapsedLabel, fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(durationLabel, fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
             }
 
-            // Controls row — space-between, full width
+            // Component version 2 order: speed, play, rewind 15, forward 30.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Bottom
             ) {
-                // Speed button — Figma: 36dp, border 2dp primary, radius 10dp, transparent bg
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                        .semantics {
-                            contentDescription = "Playback speed ${speedLabel}x"
-                            role = Role.Button
-                        }
-                        .clickable(role = Role.Button) { showSpeedSheet = true }
-                ) {
-                    Text(
-                        text = speedLabel,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                PlayerLabelControl(
+                    icon = R.drawable.ic_player_speed,
+                    label = speedLabel,
+                    contentDescription = "Playback speed ${speedLabel}x",
+                    onClick = { showSpeedSheet = true }
+                )
 
-                // Rewind 10 — Figma: container 40dp, icon fills container
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .semantics { contentDescription = "Rewind 10 seconds" }
-                        .clickable(role = Role.Button, onClick = onSeekBackward)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_go_backward_10_sec),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-
-                // Play Button — Figma: 56dp circle, primary bg,
-                // shadow: 0px 4px 3px rgba(0,0,0,0.1) + 0px 2px 2px rgba(0,0,0,0.1)
-                // icon: 20dp
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -273,45 +251,93 @@ fun PlayerView(
                         .clickable(role = Role.Button, onClick = onPlayClick)
                 ) {
                     Icon(
-                        painter = painterResource(id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                        painter = painterResource(
+                            id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_player_play
+                        ),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(if (isPlaying) 22.dp else 21.dp, 22.dp)
                     )
                 }
 
-                // Forward 15 — Figma: container 40dp, icon fills container
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .semantics { contentDescription = "Forward 15 seconds" }
-                        .clickable(role = Role.Button, onClick = onSeekForward)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_go_forward_15_sec),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
+                PlayerLabelControl(
+                    icon = R.drawable.ic_player_skip,
+                    label = "-15",
+                    contentDescription = "Rewind 15 seconds",
+                    iconModifier = Modifier.rotate(180f),
+                    onClick = onSeekBackward
+                )
 
-                // Notes Button — Figma: container 36dp, icon fills container (30dp effective)
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .semantics { contentDescription = "Show notes" }
-                        .clickable(role = Role.Button, onClick = onNotesClick)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_note),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
+                PlayerLabelControl(
+                    icon = R.drawable.ic_player_skip,
+                    label = "+30",
+                    contentDescription = "Forward 30 seconds",
+                    onClick = onSeekForward
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .semantics {
+                        contentDescription = "Show notes"
+                        role = Role.Button
+                    }
+                    .clickable(role = Role.Button, onClick = onNotesClick),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_player_note),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Show notes",
+                    fontFamily = InterFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerLabelControl(
+    icon: Int,
+    label: String,
+    contentDescription: String,
+    iconModifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .size(56.dp)
+            .semantics {
+                this.contentDescription = contentDescription
+                role = Role.Button
+            }
+            .clickable(role = Role.Button, onClick = onClick),
+        verticalArrangement = Arrangement.Bottom,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            painter = painterResource(id = icon),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = iconModifier.height(22.dp)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

@@ -326,14 +326,14 @@ fun HomeScreen(
                             title = currentEpisode.title,
                             podcastTitle = currentEpisode.podcastTitle,
                             elapsedLabel = formatProgressTime(playbackState.positionSeconds),
-                            durationLabel = formatProgressTime(playbackState.remainingSeconds),
+                            durationLabel = formatProgressTime(playbackState.durationSeconds),
                             progress = playbackState.progress,
                             isPlaying = playbackState.isPlaying,
                             speedLabel = playbackState.speedLabel,
                             onSpeedChange = onSpeedChange,
                             onPlayClick = onPlayToggle,
-                            onSeekBackward = { onSeekBy(-10) },
-                            onSeekForward = { onSeekBy(15) },
+                            onSeekBackward = { onSeekBy(-15) },
+                            onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
                             onNotesClick = { showNotesEpisode = currentEpisode }
                         )
