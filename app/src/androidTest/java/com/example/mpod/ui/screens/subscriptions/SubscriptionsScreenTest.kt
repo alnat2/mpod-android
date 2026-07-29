@@ -93,6 +93,11 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Options for First episode").performClick()
+        composeRule.onNodeWithTag("episode_actions_sheet").assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_action_icon_playlist", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_action_icon_notes", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_action_icon_download", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_action_icon_listened", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Add to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }

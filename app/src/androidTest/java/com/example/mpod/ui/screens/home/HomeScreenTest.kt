@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -38,9 +39,15 @@ class HomeScreenTest {
             .performScrollTo()
             .performClick()
 
+        composeRule.onNodeWithTag("episode_actions_sheet").assertIsDisplayed()
         composeRule.onNodeWithTag("home_episode_play_action").assertIsDisplayed()
         composeRule.onNodeWithTag("home_episode_playlist_action").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Show notes").assertCountEquals(0)
+        composeRule.onNodeWithTag("episode_action_icon_play", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("episode_action_icon_playlist", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(
+            "episode_action_icon_notes",
+            useUnmergedTree = true
+        ).assertCountEquals(0)
         composeRule.onAllNodesWithText("Download").assertCountEquals(0)
         composeRule.onAllNodesWithText("Mark as listened").assertCountEquals(0)
         composeRule.onAllNodesWithText("Move down").assertCountEquals(0)
