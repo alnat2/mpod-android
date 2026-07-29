@@ -4,18 +4,23 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -37,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -217,29 +223,51 @@ fun SubscriptionsScreen(
                     val pagerState = rememberPagerState(pageCount = { podcasts.size })
                     val selectedPodcast = podcasts.getOrNull(pagerState.currentPage) ?: podcasts.first()
 
-                    HorizontalPager(
-                        state = pagerState,
-                        key = { page -> podcasts[page].id },
-                        pageSpacing = 4.dp,
+                    BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
-                            .testTag("subscriptions_podcast_pager")
                     ) {
-                        val podcast = podcasts[it]
-                        PodcastCard(
-                            title = podcast.title,
-                            description = podcast.description,
-                            imageUrl = podcast.imageUrl,
-                            selected = it == pagerState.currentPage,
-                            onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
-                            isRefreshing = state.isRefreshingAll || podcast.id in state.refreshingPodcastIds,
-                            isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
-                            isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
-                            unsubscribeEnabled = state.pendingUnsubscribe == null,
-                            errorMessage = podcast.errorMessage,
-                            onRefresh = { onRefreshPodcast(podcast.id) }
-                        )
+                        val carouselWidth = maxWidth + 40.dp
+                        HorizontalPager(
+                            state = pagerState,
+                            key = { page -> podcasts[page].id },
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            pageSize = PageSize.Fixed(maxWidth),
+                            pageSpacing = 12.dp,
+                            modifier = Modifier
+                                .requiredWidth(carouselWidth)
+                                .offset(x = (-20).dp)
+                                .height(160.dp)
+                                .testTag("subscriptions_podcast_pager")
+                        ) {
+                            val podcast = podcasts[it]
+                            val isSelected = it == pagerState.currentPage
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("subscription_podcast_card_${podcast.id}")
+                            ) {
+                                PodcastCard(
+                                    title = podcast.title,
+                                    description = podcast.description,
+                                    imageUrl = podcast.imageUrl,
+                                    selected = isSelected,
+                                    onUnsubscribe = { onUnsubscribePodcast(podcast.id) },
+                                    isRefreshing = state.isRefreshingAll || podcast.id in state.refreshingPodcastIds,
+                                    isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
+                                    isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
+                                    unsubscribeEnabled = state.pendingUnsubscribe == null,
+                                    errorMessage = podcast.errorMessage,
+                                    onRefresh = { onRefreshPodcast(podcast.id) },
+                                    modifier = if (isSelected) {
+                                        Modifier
+                                    } else {
+                                        Modifier.clearAndSetSemantics { }
+                                    }
+                                )
+                            }
+                        }
                     }
 
                     if (selectedPodcast.episodesUnavailable) {

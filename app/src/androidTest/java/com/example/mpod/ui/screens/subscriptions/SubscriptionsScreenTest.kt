@@ -18,11 +18,39 @@ import androidx.compose.ui.test.swipeRight
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Rule
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SubscriptionsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun carouselShowsEdgeOfNextPodcastWithoutShrinkingSelectedCard() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(state = populatedState())
+            }
+        }
+
+        val pagerBounds = composeRule.onNodeWithTag("subscriptions_podcast_pager")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val selectedCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_1")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        val nextCardBounds = composeRule.onNodeWithTag("subscription_podcast_card_2")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        val leftInset = selectedCardBounds.left - pagerBounds.left
+        val rightInset = pagerBounds.right - selectedCardBounds.right
+        assertTrue(leftInset > 0f)
+        assertEquals(leftInset, rightInset, 1f)
+        assertTrue(nextCardBounds.left < pagerBounds.right)
+        assertTrue(nextCardBounds.width > 0f)
+        composeRule.onAllNodesWithText("Unsubscribe").assertCountEquals(1)
+    }
 
     @Test
     fun swipingCarouselChangesSelectedPodcastEpisodesAndCanReturn() {
