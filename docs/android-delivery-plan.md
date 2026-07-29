@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-29 (post-acceptance maintenance recorded)
 
-Current Android source baseline: `1.0.14 (15)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
+Current Android source baseline: `1.0.15 (16)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
 ## Purpose
 
@@ -124,7 +124,7 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - Every production APK installed for product-owner testing or handed off as a new build receives a new patch `versionName`.
 - `versionCode` increases by exactly one for every such build and is never reused, even when the preceding APK was not publicly released.
 - A version bump is committed with the changes included in that APK, so an installed version can be traced to one source revision.
-- Current build: `1.0.14 (15)`.
+- Current build: `1.0.15 (16)`.
 
 Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
 
