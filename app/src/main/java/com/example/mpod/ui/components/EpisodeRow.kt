@@ -1,22 +1,16 @@
 package com.example.mpod.ui.components
 
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Notes
-import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.CheckCircleOutline
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayCircleOutline
-import androidx.compose.material.icons.outlined.PlaylistRemove
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,7 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -104,8 +98,6 @@ fun EpisodeRow(
             isListened = isListened,
             downloaded = downloaded,
             isDownloading = isDownloading,
-            canMoveUp = canMoveUp,
-            canMoveDown = canMoveDown,
             onDismiss = { menuExpanded = false },
             onAction = { action ->
                 menuExpanded = false
@@ -211,7 +203,7 @@ fun EpisodeRow(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_ellipsis_vertical),
+                painter = painterResource(id = R.drawable.ic_huge_more_vertical),
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -231,8 +223,6 @@ private fun EpisodeActionsBottomSheet(
     isListened: Boolean,
     downloaded: Boolean,
     isDownloading: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
     onDismiss: () -> Unit,
     onAction: (EpisodeRowAction) -> Unit
 ) {
@@ -275,10 +265,10 @@ private fun EpisodeActionsBottomSheet(
             if (compactPlaybackMenu) {
                 EpisodeSheetAction(
                     text = compactPlaybackActionLabel,
-                    icon = if (compactPlaybackActionLabel == "Pause") {
-                        Icons.Outlined.Pause
+                    iconRes = if (compactPlaybackActionLabel == "Pause") {
+                        R.drawable.ic_huge_pause
                     } else {
-                        Icons.Outlined.PlayCircleOutline
+                        R.drawable.ic_huge_play
                     },
                     iconTag = "episode_action_icon_play",
                     modifier = Modifier.testTag("home_episode_play_action"),
@@ -286,10 +276,10 @@ private fun EpisodeActionsBottomSheet(
                 )
                 EpisodeSheetAction(
                     text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
-                    icon = if (inPlaylist) {
-                        Icons.Outlined.PlaylistRemove
+                    iconRes = if (inPlaylist) {
+                        R.drawable.ic_huge_playlist_remove
                     } else {
-                        Icons.AutoMirrored.Outlined.PlaylistAdd
+                        R.drawable.ic_huge_playlist_add
                     },
                     iconTag = "episode_action_icon_playlist",
                     modifier = Modifier.testTag("home_episode_playlist_action"),
@@ -301,28 +291,12 @@ private fun EpisodeActionsBottomSheet(
                     }
                 )
             } else {
-                if (canMoveUp) {
-                    EpisodeSheetAction(
-                        text = "Move up",
-                        icon = Icons.Outlined.ArrowUpward,
-                        iconTag = "episode_action_icon_move_up",
-                        onClick = { onAction(EpisodeRowAction.MoveUp) }
-                    )
-                }
-                if (canMoveDown) {
-                    EpisodeSheetAction(
-                        text = "Move down",
-                        icon = Icons.Outlined.ArrowDownward,
-                        iconTag = "episode_action_icon_move_down",
-                        onClick = { onAction(EpisodeRowAction.MoveDown) }
-                    )
-                }
                 EpisodeSheetAction(
                     text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
-                    icon = if (inPlaylist) {
-                        Icons.Outlined.PlaylistRemove
+                    iconRes = if (inPlaylist) {
+                        R.drawable.ic_huge_playlist_remove
                     } else {
-                        Icons.AutoMirrored.Outlined.PlaylistAdd
+                        R.drawable.ic_huge_playlist_add
                     },
                     iconTag = "episode_action_icon_playlist",
                     onClick = {
@@ -334,7 +308,7 @@ private fun EpisodeActionsBottomSheet(
                 )
                 EpisodeSheetAction(
                     text = "Show notes",
-                    icon = Icons.AutoMirrored.Outlined.Notes,
+                    iconRes = R.drawable.ic_huge_note,
                     iconTag = "episode_action_icon_notes",
                     onClick = { onAction(EpisodeRowAction.ShowNotes) }
                 )
@@ -344,7 +318,11 @@ private fun EpisodeActionsBottomSheet(
                         downloaded -> "Downloaded"
                         else -> "Download"
                     },
-                    icon = Icons.Outlined.Download,
+                    iconRes = if (downloaded) {
+                        R.drawable.ic_huge_download_square_02
+                    } else {
+                        R.drawable.ic_huge_download_square_01
+                    },
                     iconTag = "episode_action_icon_download",
                     enabled = !downloaded && !isDownloading,
                     showProgress = isDownloading,
@@ -352,10 +330,10 @@ private fun EpisodeActionsBottomSheet(
                 )
                 EpisodeSheetAction(
                     text = if (isListened) "Mark as unlistened" else "Mark as listened",
-                    icon = if (isListened) {
-                        Icons.Outlined.RadioButtonUnchecked
+                    iconRes = if (isListened) {
+                        R.drawable.ic_huge_view_off
                     } else {
-                        Icons.Outlined.CheckCircleOutline
+                        R.drawable.ic_huge_view
                     },
                     iconTag = "episode_action_icon_listened",
                     onClick = {
@@ -373,7 +351,7 @@ private fun EpisodeActionsBottomSheet(
 @Composable
 private fun EpisodeSheetAction(
     text: String,
-    icon: ImageVector,
+    @DrawableRes iconRes: Int,
     iconTag: String,
     enabled: Boolean = true,
     showProgress: Boolean = false,
@@ -391,13 +369,10 @@ private fun EpisodeSheetAction(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (showProgress) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp
-            )
+            HugeLoadingIcon(modifier = Modifier.size(24.dp))
         } else {
             Icon(
-                imageVector = icon,
+                painter = painterResource(iconRes),
                 contentDescription = null,
                 modifier = Modifier
                     .size(24.dp)
@@ -412,4 +387,23 @@ private fun EpisodeSheetAction(
             color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+@Composable
+private fun HugeLoadingIcon(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "episode-download-loading")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing)
+        ),
+        label = "episode-download-loading-rotation"
+    )
+    Icon(
+        painter = painterResource(R.drawable.ic_huge_loading_02),
+        contentDescription = null,
+        modifier = modifier.rotate(rotation),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
