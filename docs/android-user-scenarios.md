@@ -162,7 +162,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | PLY-08 | Play continuously | Progress syncs periodically without flooding or moving backward unexpectedly | C,E | Verified |
 | PLY-09 | Finish an episode naturally | Backend marks completion, cleans queue/download state, and eligible next episode starts automatically | C,E,D | Verified |
 | PLY-10 | Pause or seek inside the final 15 seconds | Position is stored as ordinary progress only; the episode remains unlistened and in the playlist because the client did not report natural completion | C,E | Verified |
-| PLY-11 | Finish the last playlist item | Completed item disappears; backend `nextEpisodeId` selects the nearest earlier unlistened item and Android starts it at saved progress or `0:00` when playback state is absent; without a fallback the player becomes truthfully empty/non-playing | C,E | Verified |
+| PLY-11 | Finish the last playlist item | Completed item disappears; backend `nextEpisodeId` selects the topmost earlier unlistened item in playlist order and Android starts it at saved progress or `0:00` when playback state is absent; without a fallback the player becomes truthfully empty/non-playing | C,E | Verified |
 | PLY-12 | Playback progress/active/speed write fails transiently | Latest semantic state persists locally, retries with backoff, survives process restart, and clears only after success | C,E,L | Verified |
 | PLY-13 | A delayed completion retry returns after another episode starts | Retry cannot hijack the newer active playback | C,E,L | Verified |
 | PLY-14 | Audio stream fails before or during playback | Player shows a recoverable error; retry does not corrupt queue/progress | U,E,L,D | Verified |
