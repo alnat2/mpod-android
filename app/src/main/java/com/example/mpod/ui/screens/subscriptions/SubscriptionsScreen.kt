@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -329,6 +330,37 @@ fun SubscriptionsScreen(
                                 key = { episode -> episode.id },
                                 contentType = { "episode_row" }
                             ) { episode ->
+                                val latestSelectedPodcast = rememberUpdatedState(selectedPodcast)
+                                val latestEpisode = rememberUpdatedState(episode)
+                                val latestOnAddEpisodeToPlaylist = rememberUpdatedState(onAddEpisodeToPlaylist)
+                                val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
+                                val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
+                                val latestOnDownloadEpisode = rememberUpdatedState(onDownloadEpisode)
+                                val rowAction = remember(episode.id) {
+                                    { action: EpisodeRowAction ->
+                                        when (action) {
+                                            EpisodeRowAction.Play -> Unit
+                                            EpisodeRowAction.AddToPlaylist -> {
+                                                latestOnAddEpisodeToPlaylist.value(episode.id)
+                                            }
+                                            EpisodeRowAction.RemoveFromPlaylist -> {
+                                                latestOnRemoveEpisodeFromPlaylist.value(episode.id)
+                                            }
+                                            EpisodeRowAction.ShowNotes -> {
+                                                showNotesEpisode = latestSelectedPodcast.value to latestEpisode.value
+                                            }
+                                            EpisodeRowAction.Download -> latestOnDownloadEpisode.value(episode.id)
+                                            EpisodeRowAction.MarkListened -> {
+                                                latestOnSetEpisodeListened.value(episode.id, true)
+                                            }
+                                            EpisodeRowAction.MarkUnlistened -> {
+                                                latestOnSetEpisodeListened.value(episode.id, false)
+                                            }
+                                            EpisodeRowAction.MoveUp -> Unit
+                                            EpisodeRowAction.MoveDown -> Unit
+                                        }
+                                    }
+                                }
                                 EpisodeRow(
                                     title = episode.title,
                                     podcastName = selectedPodcast.title,
@@ -341,19 +373,7 @@ fun SubscriptionsScreen(
                                     actionsEnabled = episode.id !in state.busyEpisodeIds,
                                     showDragHandle = false,
                                     modifier = Modifier.testTag("subscription_episode_row_${episode.id}"),
-                                    onAction = { action ->
-                                        when (action) {
-                                            EpisodeRowAction.Play -> Unit
-                                            EpisodeRowAction.AddToPlaylist -> onAddEpisodeToPlaylist(episode.id)
-                                            EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
-                                            EpisodeRowAction.ShowNotes -> showNotesEpisode = selectedPodcast to episode
-                                            EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
-                                            EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
-                                            EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
-                                            EpisodeRowAction.MoveUp -> Unit
-                                            EpisodeRowAction.MoveDown -> Unit
-                                        }
-                                    }
+                                    onAction = rowAction
                                 )
                             }
                         }

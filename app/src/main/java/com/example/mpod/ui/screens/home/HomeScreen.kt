@@ -349,6 +349,10 @@ fun HomeScreen(
                     }
 
                     item {
+                        val latestPlayerEpisode = rememberUpdatedState(currentEpisode)
+                        val playerNotesClick = remember {
+                            { showNotesEpisode = latestPlayerEpisode.value }
+                        }
                         HomePlayerCard(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -360,7 +364,7 @@ fun HomeScreen(
                             onSeekBackward = { onSeekBy(-15) },
                             onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
-                            onNotesClick = { showNotesEpisode = currentEpisode }
+                            onNotesClick = playerNotesClick
                         )
                     }
 
@@ -377,8 +381,45 @@ fun HomeScreen(
                         contentType = { _, _ -> "episode_row" }
                     ) { index, episode ->
                         val isDragging = draggedEpisodeId == episode.id
-                        val latestOnMoveEpisode by rememberUpdatedState(onMoveEpisode)
+                        val latestEpisode = rememberUpdatedState(episode)
+                        val latestCurrentEpisodeId = rememberUpdatedState(currentEpisode.id)
+                        val latestOnPlayToggle = rememberUpdatedState(onPlayToggle)
+                        val latestOnPlayEpisode = rememberUpdatedState(onPlayEpisode)
+                        val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
+                        val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
+                        val latestOnDownloadEpisode = rememberUpdatedState(onDownloadEpisode)
+                        val latestOnMoveEpisode = rememberUpdatedState(onMoveEpisode)
                         val latestReorderStepPx by rememberUpdatedState(reorderStepPx)
+                        val rowClick = remember(episode.id) {
+                            { latestOnPlayEpisode.value(episode.id) }
+                        }
+                        val rowAction = remember(episode.id) {
+                            { action: EpisodeRowAction ->
+                                when (action) {
+                                    EpisodeRowAction.Play -> {
+                                        if (episode.id == latestCurrentEpisodeId.value) {
+                                            latestOnPlayToggle.value()
+                                        } else {
+                                            latestOnPlayEpisode.value(episode.id)
+                                        }
+                                    }
+                                    EpisodeRowAction.AddToPlaylist -> Unit
+                                    EpisodeRowAction.RemoveFromPlaylist -> {
+                                        latestOnRemoveEpisodeFromPlaylist.value(episode.id)
+                                    }
+                                    EpisodeRowAction.ShowNotes -> showNotesEpisode = latestEpisode.value
+                                    EpisodeRowAction.Download -> latestOnDownloadEpisode.value(episode.id)
+                                    EpisodeRowAction.MarkListened -> {
+                                        latestOnSetEpisodeListened.value(episode.id, true)
+                                    }
+                                    EpisodeRowAction.MarkUnlistened -> {
+                                        latestOnSetEpisodeListened.value(episode.id, false)
+                                    }
+                                    EpisodeRowAction.MoveUp -> latestOnMoveEpisode.value(episode.id, -1)
+                                    EpisodeRowAction.MoveDown -> latestOnMoveEpisode.value(episode.id, 1)
+                                }
+                            }
+                        }
                         EpisodeRow(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
@@ -432,7 +473,7 @@ fun HomeScreen(
                                                     dragAccumulatorPx += dragAmount.y
                                                     if (abs(dragAccumulatorPx) >= latestReorderStepPx) {
                                                         val offset = if (dragAccumulatorPx < 0f) -1 else 1
-                                                        latestOnMoveEpisode(episode.id, offset)
+                                                        latestOnMoveEpisode.value(episode.id, offset)
                                                         dragAccumulatorPx -= latestReorderStepPx * offset
                                                     }
                                                 }
@@ -440,23 +481,8 @@ fun HomeScreen(
                                         }
                                     }
                                 ),
-                            onClick = { onPlayEpisode(episode.id) },
-                            onAction = { action ->
-                                when (action) {
-                                    EpisodeRowAction.Play -> {
-                                        if (episode.id == currentEpisode.id) onPlayToggle()
-                                        else onPlayEpisode(episode.id)
-                                    }
-                                    EpisodeRowAction.AddToPlaylist -> Unit
-                                    EpisodeRowAction.RemoveFromPlaylist -> onRemoveEpisodeFromPlaylist(episode.id)
-                                    EpisodeRowAction.ShowNotes -> showNotesEpisode = episode
-                                    EpisodeRowAction.Download -> onDownloadEpisode(episode.id)
-                                    EpisodeRowAction.MarkListened -> onSetEpisodeListened(episode.id, true)
-                                    EpisodeRowAction.MarkUnlistened -> onSetEpisodeListened(episode.id, false)
-                                    EpisodeRowAction.MoveUp -> onMoveEpisode(episode.id, -1)
-                                    EpisodeRowAction.MoveDown -> onMoveEpisode(episode.id, 1)
-                                }
-                            }
+                            onClick = rowClick,
+                            onAction = rowAction
                         )
                     }
                 }
