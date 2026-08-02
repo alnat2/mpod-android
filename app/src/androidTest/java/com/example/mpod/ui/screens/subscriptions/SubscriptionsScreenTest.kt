@@ -70,6 +70,34 @@ class SubscriptionsScreenTest {
     }
 
     @Test
+    fun headerSubtitleShowsPodcastsWithUnlistenedCount() {
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(
+                        podcasts = listOf(
+                            podcast(
+                                id = 1,
+                                title = "Active podcast",
+                                episodeTitle = "Fresh episode",
+                                isListened = false
+                            ),
+                            podcast(
+                                id = 2,
+                                title = "Caught up podcast",
+                                episodeTitle = "Old episode",
+                                isListened = true
+                            )
+                        )
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("2 podcasts · 1 with unlistened").assertIsDisplayed()
+    }
+
+    @Test
     fun swipingCarouselChangesSelectedPodcastEpisodesAndCanReturn() {
         composeRule.setContent {
             MpodTheme {
@@ -534,7 +562,8 @@ class SubscriptionsScreenTest {
     private fun podcast(
         id: Int,
         title: String,
-        episodeTitle: String
+        episodeTitle: String,
+        isListened: Boolean = false
     ): SubscriptionPodcastUi {
         return SubscriptionPodcastUi(
             id = id,
@@ -542,14 +571,14 @@ class SubscriptionsScreenTest {
             description = "Podcast description",
             imageUrl = null,
             totalEpisodeCount = 1,
-            unlistenedEpisodeCount = 1,
+            unlistenedEpisodeCount = if (isListened) 0 else 1,
             episodes = listOf(
                 SubscriptionEpisodeUi(
                     id = id,
                     title = episodeTitle,
                     durationSeconds = 60,
                     publishedAt = "2026-07-14T10:00:00Z",
-                    isListened = false,
+                    isListened = isListened,
                     downloaded = false,
                     summary = "$episodeTitle notes",
                     inPlaylist = false

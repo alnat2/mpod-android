@@ -188,7 +188,7 @@ fun SubscriptionsScreen(
                 podcasts.isEmpty() -> {
                     PageHeader(
                         title = "Subscriptions",
-                        subtitle = podcastCountLabel(state.podcasts.size),
+                        subtitle = subscriptionsHeaderSubtitle(state.podcasts),
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
                         isRefreshing = state.isRefreshingAll,
@@ -209,7 +209,7 @@ fun SubscriptionsScreen(
                         subtitle = if (hasRefreshError) {
                             "Last refresh · today 3:04"
                         } else {
-                            podcastCountLabel(state.podcasts.size)
+                            subscriptionsHeaderSubtitle(state.podcasts)
                         },
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
@@ -619,6 +619,11 @@ private fun RefreshErrorBanner(
 
 private fun podcastCountLabel(count: Int): String {
     return "$count ${if (count == 1) "podcast" else "podcasts"}"
+}
+
+internal fun subscriptionsHeaderSubtitle(podcasts: List<SubscriptionPodcastUi>): String {
+    val podcastsWithUnlistened = podcasts.count { it.unlistenedEpisodeCount > 0 }
+    return "${podcastCountLabel(podcasts.size)} · $podcastsWithUnlistened with unlistened"
 }
 
 private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {

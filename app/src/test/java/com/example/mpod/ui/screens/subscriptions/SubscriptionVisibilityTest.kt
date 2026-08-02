@@ -13,6 +13,26 @@ class SubscriptionVisibilityTest {
     }
 
     @Test
+    fun headerSubtitleCountsPodcastsWithUnlistenedEpisodes() {
+        val podcasts = listOf(
+            podcast(id = 1, episodes = listOf(episode(id = 1, isListened = false))),
+            podcast(id = 2, episodes = listOf(episode(id = 2, isListened = true))),
+            podcast(
+                id = 3,
+                episodes = listOf(
+                    episode(id = 3, isListened = false),
+                    episode(id = 4, isListened = false)
+                )
+            )
+        )
+
+        assertEquals(
+            "3 podcasts · 2 with unlistened",
+            subscriptionsHeaderSubtitle(podcasts)
+        )
+    }
+
+    @Test
     fun unlistenedVisibilityHidesCaughtUpPodcastsAndListenedEpisodes() {
         val activePodcast = podcast(
             id = 1,
