@@ -94,6 +94,14 @@ class SubscriptionVisibilityTest {
         )
     }
 
+    @Test
+    fun carouselIndexHandlesStalePagesAfterVisibilityChanges() {
+        assertEquals(0, podcastIndexForCarouselPage(page = 12, podcastCount = 2))
+        assertEquals(1, podcastIndexForCarouselPage(page = 0, podcastCount = 2))
+        assertEquals(0, podcastIndexForCarouselPage(page = 1, podcastCount = 2))
+        assertEquals(0, podcastIndexForCarouselPage(page = 0, podcastCount = 0))
+    }
+
     private fun podcast(
         id: Int,
         episodes: List<SubscriptionEpisodeUi>

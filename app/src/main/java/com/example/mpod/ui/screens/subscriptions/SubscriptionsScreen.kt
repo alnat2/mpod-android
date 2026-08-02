@@ -225,13 +225,14 @@ fun SubscriptionsScreen(
                     )
 
                     val loopsContinuously = podcasts.size > 1
-                    val pagerState = key(loopsContinuously) {
+                    val carouselPodcastIds = remember(podcasts) { podcasts.map { it.id } }
+                    val pagerState = key(loopsContinuously, carouselPodcastIds) {
                         rememberPagerState(
                             initialPage = 0,
                             pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
                         )
                     }
-                    LaunchedEffect(pagerState, podcasts.size) {
+                    LaunchedEffect(pagerState, carouselPodcastIds) {
                         if (loopsContinuously) {
                             pagerState.scrollToPage(1)
                             snapshotFlow { pagerState.settledPage }
@@ -435,12 +436,12 @@ fun SubscriptionsScreen(
     }
 }
 
-private fun podcastIndexForCarouselPage(page: Int, podcastCount: Int): Int {
-    if (podcastCount == 1) return 0
-    return when (page) {
-        0 -> podcastCount - 1
-        podcastCount + 1 -> 0
-        else -> page - 1
+internal fun podcastIndexForCarouselPage(page: Int, podcastCount: Int): Int {
+    if (podcastCount <= 1) return 0
+    return when {
+        page <= 0 -> podcastCount - 1
+        page >= podcastCount + 1 -> 0
+        else -> (page - 1).coerceIn(0, podcastCount - 1)
     }
 }
 

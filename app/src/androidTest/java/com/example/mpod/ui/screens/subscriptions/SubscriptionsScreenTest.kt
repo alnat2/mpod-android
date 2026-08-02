@@ -264,21 +264,34 @@ class SubscriptionsScreenTest {
 
     @Test
     fun caughtUpStateIsDistinctFromEmptyLibraryAndCanShowListenedEpisodes() {
-        val caughtUpPodcast = podcast(
+        val firstCaughtUpPodcast = podcast(
             id = 1,
-            title = "Caught up podcast",
-            episodeTitle = "Listened episode"
+            title = "First caught up podcast",
+            episodeTitle = "First listened episode"
         ).copy(
             unlistenedEpisodeCount = 0,
             episodes = listOf(
-                podcast(1, "Caught up podcast", "Listened episode")
+                podcast(1, "First caught up podcast", "First listened episode")
+                    .episodes.single().copy(isListened = true)
+            )
+        )
+        val secondCaughtUpPodcast = podcast(
+            id = 2,
+            title = "Second caught up podcast",
+            episodeTitle = "Second listened episode"
+        ).copy(
+            unlistenedEpisodeCount = 0,
+            episodes = listOf(
+                podcast(2, "Second caught up podcast", "Second listened episode")
                     .episodes.single().copy(isListened = true)
             )
         )
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
-                    state = SubscriptionsUiState(podcasts = listOf(caughtUpPodcast))
+                    state = SubscriptionsUiState(
+                        podcasts = listOf(firstCaughtUpPodcast, secondCaughtUpPodcast)
+                    )
                 )
             }
         }
@@ -286,7 +299,8 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithText("All caught up").assertIsDisplayed()
         composeRule.onAllNodesWithText("No podcasts yet").assertCountEquals(0)
         composeRule.onNodeWithText("Show all").performClick()
-        composeRule.onNodeWithText("Listened episode").assertIsDisplayed()
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").assertIsDisplayed()
+        composeRule.onNodeWithText("First listened episode").assertIsDisplayed()
     }
 
     @Test
