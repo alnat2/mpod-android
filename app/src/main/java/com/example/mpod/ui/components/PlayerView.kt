@@ -15,8 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -59,6 +62,8 @@ fun PlayerView(
     val speedSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val speeds = listOf("0.5", "0.75", "1.0", "1.3", "1.5", "2.0")
     val displayedProgress = draggedProgress ?: progress.coerceIn(0f, 1f)
+    val progressTrackColor = MaterialTheme.colorScheme.surfaceVariant
+    val progressFillColor = MaterialTheme.colorScheme.primary
 
     if (showSpeedSheet) {
         MpodBottomSheet(
@@ -223,15 +228,23 @@ fun PlayerView(
                                     }
                                 }
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(displayedProgress)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                            )
-                        }
+                                .drawBehind {
+                                    val corner = CornerRadius(size.height / 2f, size.height / 2f)
+                                    drawRoundRect(
+                                        color = progressTrackColor,
+                                        size = size,
+                                        cornerRadius = corner
+                                    )
+                                    drawRoundRect(
+                                        color = progressFillColor,
+                                        size = Size(
+                                            width = size.width * displayedProgress,
+                                            height = size.height
+                                        ),
+                                        cornerRadius = corner
+                                    )
+                                }
+                        )
                     }
 
                     // Component version 2 order: speed, play, rewind 15, forward 30.
