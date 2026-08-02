@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -79,11 +80,12 @@ fun EpisodeRow(
         MaterialTheme.colorScheme.surfaceVariant
     else
         MaterialTheme.colorScheme.surface
+    val showStatusIcons = downloaded || inPlaylist
     val statusText = when {
         isDownloading -> "Downloading…"
         statusTextOverride != null -> statusTextOverride
-        inPlaylist -> "In playlist"
         isPlaying -> "$podcastName · now playing"
+        showStatusIcons -> null
         else -> podcastName
     }
 
@@ -139,14 +141,11 @@ fun EpisodeRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
+            EpisodeStatusLine(
                 text = statusText,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Normal,
-                color = if (isPlaying) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                showDownloaded = downloaded,
+                showInPlaylist = inPlaylist,
+                isPlaying = isPlaying
             )
         }
 
@@ -206,6 +205,52 @@ fun EpisodeRow(
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun EpisodeStatusLine(
+    text: String?,
+    showDownloaded: Boolean,
+    showInPlaylist: Boolean,
+    isPlaying: Boolean
+) {
+    val showText = !text.isNullOrBlank()
+    if (!showDownloaded && !showInPlaylist && !showText) return
+
+    Row(
+        modifier = Modifier.heightIn(min = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (showDownloaded) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_episode_status_downloaded),
+                contentDescription = "Downloaded",
+                modifier = Modifier.size(16.dp),
+                tint = Color.Unspecified
+            )
+        }
+        if (showInPlaylist) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_episode_status_in_playlist),
+                contentDescription = "In playlist",
+                modifier = Modifier.size(16.dp),
+                tint = Color.Unspecified
+            )
+        }
+        if (showText) {
+            Text(
+                text = text.orEmpty(),
+                modifier = Modifier.weight(1f, fill = false),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Normal,
+                color = if (isPlaying) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

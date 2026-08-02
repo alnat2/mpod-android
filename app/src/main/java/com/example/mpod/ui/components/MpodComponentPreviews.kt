@@ -60,7 +60,9 @@ private fun HomeComponentsPreview() {
             title = "How public transit maps teach invisible habits",
             podcastName = "Decoder Ring",
             duration = "36m",
-            date = "31.03.26"
+            date = "31.03.26",
+            inPlaylist = true,
+            downloaded = true
         )
 
         PreviewLabel("Bottom Nav")
@@ -185,7 +187,9 @@ private fun MobileComponentCatalog() {
         title = "How public transit maps teach invisible habits",
         podcastName = "Decoder Ring",
         duration = "36m",
-        date = "31.03.26"
+        date = "31.03.26",
+        inPlaylist = true,
+        downloaded = true
     )
 
     PreviewLabel("PodcastCard Mobile")
