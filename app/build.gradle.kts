@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.prod.mpod"
-        minSdk = 34
+        minSdk = 26
         targetSdk = 36
         versionCode = 18
         versionName = "1.0.17"
