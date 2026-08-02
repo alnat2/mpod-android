@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -174,11 +175,13 @@ private fun PodcastArtwork(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val artworkSizePx = with(LocalDensity.current) { PodcastArtworkSize.roundToPx() }
     var imageLoaded by remember(imageUrl) { mutableStateOf(false) }
-    val imageRequest = remember(context, imageUrl) {
+    val imageRequest = remember(context, imageUrl, artworkSizePx) {
         imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
             ImageRequest.Builder(context)
                 .data(url)
+                .size(artworkSizePx, artworkSizePx)
                 .setHeader("User-Agent", "Mozilla/5.0 mpod-android")
                 .crossfade(false)
                 .build()
@@ -187,7 +190,7 @@ private fun PodcastArtwork(
 
     Box(
         modifier = modifier
-            .size(88.dp)
+            .size(PodcastArtworkSize)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.onBackground)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
@@ -221,6 +224,8 @@ private fun PodcastArtworkFallback(title: String) {
         modifier = Modifier.fillMaxSize()
     )
 }
+
+private val PodcastArtworkSize = 88.dp
 
 @Composable
 fun MarkAllListenedHeader(
