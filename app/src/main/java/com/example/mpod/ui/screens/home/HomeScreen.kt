@@ -381,6 +381,7 @@ fun HomeScreen(
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
                             showDragHandle = true,
+                            showStatusIcons = false,
                             compactPlaybackMenu = true,
                             compactPlaybackActionLabel = if (
                                 episode.id == currentEpisode.id && playbackSummary.isPlaying

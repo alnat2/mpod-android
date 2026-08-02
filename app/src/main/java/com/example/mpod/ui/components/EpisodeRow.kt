@@ -68,6 +68,7 @@ fun EpisodeRow(
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
     showDragHandle: Boolean = true,
+    showStatusIcons: Boolean = true,
     compactPlaybackMenu: Boolean = false,
     compactPlaybackActionLabel: String = "Play",
     statusTextOverride: String? = null,
@@ -80,12 +81,14 @@ fun EpisodeRow(
         MaterialTheme.colorScheme.surfaceVariant
     else
         MaterialTheme.colorScheme.surface
-    val showStatusIcons = downloaded || inPlaylist
+    val showDownloadedStatus = showStatusIcons && downloaded
+    val showInPlaylistStatus = showStatusIcons && inPlaylist
+    val hasStatusIcons = showDownloadedStatus || showInPlaylistStatus
     val statusText = when {
         isDownloading -> "Downloading…"
         statusTextOverride != null -> statusTextOverride
         isPlaying -> "$podcastName · now playing"
-        showStatusIcons -> null
+        hasStatusIcons -> null
         else -> podcastName
     }
 
@@ -143,8 +146,8 @@ fun EpisodeRow(
             )
             EpisodeStatusLine(
                 text = statusText,
-                showDownloaded = downloaded,
-                showInPlaylist = inPlaylist,
+                showDownloaded = showDownloadedStatus,
+                showInPlaylist = showInPlaylistStatus,
                 isPlaying = isPlaying
             )
         }
