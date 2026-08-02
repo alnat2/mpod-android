@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-07-29 (post-acceptance maintenance recorded)
+Last updated: 2026-08-02 (release network and signing configuration prepared)
 
-Current Android source baseline: `1.0.15 (16)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
+Current Android source baseline: `1.0.17 (18)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
 ## Purpose
 
@@ -30,7 +30,7 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Area | Confirmed decision |
 |---|---|
 | Distribution | APK, outside Google Play for the current scope |
-| Minimum OS | Android 14+ |
+| Minimum OS | Android 8.0+ (API 26) |
 | UI language | English |
 | Development backend | Development and scenario verification use `192.168.0.222:5051` |
 | Production backend | Before release assembly, release configuration uses `192.168.0.222:5050` |
@@ -124,15 +124,17 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - Every production APK installed for product-owner testing or handed off as a new build receives a new patch `versionName`.
 - `versionCode` increases by exactly one for every such build and is never reused, even when the preceding APK was not publicly released.
 - A version bump is committed with the changes included in that APK, so an installed version can be traced to one source revision.
-- Current build: `1.0.15 (16)`.
+- Current build: `1.0.17 (18)`.
 
 Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
 
 ### Current known limitations and deferred work
 
 - `DLD-01`–`DLD-09` remain explicitly Deferred pending the planned download redesign; they are not represented as release-verified.
-- The immutable production acceptance artifact remains the APK from `67ad83f`, documented in wave 24. Current source/test baseline `a72145b` contains later owner-reviewed maintenance and must not be described using the older artifact checksum.
-- Final distribution signing credentials, TLS/network-security changes, and release packaging remain intentionally deferred. The accepted APK uses the documented Android Debug certificate and approved LAN HTTP transport. Production HTTP request logging is disabled at build time; Debug retains BASIC request logging.
+- The immutable production acceptance artifact remains the APK from `67ad83f`, documented in wave 24. Current source/test baseline contains later owner-reviewed maintenance and must not be described using the older artifact checksum.
+- Release signing is configured through `MPOD_RELEASE_STORE_FILE`, `MPOD_RELEASE_STORE_PASSWORD`, `MPOD_RELEASE_KEY_ALIAS`, and `MPOD_RELEASE_KEY_PASSWORD`. When those values are absent, local/CI release builds still use the documented debug keystore until production credentials are supplied.
+- Network security denies cleartext by default and explicitly allows the approved development/LAN hosts: `192.168.0.222`, `10.0.2.2`, `127.0.0.1`, and `localhost`. Production TLS host/certificate policy remains pending backend infrastructure.
+- Production HTTP request logging is disabled at build time; Debug retains BASIC request logging.
 - Exhaustive TalkBack, font/display scaling, and non-blocking visual/performance polish remain post-acceptance work unless a concrete functional defect is observed.
 - Backend follow-up `BE-FU-01` remains recorded in the scenario map. `BE-FU-02` was resolved by backend commit `6c0ce47`, which requires explicit completion.
 

@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.example.mpod"
     compileSdk = 37
@@ -20,25 +22,38 @@ android {
     }
 
     signingConfigs {
-        create("customRelease") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        create("release") {
+            val releaseStoreFile = env("MPOD_RELEASE_STORE_FILE")
+            if (releaseStoreFile == null) {
+                storeFile = file("debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            } else {
+                storeFile = file(releaseStoreFile)
+                storePassword = env("MPOD_RELEASE_STORE_PASSWORD")
+                    ?: error("MPOD_RELEASE_STORE_PASSWORD is required when MPOD_RELEASE_STORE_FILE is set.")
+                keyAlias = env("MPOD_RELEASE_KEY_ALIAS")
+                    ?: error("MPOD_RELEASE_KEY_ALIAS is required when MPOD_RELEASE_STORE_FILE is set.")
+                keyPassword = env("MPOD_RELEASE_KEY_PASSWORD")
+                    ?: error("MPOD_RELEASE_KEY_PASSWORD is required when MPOD_RELEASE_STORE_FILE is set.")
+            }
         }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".test"
+            buildConfigField("String", "BACKEND_SCHEME", "\"http\"")
             buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5051\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("String", "BACKEND_SCHEME", "\"http\"")
             buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5050\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("customRelease")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

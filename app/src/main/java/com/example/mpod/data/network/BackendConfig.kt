@@ -9,6 +9,9 @@ class BackendConfig @Inject constructor() {
     val address: String
         get() = BuildConfig.BACKEND_ADDRESS
 
+    val scheme: String
+        get() = BuildConfig.BACKEND_SCHEME
+
     val baseUrl: String
-        get() = "http://$address/"
+        get() = "$scheme://$address/"
 }
