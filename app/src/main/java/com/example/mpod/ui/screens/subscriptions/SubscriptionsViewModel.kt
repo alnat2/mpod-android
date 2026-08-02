@@ -21,10 +21,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import retrofit2.Response
 import javax.inject.Inject
@@ -487,30 +491,35 @@ class SubscriptionsViewModel @Inject constructor(
                 ?: missingApiPayload("Could not load playlist.")
             ).toSet()
 
-        var hasEpisodeLoadFailures = false
-        val podcastItems = podcasts.map { podcast ->
-            val episodesResult = runCatching {
-                api.getPodcastEpisodes(podcast.id)
-                    .requireApiBody("Could not load episodes.")
-                    .episodes
-                    ?: missingApiPayload("Could not load episodes.")
-            }
-            val allEpisodes = episodesResult.getOrNull().orEmpty()
-            val loadErrorMessage = if (episodesResult.isFailure) {
-                hasEpisodeLoadFailures = true
-                "Episodes unavailable. Refresh this podcast to try again."
-            } else {
-                null
-            }
+        val episodeLoadSemaphore = Semaphore(SUBSCRIPTION_EPISODE_LOAD_PARALLELISM)
+        val podcastLoads = podcasts.map { podcast ->
+            async {
+                episodeLoadSemaphore.withPermit {
+                    val episodesResult = runCatching {
+                        api.getPodcastEpisodes(podcast.id)
+                            .requireApiBody("Could not load episodes.")
+                            .episodes
+                            ?: missingApiPayload("Could not load episodes.")
+                    }
+                    val allEpisodes = episodesResult.getOrNull().orEmpty()
+                    val loadErrorMessage = if (episodesResult.isFailure) {
+                        "Episodes unavailable. Refresh this podcast to try again."
+                    } else {
+                        null
+                    }
 
-            podcast.toSubscriptionPodcast(
-                episodes = allEpisodes.map { it.toSubscriptionEpisode(playlistEpisodeIds) },
-                totalEpisodeCount = allEpisodes.size,
-                unlistenedEpisodeCount = allEpisodes.count { !it.isListened },
-                errorMessage = loadErrorMessage,
-                episodesUnavailable = episodesResult.isFailure
-            )
-        }
+                    podcast.toSubscriptionPodcast(
+                        episodes = allEpisodes.map { it.toSubscriptionEpisode(playlistEpisodeIds) },
+                        totalEpisodeCount = allEpisodes.size,
+                        unlistenedEpisodeCount = allEpisodes.count { !it.isListened },
+                        errorMessage = loadErrorMessage,
+                        episodesUnavailable = episodesResult.isFailure
+                    ) to episodesResult.isFailure
+                }
+            }
+        }.awaitAll()
+        val podcastItems = podcastLoads.map { it.first }
+        val hasEpisodeLoadFailures = podcastLoads.any { it.second }
 
         SubscriptionsUiState(
             hasLoadedOnce = true,
@@ -790,3 +799,5 @@ data class SubscriptionEpisodeUi(
     val summary: String?,
     val inPlaylist: Boolean
 )
+
+private const val SUBSCRIPTION_EPISODE_LOAD_PARALLELISM = 6

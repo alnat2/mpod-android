@@ -7,15 +7,20 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class SubscriptionsViewModelTest {
     private lateinit var server: MockWebServer
@@ -183,6 +188,41 @@ class SubscriptionsViewModelTest {
         }
         assertEquals("Recovered episode", recovered.podcasts.first().episodes.single().title)
         assertEquals("Healthy episode", recovered.podcasts.last().episodes.single().title)
+    }
+
+    @Test
+    fun subscriptionRefreshLoadsPodcastEpisodesConcurrently() = runBlocking {
+        awaitState { !it.isLoading && it.podcasts.singleOrNull()?.id == 41 }
+        val episodeRequestsStarted = CountDownLatch(2)
+        val inFlightEpisodeRequests = AtomicInteger(0)
+        val maxInFlightEpisodeRequests = AtomicInteger(0)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                return when (request.path) {
+                    "/api/podcasts" -> MockResponse().setResponseCode(200).setBody(
+                        """{"podcasts":[{"id":41,"title":"First","description":"Test","rssUrl":"https://example.com/first.xml"},{"id":42,"title":"Second","description":"Test","rssUrl":"https://example.com/second.xml"}]}"""
+                    )
+                    "/api/playlist" -> MockResponse().setResponseCode(200).setBody("""{"items":[]}""")
+                    "/api/podcasts/41/episodes",
+                    "/api/podcasts/42/episodes" -> {
+                        val inFlight = inFlightEpisodeRequests.incrementAndGet()
+                        maxInFlightEpisodeRequests.updateAndGet { current -> maxOf(current, inFlight) }
+                        episodeRequestsStarted.countDown()
+                        episodeRequestsStarted.await(2, TimeUnit.SECONDS)
+                        inFlightEpisodeRequests.decrementAndGet()
+                        MockResponse().setResponseCode(200).setBody(
+                            """{"episodes":[{"id":${request.path?.substringAfter("/api/podcasts/")?.substringBefore("/") ?: 0},"podcastId":41,"title":"Episode","isListened":false}]}"""
+                        )
+                    }
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+
+        viewModel.refresh()
+        awaitState { !it.isRefreshing && it.podcasts.size == 2 }
+
+        assertTrue(maxInFlightEpisodeRequests.get() >= 2)
     }
 
     @Test
