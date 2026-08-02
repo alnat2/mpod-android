@@ -100,7 +100,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | SUB-02 | Subscriptions load fails | Error is visible and Try again reloads the screen | U,E | Verified |
 | SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct path | U,E | Verified |
 | SUB-04 | All subscribed episodes are listened in Unlistened mode | Caught-up state is distinct from an empty library and can switch to Show all | C,U,E | Verified |
-| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, and episode list change together and can return; the Subscriptions header summarizes the total subscriptions and how many podcasts have unlistened episodes, e.g. `12 podcasts · 2 with unlistened` | U,E | Verified |
+| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, and episode list change together and can return; the Subscriptions header summarizes the total subscriptions and how many podcasts have unlistened episodes, e.g. `12 podcasts · 2 unlistened` | U,E | Verified |
 | SUB-06 | Toggle Show all / Show unlistened | Icon and visible podcasts/episodes match the selected filter | C,U,E | Verified |
 | SUB-07 | Podcast artwork loads successfully | Real artwork is shown without replacing it with fallback | U,E | Verified |
 | SUB-08 | Artwork is missing, invalid, or fails to decode/load | Approved Figma fallback artwork is shown | U,E | Verified |

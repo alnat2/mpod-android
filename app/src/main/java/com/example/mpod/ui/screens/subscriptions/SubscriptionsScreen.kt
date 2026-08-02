@@ -647,7 +647,7 @@ private fun podcastCountLabel(count: Int): String {
 
 internal fun subscriptionsHeaderSubtitle(podcasts: List<SubscriptionPodcastUi>): String {
     val podcastsWithUnlistened = podcasts.count { it.unlistenedEpisodeCount > 0 }
-    return "${podcastCountLabel(podcasts.size)} · $podcastsWithUnlistened with unlistened"
+    return "${podcastCountLabel(podcasts.size)} · $podcastsWithUnlistened unlistened"
 }
 
 private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {

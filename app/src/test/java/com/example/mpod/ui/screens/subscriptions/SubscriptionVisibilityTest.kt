@@ -27,7 +27,7 @@ class SubscriptionVisibilityTest {
         )
 
         assertEquals(
-            "3 podcasts · 2 with unlistened",
+            "3 podcasts · 2 unlistened",
             subscriptionsHeaderSubtitle(podcasts)
         )
     }

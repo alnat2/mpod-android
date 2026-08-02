@@ -94,7 +94,7 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("2 podcasts · 1 with unlistened").assertIsDisplayed()
+        composeRule.onNodeWithText("2 podcasts · 1 unlistened").assertIsDisplayed()
     }
 
     @Test
