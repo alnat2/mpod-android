@@ -7,6 +7,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -35,6 +36,7 @@ object NetworkModule {
             .readTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .callTimeout(CORE_NETWORK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .configureConnectionPool()
             .addInterceptor(sessionExpiryInterceptor)
             .addDebugHttpLogging(BuildConfig.DEBUG)
             .cookieJar(cookieJar)
@@ -71,4 +73,14 @@ internal fun OkHttpClient.Builder.addDebugHttpLogging(enabled: Boolean): OkHttpC
     }
 }
 
+internal fun OkHttpClient.Builder.configureConnectionPool(): OkHttpClient.Builder = connectionPool(
+    ConnectionPool(
+        maxIdleConnections = CORE_NETWORK_MAX_IDLE_CONNECTIONS,
+        keepAliveDuration = CORE_NETWORK_KEEP_ALIVE_MINUTES,
+        TimeUnit.MINUTES
+    )
+)
+
 internal const val CORE_NETWORK_TIMEOUT_SECONDS = 30L
+internal const val CORE_NETWORK_MAX_IDLE_CONNECTIONS = 10
+internal const val CORE_NETWORK_KEEP_ALIVE_MINUTES = 5L
