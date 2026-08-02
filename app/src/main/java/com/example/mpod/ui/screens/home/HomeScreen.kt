@@ -77,6 +77,8 @@ fun HomeRoute(
     var playbackState by remember { mutableStateOf(HomePlaybackUiState()) }
     var playbackSummary by remember { mutableStateOf(HomePlaybackSummaryUiState()) }
     val playbackStateProvider = remember { { playbackState } }
+    val latestActiveEpisodeId by rememberUpdatedState(state.activeEpisodeId)
+    val latestQueue by rememberUpdatedState(state.queue)
     val controllerFuture = remember(context) {
         MediaController.Builder(
             context,
@@ -86,8 +88,8 @@ fun HomeRoute(
 
     fun updatePlaybackSnapshot() {
         val nextState = controller.toHomePlaybackUiState(
-            activeEpisodeId = state.activeEpisodeId,
-            queue = state.queue
+            activeEpisodeId = latestActiveEpisodeId,
+            queue = latestQueue
         )
         playbackState = nextState
 
@@ -124,9 +126,11 @@ fun HomeRoute(
         if (refreshKey > 0) viewModel.refresh()
     }
 
-    DisposableEffect(controller, state.activeEpisodeId, state.queue) {
+    LaunchedEffect(controller, state.activeEpisodeId, state.queue) {
         updatePlaybackSnapshot()
+    }
 
+    DisposableEffect(controller) {
         val player = controller
         if (player == null) {
             onDispose {}
@@ -141,18 +145,24 @@ fun HomeRoute(
         }
     }
 
-    LaunchedEffect(controller, state.activeEpisodeId, state.queue) {
+    LaunchedEffect(controller) {
         while (true) {
             updatePlaybackSnapshot()
             val player = controller
-            delay(if (player?.isPlaying == true) 500 else 1_500)
+            delay(
+                if (player?.isPlaying == true) {
+                    PLAYING_PLAYBACK_SNAPSHOT_INTERVAL_MS
+                } else {
+                    IDLE_PLAYBACK_SNAPSHOT_INTERVAL_MS
+                }
+            )
         }
     }
 
     LaunchedEffect(playbackSummary.currentEpisodeId) {
         val episodeId = playbackSummary.currentEpisodeId ?: return@LaunchedEffect
         if (episodeId != state.activeEpisodeId) {
-            delay(500)
+            delay(PLAYBACK_ROUTE_REFRESH_DELAY_MS)
             viewModel.refresh()
         }
     }
@@ -655,6 +665,10 @@ private fun Float?.toSpeedLabel(): String = when (this) {
     2f -> "2.0"
     else -> "1.3"
 }
+
+private const val PLAYING_PLAYBACK_SNAPSHOT_INTERVAL_MS = 500L
+private const val IDLE_PLAYBACK_SNAPSHOT_INTERVAL_MS = 1_500L
+private const val PLAYBACK_ROUTE_REFRESH_DELAY_MS = 500L
 
 private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
     if (!hasPodcasts) return HomeUiState(hasPodcasts = false)
