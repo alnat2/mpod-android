@@ -324,7 +324,11 @@ fun SubscriptionsScreen(
                                     modifier = Modifier.testTag("subscriptions_episode_header")
                                 )
                             }
-                            items(selectedPodcast.episodes, key = { episode -> episode.id }) { episode ->
+                            items(
+                                items = selectedPodcast.episodes,
+                                key = { episode -> episode.id },
+                                contentType = { "episode_row" }
+                            ) { episode ->
                                 EpisodeRow(
                                     title = episode.title,
                                     podcastName = selectedPodcast.title,

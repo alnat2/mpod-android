@@ -373,7 +373,8 @@ fun HomeScreen(
 
                     itemsIndexed(
                         items = state.queue,
-                        key = { _, episode -> episode.id }
+                        key = { _, episode -> episode.id },
+                        contentType = { _, _ -> "episode_row" }
                     ) { index, episode ->
                         val isDragging = draggedEpisodeId == episode.id
                         val latestOnMoveEpisode by rememberUpdatedState(onMoveEpisode)
