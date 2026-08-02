@@ -139,6 +139,40 @@ class PlaybackQueueReconciliationTest {
     }
 
     @Test
+    fun completedEpisodePlaybackResumesFirstRemainingQueueItem() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 12_000, 3 to 8_000, 4 to 0),
+            backendActiveEpisodeId = 3,
+            currentEpisodeId = 4,
+            currentPositionMs = 45_000,
+            currentPlayWhenReady = true,
+            preferFirstEpisode = true,
+            forcePlayPreferred = true
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(12_000L, target?.positionMs)
+        assertTrue(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun completedLastEpisodePlaybackWrapsToFirstRemainingQueueItem() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 12_000, 3 to 8_000),
+            backendActiveEpisodeId = null,
+            currentEpisodeId = 4,
+            currentPositionMs = 45_000,
+            currentPlayWhenReady = false,
+            preferFirstEpisode = true,
+            forcePlayPreferred = true
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(12_000L, target?.positionMs)
+        assertTrue(target?.playWhenReady == true)
+    }
+
+    @Test
     fun initialLoadUsesSavedActivePositionWithoutAutoplay() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(1 to 2_000, 2 to 32_000),

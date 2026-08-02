@@ -155,6 +155,7 @@ class PlaybackService : MediaSessionService() {
 
     private suspend fun reconcileQueueWithBackend(
         preferredEpisodeId: Int? = null,
+        preferFirstEpisode: Boolean = false,
         forcePlayPreferred: Boolean = false
     ): Unit {
         queueReconciliationMutex.withLock {
@@ -182,6 +183,7 @@ class PlaybackService : MediaSessionService() {
                 currentPositionMs = player.currentPosition,
                 currentPlayWhenReady = player.playWhenReady,
                 preferredEpisodeId = preferredEpisodeId,
+                preferFirstEpisode = preferFirstEpisode,
                 forcePlayPreferred = forcePlayPreferred
             )
 
@@ -239,7 +241,10 @@ class PlaybackService : MediaSessionService() {
 
             if (target.playWhenReady) {
                 startPeriodicSync()
-                if (preferredEpisodeId == target.episodeId && forcePlayPreferred) {
+                if (
+                    forcePlayPreferred &&
+                    (preferredEpisodeId == target.episodeId || preferFirstEpisode)
+                ) {
                     playbackSyncManager.submitActive(target.episodeId)
                 }
             } else {
@@ -303,11 +308,11 @@ class PlaybackService : MediaSessionService() {
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
                 serviceScope.launch {
                     val completion = completeEpisode(finishedEpisodeId)
-                    nextEpisodeId?.let {
-                        playbackSyncManager.submitActive(it)
-                    }
                     if (completion != null) {
-                        reconcileQueueWithBackend()
+                        reconcileQueueWithBackend(
+                            preferFirstEpisode = true,
+                            forcePlayPreferred = true
+                        )
                         queueInvalidator.refreshHome()
                     }
                 }
@@ -325,15 +330,10 @@ class PlaybackService : MediaSessionService() {
             lastCompletedEpisodeId = episodeId
             serviceScope.launch {
                 val completion = completeEpisode(episodeId) ?: return@launch
-                val fallbackEpisodeId = completion.nextEpisodeId
-                if (fallbackEpisodeId != null) {
-                    reconcileQueueWithBackend(
-                        preferredEpisodeId = fallbackEpisodeId,
-                        forcePlayPreferred = true
-                    )
-                } else {
-                    reconcileQueueWithBackend()
-                }
+                reconcileQueueWithBackend(
+                    preferFirstEpisode = true,
+                    forcePlayPreferred = true
+                )
                 queueInvalidator.refreshHome()
             }
         }
@@ -392,15 +392,14 @@ class PlaybackService : MediaSessionService() {
         response: PlaybackUpdateResponse
     ) {
         val playbackEnded = player.playbackState == Player.STATE_ENDED
-        val fallbackEpisodeId = resolveRetriedCompletionNextEpisode(
+        val shouldResumePlayback = shouldResumeAfterRetriedCompletion(
             playbackEnded = playbackEnded,
             completedEpisodeId = request.episodeId,
-            currentEpisodeId = currentEpisodeId(),
-            backendNextEpisodeId = response.nextEpisodeId
+            currentEpisodeId = currentEpisodeId()
         )
-        if (fallbackEpisodeId != null) {
+        if (shouldResumePlayback) {
             reconcileQueueWithBackend(
-                preferredEpisodeId = fallbackEpisodeId,
+                preferFirstEpisode = true,
                 forcePlayPreferred = true
             )
         } else {
@@ -487,16 +486,11 @@ internal fun mediaNotificationPlayerCommands(): Player.Commands =
         )
         .build()
 
-internal fun resolveRetriedCompletionNextEpisode(
+internal fun shouldResumeAfterRetriedCompletion(
     playbackEnded: Boolean,
     completedEpisodeId: Int,
-    currentEpisodeId: Int?,
-    backendNextEpisodeId: Int?
-): Int? {
-    return backendNextEpisodeId.takeIf {
-        playbackEnded && currentEpisodeId == completedEpisodeId
-    }
-}
+    currentEpisodeId: Int?
+): Boolean = playbackEnded && currentEpisodeId == completedEpisodeId
 
 internal fun shouldSyncCurrentBeforeQueueReconciliation(
     currentEpisodeId: Int?,

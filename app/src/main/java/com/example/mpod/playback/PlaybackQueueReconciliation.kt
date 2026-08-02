@@ -30,6 +30,7 @@ internal fun resolveQueuePlaybackTarget(
     currentPositionMs: Long,
     currentPlayWhenReady: Boolean,
     preferredEpisodeId: Int? = null,
+    preferFirstEpisode: Boolean = false,
     forcePlayPreferred: Boolean = false
 ): QueuePlaybackTarget? {
     if (queue.isEmpty()) return null
@@ -37,6 +38,7 @@ internal fun resolveQueuePlaybackTarget(
     val queueById = queue.associateBy { it.episodeId }
     val currentStillQueued = currentEpisodeId != null && currentEpisodeId in queueById
     val preferred = preferredEpisodeId?.takeIf(queueById::containsKey)
+        ?: queue.first().episodeId.takeIf { preferFirstEpisode }
     val targetEpisodeId = preferred
         ?: currentEpisodeId?.takeIf(queueById::containsKey)
         ?: backendActiveEpisodeId?.takeIf(queueById::containsKey)

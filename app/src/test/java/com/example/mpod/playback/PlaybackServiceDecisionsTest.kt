@@ -46,46 +46,32 @@ class PlaybackServiceDecisionsTest {
     }
 
     @Test
-    fun `delayed completion resumes backend next episode only at same ended item`() {
-        assertEquals(
-            8,
-            resolveRetriedCompletionNextEpisode(
+    fun `delayed completion resumes queue top only at same ended item`() {
+        assertTrue(
+            shouldResumeAfterRetriedCompletion(
                 playbackEnded = true,
                 completedEpisodeId = 7,
-                currentEpisodeId = 7,
-                backendNextEpisodeId = 8
+                currentEpisodeId = 7
             )
         )
     }
 
     @Test
     fun `delayed completion does not hijack newer playback`() {
-        assertNull(
-            resolveRetriedCompletionNextEpisode(
+        assertEquals(
+            false,
+            shouldResumeAfterRetriedCompletion(
                 playbackEnded = true,
                 completedEpisodeId = 7,
-                currentEpisodeId = 9,
-                backendNextEpisodeId = 8
+                currentEpisodeId = 9
             )
         )
-        assertNull(
-            resolveRetriedCompletionNextEpisode(
+        assertEquals(
+            false,
+            shouldResumeAfterRetriedCompletion(
                 playbackEnded = false,
                 completedEpisodeId = 7,
-                currentEpisodeId = 7,
-                backendNextEpisodeId = 8
-            )
-        )
-    }
-
-    @Test
-    fun `completion without backend next episode reconciles without forced target`() {
-        assertNull(
-            resolveRetriedCompletionNextEpisode(
-                playbackEnded = true,
-                completedEpisodeId = 7,
-                currentEpisodeId = 7,
-                backendNextEpisodeId = null
+                currentEpisodeId = 7
             )
         )
     }
