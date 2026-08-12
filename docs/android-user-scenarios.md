@@ -202,7 +202,7 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SET-01 | Open Settings while backend-dependent data loads or fails | Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Verified |
+| SET-01 | Open Settings while backend-dependent data loads or fails | Header shows last refresh and current IP/geo when available; Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Verified |
 | SET-02 | Open the daily refresh time control and cancel | Android time picker uses device 12/24-hour mode; cancel leaves the saved time unchanged | C,U,E | Verified |
 | SET-03 | Select a new time and save | Exact `HH:mm` value is persisted by backend and confirmed state is shown | C,U,E | Verified |
 | SET-04 | Open Settings without changing refresh time | Save is disabled/secondary and does not make a redundant write | U | Verified |
@@ -210,7 +210,7 @@ The MVP uses event-driven reconciliation, not continuous polling. Android reload
 | SET-06 | Save succeeds but status reload fails | Saved confirmed value remains; UI distinguishes save success from status-refresh failure | C,U,E | Verified |
 | SET-07 | Proxy is not configured | Status is truthful and the switch cannot claim a running proxy | C,U,E | Verified |
 | SET-08 | Enable or disable configured SOCKS5 proxy | Backend setting and visible switch/status agree after save/reload | C,U,E | Verified |
-| SET-09 | Proxy reports running, unknown, or error | Current IP/geo/error/status are represented truthfully and unrelated Settings remain usable | C,U,E | Verified |
+| SET-09 | Proxy reports running, unknown, or error | Current IP/geo are represented truthfully in the Settings header, proxy errors stay scoped to the SOCKS5 card, and unrelated Settings remain usable | C,U,E | Verified |
 | SET-10 | First install follows system theme | Dark device gives Dark; light device gives Light | C,U,E,D | Verified |
 | SET-11 | Toggle Use dark theme off/on | Off selects explicit Light; on selects explicit Dark; choice persists across restart | C,U,E,D | Verified |
 | SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Verified |
@@ -241,7 +241,7 @@ The product owner confirmed on 2026-07-19:
 2. Links in Show notes are tappable and open through the Android system browser.
 3. Android media notification and lock-screen controls expose Play/Pause only, together with episode/podcast metadata.
 4. Downloads have no user-facing Cancel action in the MVP. An interrupted request either completes or returns to a retryable Download state without false success.
-5. Settings has no Retry buttons. Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
+5. Settings has no Retry buttons. The header shows last refresh and current IP/geo when available; Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
 6. Web/Android synchronization is event-driven for the MVP: launch, foreground, entry to Home or Subscriptions, and manual Refresh reconcile shared state. There is no continuous polling and no immediate interruption of current audio before reconciliation.
 7. Downloads are explicitly deferred from the current release acceptance pending redesign. Until that redesign, the existing Android behavior permits one download at a time and disables other Download actions while it is running; `DLD-01`–`DLD-09` must not be represented as Verified.
 8. Release acceptance uses one release APK. A separate test application, a second application ID, Test/Production coexistence, and upgrade/co-installation checks are not mpod requirements. After all PRD scenarios and regression tests pass, release is switched to production server `5050`, assembled, and smoke-tested for login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback. With no critical defects, the APK is ready for release.

@@ -126,7 +126,10 @@ fun SettingsScreen(
             .padding(top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        PageHeader(title = "Settings")
+        PageHeader(
+            title = "Settings",
+            subtitle = "${state.refreshHeaderText}\n${state.proxyHeaderText}"
+        )
 
         if (state.errorMessage != null) {
             SettingsStatusCard(
@@ -186,15 +189,6 @@ fun SettingsScreen(
                             onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
                         )
                     }
-                    if (!state.isRefreshLoading && state.refreshErrorMessage == null) {
-                        Text(
-                            text = state.schedulerStatusText,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
                 }
             }
         }
@@ -208,7 +202,9 @@ fun SettingsScreen(
                         state.proxyErrorMessage,
                         isError = true
                     )
-                    else -> SettingsSectionStatus(state.proxyStatusText)
+                    else -> SettingsSectionStatus(
+                        "Turn on if direct connection update fails."
+                    )
                 }
             },
             action = {

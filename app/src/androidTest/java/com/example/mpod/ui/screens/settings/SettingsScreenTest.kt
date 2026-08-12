@@ -2,10 +2,12 @@ package com.example.mpod.ui.screens.settings
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +20,26 @@ import org.junit.Test
 class SettingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun settingsShowsHeaderStatusAndProxyDescription() {
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(
+                        refreshHeaderText = "Last refresh today at 03:04",
+                        proxyHeaderText = "Current IP: 43.32.112.45 • Geo: UK",
+                        proxyStatusText = "Current IP: 43.32.112.45 · Geo: UK"
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Last refresh today at 03:04").assertIsDisplayed()
+        composeRule.onNodeWithText("Current IP: 43.32.112.45 • Geo: UK").assertIsDisplayed()
+        composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Current IP: 43.32.112.45 · Geo: UK").assertCountEquals(0)
+    }
 
     @Test
     fun darkThemeSwitchEnablesDarkMode() {
@@ -213,9 +235,9 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithText("Current app build: 1.2.3").assertIsDisplayed()
-        composeRule.onNodeWithText("Current app build: 1.2.3 (42) · Test").assertDoesNotExist()
-        composeRule.onNodeWithText("Package: com.prod.mpod.test").assertDoesNotExist()
-        composeRule.onNodeWithText("Server: 192.168.0.222:5051 · Backend: abc1234")
-            .assertDoesNotExist()
+        composeRule.onAllNodesWithText("Current app build: 1.2.3 (42) · Test").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Package: com.prod.mpod.test").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Server: 192.168.0.222:5051 · Backend: abc1234")
+            .assertCountEquals(0)
     }
 }

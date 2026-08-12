@@ -25,6 +25,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import retrofit2.Response
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -228,6 +229,8 @@ class SettingsViewModel @Inject constructor(
             },
             schedulerStatusText = scheduler?.let(::schedulerStatusText)
                 ?: base.schedulerStatusText,
+            refreshHeaderText = scheduler?.let(::settingsRefreshHeaderText)
+                ?: base.refreshHeaderText,
             isProxyLoading = false,
             proxyEnabled = settings?.proxyEnabled == true && proxyConfigured,
             proxyConfigured = proxyConfigured,
@@ -241,7 +244,12 @@ class SettingsViewModel @Inject constructor(
                 proxyStatusText(settings, proxy)
             } else {
                 base.proxyStatusText
-            }
+            },
+            proxyHeaderText = if (settings != null && proxyResult.isSuccess) {
+                proxyHeaderText(proxy)
+            } else {
+                base.proxyHeaderText
+            },
         )
     }
 
@@ -254,6 +262,7 @@ class SettingsViewModel @Inject constructor(
             ?: missingApiPayload("Could not load refresh status.")
         confirmedState.copy(
             schedulerStatusText = schedulerStatusText(scheduler),
+            refreshHeaderText = settingsRefreshHeaderText(scheduler),
             refreshErrorMessage = null
         )
     }.getOrElse {
@@ -279,6 +288,7 @@ class SettingsViewModel @Inject constructor(
         confirmedState.copy(
             proxyConfigured = confirmedState.proxyConfigured || proxy?.proxyConfigured == true,
             proxyStatusText = proxyStatusText(settings, proxy),
+            proxyHeaderText = proxyHeaderText(proxy),
             proxyErrorMessage = null
         )
     }.getOrElse {
@@ -314,12 +324,24 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private fun settingsRefreshHeaderText(scheduler: SchedulerStatusDto?): String {
+        val lastRefresh = scheduler?.lastRunAt ?: scheduler?.lastSuccessAt ?: scheduler?.lastFailureAt
+        return formatSettingsLastRefreshText(lastRefresh)
+    }
+
+    private fun proxyHeaderText(proxy: ProxyStatusDto?): String {
+        val ip = proxy?.externalIp?.takeIf { it.isNotBlank() } ?: "unknown"
+        val geo = proxy?.country?.takeIf { it.isNotBlank() } ?: "unknown"
+        return "Current IP: $ip • Geo: $geo"
+    }
+
     private fun Response<*>?.errorMessage(defaultMessage: String): String {
         return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
     }
 }
 
 private val schedulerTimestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+private val settingsHeaderTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 internal fun formatSchedulerTimestamp(
     rawTimestamp: String,
@@ -330,6 +352,26 @@ internal fun formatSchedulerTimestamp(
         .format(schedulerTimestampFormatter)
 }.getOrElse {
     rawTimestamp.replace('T', ' ').take(16)
+}
+
+internal fun formatSettingsLastRefreshText(
+    rawTimestamp: String?,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+    today: LocalDate = LocalDate.now(zoneId)
+): String {
+    if (rawTimestamp.isNullOrBlank()) return "Last refresh never"
+    return runCatching {
+        val dateTime = Instant.parse(rawTimestamp).atZone(zoneId)
+        val date = dateTime.toLocalDate()
+        val day = when (date) {
+            today -> "today"
+            today.minusDays(1) -> "yesterday"
+            else -> date.toString()
+        }
+        "Last refresh $day at ${dateTime.format(settingsHeaderTimeFormatter)}"
+    }.getOrElse {
+        "Last refresh ${rawTimestamp.replace('T', ' ').take(16)}"
+    }
 }
 
 data class SettingsUiState(
@@ -349,6 +391,8 @@ data class SettingsUiState(
     val exportMessage: String? = null,
     val proxyStatusText: String = "Checking proxy status...",
     val schedulerStatusText: String = "Status: idle · last refresh never",
+    val refreshHeaderText: String = "Last refresh never",
+    val proxyHeaderText: String = "Current IP: checking... • Geo: checking...",
     val appBuild: String? = null
 )
 
