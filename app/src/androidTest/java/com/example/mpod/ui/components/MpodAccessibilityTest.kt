@@ -60,7 +60,7 @@ class MpodAccessibilityTest {
             .assertIsOn()
             .assertTouchWidthIsEqualTo(48.dp)
             .assertTouchHeightIsEqualTo(48.dp)
-        composeRule.onNodeWithContentDescription("Options for Accessible episode")
+        composeRule.onNodeWithContentDescription("Add Accessible episode to playlist")
             .assertHasClickAction()
             .assertTouchWidthIsEqualTo(48.dp)
             .assertTouchHeightIsEqualTo(48.dp)

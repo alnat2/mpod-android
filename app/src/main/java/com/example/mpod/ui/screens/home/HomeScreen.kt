@@ -43,12 +43,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
-import com.example.mpod.ui.components.EpisodeRow
-import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.PageHeader
+import com.example.mpod.ui.components.PlayerPlaylistItem
 import com.example.mpod.ui.components.PlayerView
 import com.example.mpod.ui.components.ShowNotesMobile
 import com.example.mpod.ui.components.figmaDropShadow
@@ -216,8 +215,7 @@ fun HomeRoute(
         onImportOpml = onImportOpml,
         onRetryLoad = viewModel::refresh,
         onMoveEpisode = viewModel::moveEpisode,
-        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
-        onSetEpisodeListened = viewModel::setEpisodeListened
+        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist
     )
 }
 
@@ -240,8 +238,7 @@ fun HomeScreen(
     onImportOpml: () -> Unit = {},
     onRetryLoad: () -> Unit = {},
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
-    onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
-    onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> }
+    onRemoveEpisodeFromPlaylist: (Int) -> Unit = {}
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
     var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
@@ -376,69 +373,35 @@ fun HomeScreen(
                         contentType = { _, _ -> "episode_row" }
                     ) { index, episode ->
                         val isDragging = draggedEpisodeId == episode.id
-                        val latestEpisode = rememberUpdatedState(episode)
                         val latestCurrentEpisodeId = rememberUpdatedState(currentEpisode.id)
                         val latestOnPlayToggle = rememberUpdatedState(onPlayToggle)
                         val latestOnPlayEpisode = rememberUpdatedState(onPlayEpisode)
                         val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
-                        val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
                         val latestOnMoveEpisode = rememberUpdatedState(onMoveEpisode)
                         val latestReorderStepPx by rememberUpdatedState(reorderStepPx)
                         val rowClick = remember(episode.id) {
                             { latestOnPlayEpisode.value(episode.id) }
                         }
-                        val rowAction = remember(episode.id) {
-                            { action: EpisodeRowAction ->
-                                when (action) {
-                                    EpisodeRowAction.Play -> {
-                                        if (episode.id == latestCurrentEpisodeId.value) {
-                                            latestOnPlayToggle.value()
-                                        } else {
-                                            latestOnPlayEpisode.value(episode.id)
-                                        }
-                                    }
-                                    EpisodeRowAction.AddToPlaylist -> Unit
-                                    EpisodeRowAction.RemoveFromPlaylist -> {
-                                        latestOnRemoveEpisodeFromPlaylist.value(episode.id)
-                                    }
-                                    EpisodeRowAction.ShowNotes -> showNotesEpisode = latestEpisode.value
-                                    EpisodeRowAction.MarkListened -> {
-                                        latestOnSetEpisodeListened.value(episode.id, true)
-                                    }
-                                    EpisodeRowAction.MarkUnlistened -> {
-                                        latestOnSetEpisodeListened.value(episode.id, false)
-                                    }
-                                    EpisodeRowAction.MoveUp -> latestOnMoveEpisode.value(episode.id, -1)
-                                    EpisodeRowAction.MoveDown -> latestOnMoveEpisode.value(episode.id, 1)
+                        val playToggleClick = remember(episode.id) {
+                            {
+                                if (episode.id == latestCurrentEpisodeId.value) {
+                                    latestOnPlayToggle.value()
+                                } else {
+                                    latestOnPlayEpisode.value(episode.id)
                                 }
                             }
                         }
-                        EpisodeRow(
+                        val removeClick = remember(episode.id) {
+                            { latestOnRemoveEpisodeFromPlaylist.value(episode.id) }
+                        }
+                        PlayerPlaylistItem(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
                             duration = formatEpisodeDuration(episode.durationSeconds),
-                            isPlaying = episode.id == currentEpisode.id,
-                            inPlaylist = true,
-                            isListened = episode.isListened,
+                            isCurrent = episode.id == currentEpisode.id,
+                            isPlaying = episode.id == currentEpisode.id && playbackSummary.isPlaying,
                             downloaded = episode.downloaded,
                             actionsEnabled = episode.id !in state.busyEpisodeIds,
-                            canMoveUp = index > 0,
-                            canMoveDown = index < state.queue.lastIndex,
-                            showDragHandle = true,
-                            showStatusIcons = false,
-                            compactPlaybackMenu = true,
-                            compactPlaybackActionLabel = if (
-                                episode.id == currentEpisode.id && playbackSummary.isPlaying
-                            ) {
-                                "Pause"
-                            } else {
-                                "Play"
-                            },
-                            statusTextOverride = if (episode.id == currentEpisode.id) {
-                                "${episode.podcastTitle} · now playing"
-                            } else {
-                                episode.podcastTitle
-                            },
                             modifier = Modifier
                                 .padding(bottom = 4.dp)
                                 .alpha(if (isDragging) 0.82f else 1f)
@@ -474,7 +437,8 @@ fun HomeScreen(
                                     }
                                 ),
                             onClick = rowClick,
-                            onAction = rowAction
+                            onRemoveFromPlaylist = removeClick,
+                            onPlayToggle = playToggleClick
                         )
                     }
                 }

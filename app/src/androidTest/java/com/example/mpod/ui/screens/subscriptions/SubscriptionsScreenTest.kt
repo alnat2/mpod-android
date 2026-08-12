@@ -196,13 +196,12 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
-        composeRule.onNodeWithTag("episode_actions_sheet").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Add First episode to playlist").assertIsDisplayed()
         composeRule.onNodeWithTag("episode_action_icon_playlist", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag("episode_action_icon_notes", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onAllNodesWithText("Download").assertCountEquals(0)
         composeRule.onNodeWithTag("episode_action_icon_listened", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Add to playlist").performClick()
+        composeRule.onNodeWithContentDescription("Add First episode to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
     }
@@ -215,8 +214,7 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
-        composeRule.onNodeWithText("Show notes").performClick()
+        composeRule.onNodeWithContentDescription("Show notes for First episode").performClick()
 
         composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
         composeRule.onNodeWithText("First episode notes").assertIsDisplayed()
@@ -364,9 +362,9 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
+        composeRule.onNodeWithContentDescription("Mark First episode as listened").assertIsDisplayed()
         composeRule.onAllNodesWithText("Download").assertCountEquals(0)
-        composeRule.onNodeWithText("Mark as listened").performClick()
+        composeRule.onNodeWithContentDescription("Mark First episode as listened").performClick()
 
         composeRule.runOnIdle {
             assertEquals(1 to true, listenedChange)
@@ -393,10 +391,8 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Show all").performClick()
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
-        composeRule.onNodeWithText("Remove from playlist").performClick()
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
-        composeRule.onNodeWithText("Mark as unlistened").performClick()
+        composeRule.onNodeWithContentDescription("Remove First episode from playlist").performClick()
+        composeRule.onNodeWithContentDescription("Mark First episode as unlistened").performClick()
 
         composeRule.runOnIdle {
             assertEquals(1, removedEpisodeId)
@@ -530,11 +526,10 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithTag("subscriptions_episode_list")
-            .performScrollToNode(hasContentDescription("Options for $longTitle"))
-        composeRule.onNodeWithContentDescription("Options for $longTitle")
+            .performScrollToNode(hasContentDescription("Add $longTitle to playlist"))
+        composeRule.onNodeWithContentDescription("Add $longTitle to playlist")
             .assertIsDisplayed()
             .performClick()
-        composeRule.onNodeWithText("Add to playlist").performClick()
 
         composeRule.runOnIdle { assertEquals(1_080, selectedEpisodeId) }
     }

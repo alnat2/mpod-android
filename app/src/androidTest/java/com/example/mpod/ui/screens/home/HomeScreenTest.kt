@@ -25,7 +25,7 @@ class HomeScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun homeHasNoHeaderActionsAndEpisodeMenuMatchesWeb() {
+    fun playerPlaylistUsesInlineActions() {
         var playToggleCount = 0
         composeRule.setContent {
             MpodTheme {
@@ -35,15 +35,11 @@ class HomeScreenTest {
 
         composeRule.onAllNodesWithContentDescription("Refresh").assertCountEquals(0)
         composeRule.onAllNodesWithContentDescription("View").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Options for Why store loyalty cards became a UX minefield")
+        composeRule.onNodeWithContentDescription("Play Why store loyalty cards became a UX minefield")
             .performScrollTo()
-            .performClick()
-
-        composeRule.onNodeWithTag("episode_actions_sheet").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_episode_play_action").assertIsDisplayed()
-        composeRule.onNodeWithTag("home_episode_playlist_action").assertIsDisplayed()
-        composeRule.onNodeWithTag("episode_action_icon_play", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("episode_action_icon_playlist", useUnmergedTree = true).assertIsDisplayed()
+            .assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Remove Why store loyalty cards became a UX minefield from playlist")
+            .assertIsDisplayed()
         composeRule.onAllNodesWithTag(
             "episode_action_icon_notes",
             useUnmergedTree = true
@@ -52,7 +48,7 @@ class HomeScreenTest {
         composeRule.onAllNodesWithText("Mark as listened").assertCountEquals(0)
         composeRule.onAllNodesWithText("Move down").assertCountEquals(0)
 
-        composeRule.onNodeWithTag("home_episode_play_action").performClick()
+        composeRule.onNodeWithContentDescription("Play Why store loyalty cards became a UX minefield").performClick()
         composeRule.runOnIdle { assertEquals(1, playToggleCount) }
     }
 
@@ -139,8 +135,9 @@ class HomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Options for Why store loyalty cards became a UX minefield").performClick()
-        composeRule.onNodeWithTag("home_episode_playlist_action").performClick()
+        composeRule.onNodeWithContentDescription(
+            "Remove Why store loyalty cards became a UX minefield from playlist"
+        ).performClick()
 
         composeRule.runOnIdle { assertEquals(1, removedEpisodeId) }
     }

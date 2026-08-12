@@ -1,26 +1,25 @@
 package com.example.mpod.ui.components
 
-import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,7 +44,190 @@ enum class EpisodeRowAction {
     MoveDown
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlayerPlaylistItem(
+    title: String,
+    podcastName: String,
+    duration: String,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    downloaded: Boolean,
+    actionsEnabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    onRemoveFromPlaylist: () -> Unit = {},
+    onPlayToggle: () -> Unit = {}
+) {
+    EpisodeItemSurface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 112.dp)
+            .clickable(enabled = actionsEnabled, onClick = onClick),
+        radius = 8,
+        horizontalPaddingEnd = 12
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.ic_huge_drag_drop_horizontal),
+            contentDescription = null,
+            modifier = Modifier.size(32.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            EpisodeTitle(text = title)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                EpisodeMetaLine(
+                    text = if (isCurrent) "Now playing" else podcastName,
+                    downloaded = downloaded,
+                    highlight = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = duration,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EpisodeInlineActionButton(
+                        iconRes = R.drawable.ic_huge_playlist_remove,
+                        contentDescription = "Remove $title from playlist",
+                        testTag = "player_episode_remove_action",
+                        enabled = actionsEnabled,
+                        onClick = onRemoveFromPlaylist
+                    )
+                    EpisodeInlineActionButton(
+                        iconRes = if (isPlaying) {
+                            R.drawable.ic_huge_pause
+                        } else {
+                            R.drawable.ic_huge_play
+                        },
+                        contentDescription = if (isPlaying) "Pause $title" else "Play $title",
+                        testTag = "player_episode_play_action",
+                        enabled = actionsEnabled,
+                        onClick = onPlayToggle
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SubscriptionEpisodeItem(
+    title: String,
+    podcastName: String,
+    duration: String,
+    date: String?,
+    inPlaylist: Boolean,
+    isListened: Boolean,
+    downloaded: Boolean,
+    actionsEnabled: Boolean,
+    modifier: Modifier = Modifier,
+    onAddToPlaylist: () -> Unit = {},
+    onRemoveFromPlaylist: () -> Unit = {},
+    onShowNotes: () -> Unit = {},
+    onMarkListened: () -> Unit = {},
+    onMarkUnlistened: () -> Unit = {}
+) {
+    EpisodeItemSurface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 116.dp),
+        radius = 16,
+        horizontalPaddingStart = 32,
+        horizontalPaddingEnd = 12,
+        leadingOverlayIconRes = R.drawable.ic_huge_drag_drop_vertical
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            EpisodeTitle(text = title)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    EpisodeMetaLine(
+                        text = podcastName,
+                        downloaded = downloaded,
+                        highlight = true
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = duration,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        date?.let {
+                            Text(
+                                text = it,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EpisodeInlineActionButton(
+                        iconRes = if (inPlaylist) {
+                            R.drawable.ic_huge_playlist_remove
+                        } else {
+                            R.drawable.ic_huge_playlist_add
+                        },
+                        contentDescription = if (inPlaylist) {
+                            "Remove $title from playlist"
+                        } else {
+                            "Add $title to playlist"
+                        },
+                        testTag = "episode_action_icon_playlist",
+                        enabled = actionsEnabled,
+                        onClick = if (inPlaylist) onRemoveFromPlaylist else onAddToPlaylist
+                    )
+                    EpisodeInlineActionButton(
+                        iconRes = R.drawable.ic_huge_note,
+                        contentDescription = "Show notes for $title",
+                        testTag = "episode_action_icon_notes",
+                        enabled = actionsEnabled,
+                        onClick = onShowNotes
+                    )
+                    EpisodeInlineActionButton(
+                        iconRes = if (isListened) {
+                            R.drawable.ic_huge_view_off
+                        } else {
+                            R.drawable.ic_huge_view
+                        },
+                        contentDescription = if (isListened) {
+                            "Mark $title as unlistened"
+                        } else {
+                            "Mark $title as listened"
+                        },
+                        testTag = "episode_action_icon_listened",
+                        enabled = actionsEnabled,
+                        onClick = if (isListened) onMarkUnlistened else onMarkListened
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun EpisodeRow(
     title: String,
@@ -68,335 +250,155 @@ fun EpisodeRow(
     onClick: (() -> Unit)? = null,
     onAction: ((EpisodeRowAction) -> Unit)? = null
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    val backgroundColor = if (isPlaying)
-        MaterialTheme.colorScheme.surfaceVariant
-    else
-        MaterialTheme.colorScheme.surface
-    val showDownloadedStatus = showStatusIcons && downloaded
-    val showInPlaylistStatus = showStatusIcons && inPlaylist
-    val hasStatusIcons = showDownloadedStatus || showInPlaylistStatus
-    val statusText = when {
-        statusTextOverride != null -> statusTextOverride
-        isPlaying -> "$podcastName · now playing"
-        hasStatusIcons -> null
-        else -> podcastName
-    }
-
-    if (menuExpanded && onAction != null) {
-        EpisodeActionsBottomSheet(
+    val metaText = statusTextOverride ?: podcastName
+    if (compactPlaybackMenu) {
+        PlayerPlaylistItem(
             title = title,
-            podcastName = podcastName,
-            compactPlaybackMenu = compactPlaybackMenu,
-            compactPlaybackActionLabel = compactPlaybackActionLabel,
+            podcastName = metaText,
+            duration = duration,
+            isCurrent = isPlaying,
+            isPlaying = compactPlaybackActionLabel == "Pause",
+            downloaded = downloaded,
+            actionsEnabled = actionsEnabled,
+            modifier = modifier,
+            onClick = { onClick?.invoke() },
+            onRemoveFromPlaylist = { onAction?.invoke(EpisodeRowAction.RemoveFromPlaylist) },
+            onPlayToggle = { onAction?.invoke(EpisodeRowAction.Play) }
+        )
+    } else {
+        SubscriptionEpisodeItem(
+            title = title,
+            podcastName = metaText,
+            duration = duration,
+            date = date,
             inPlaylist = inPlaylist,
             isListened = isListened,
-            onDismiss = { menuExpanded = false },
-            onAction = { action ->
-                menuExpanded = false
-                onAction(action)
-            }
+            downloaded = showStatusIcons && downloaded,
+            actionsEnabled = actionsEnabled,
+            modifier = modifier,
+            onAddToPlaylist = { onAction?.invoke(EpisodeRowAction.AddToPlaylist) },
+            onRemoveFromPlaylist = { onAction?.invoke(EpisodeRowAction.RemoveFromPlaylist) },
+            onShowNotes = { onAction?.invoke(EpisodeRowAction.ShowNotes) },
+            onMarkListened = { onAction?.invoke(EpisodeRowAction.MarkListened) },
+            onMarkUnlistened = { onAction?.invoke(EpisodeRowAction.MarkUnlistened) }
         )
     }
+}
 
-    Row(
+@Composable
+private fun EpisodeItemSurface(
+    modifier: Modifier,
+    radius: Int,
+    horizontalPaddingStart: Int = 8,
+    horizontalPaddingEnd: Int = 8,
+    leadingOverlayIconRes: Int? = null,
+    content: @Composable RowScope.() -> Unit
+) {
+    Box(
         modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 76.dp)
-            .figmaDropShadow(radius = 4.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(backgroundColor)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = if (showDragHandle) 8.dp else 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .figmaDropShadow(radius = 2.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(radius.dp))
     ) {
-        if (showDragHandle) {
+        if (leadingOverlayIconRes != null) {
             Icon(
-                painter = painterResource(id = R.drawable.ic_huge_drag_drop_vertical),
+                painter = painterResource(id = leadingOverlayIconRes),
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(32.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            EpisodeStatusLine(
-                text = statusText,
-                showDownloaded = showDownloadedStatus,
-                showInPlaylist = showInPlaylistStatus,
-                isPlaying = isPlaying
-            )
-        }
-
-        if (date == null) {
-            Text(
-                text = duration,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        } else {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = date,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = duration,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-
-        Box(
+        Row(
             modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.background)
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
-                .then(
-                    if (onAction == null || !actionsEnabled) {
-                        Modifier
-                    } else {
-                        Modifier.clickable { menuExpanded = true }
-                    }
-                )
-                .semantics {
-                    contentDescription = "Options for $title"
-                    role = Role.Button
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_huge_more_vertical),
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
+                .fillMaxWidth()
+                .padding(
+                    start = horizontalPaddingStart.dp,
+                    top = 12.dp,
+                    end = horizontalPaddingEnd.dp,
+                    bottom = 12.dp
+                ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content
+        )
     }
 }
 
 @Composable
-private fun EpisodeStatusLine(
-    text: String?,
-    showDownloaded: Boolean,
-    showInPlaylist: Boolean,
-    isPlaying: Boolean
-) {
-    val showText = !text.isNullOrBlank()
-    if (!showDownloaded && !showInPlaylist && !showText) return
+private fun EpisodeTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
 
+@Composable
+private fun EpisodeMetaLine(
+    text: String,
+    downloaded: Boolean,
+    highlight: Boolean,
+    modifier: Modifier = Modifier
+) {
     Row(
-        modifier = Modifier.heightIn(min = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = modifier.heightIn(min = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        if (showDownloaded) {
+        if (downloaded) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_episode_status_downloaded),
                 contentDescription = "Downloaded",
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(20.dp),
                 tint = Color.Unspecified
             )
         }
-        if (showInPlaylist) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_episode_status_in_playlist),
-                contentDescription = "In playlist",
-                modifier = Modifier.size(16.dp),
-                tint = Color.Unspecified
-            )
-        }
-        if (showText) {
-            Text(
-                text = text.orEmpty(),
-                modifier = Modifier.weight(1f, fill = false),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Normal,
-                color = if (isPlaying) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EpisodeActionsBottomSheet(
-    title: String,
-    podcastName: String,
-    compactPlaybackMenu: Boolean,
-    compactPlaybackActionLabel: String,
-    inPlaylist: Boolean,
-    isListened: Boolean,
-    onDismiss: () -> Unit,
-    onAction: (EpisodeRowAction) -> Unit
-) {
-    MpodBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .testTag("episode_actions_sheet")
-        ) {
-            Column(
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 18.sp,
-                    lineHeight = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = podcastName,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            if (compactPlaybackMenu) {
-                EpisodeSheetAction(
-                    text = compactPlaybackActionLabel,
-                    iconRes = if (compactPlaybackActionLabel == "Pause") {
-                        R.drawable.ic_huge_pause
-                    } else {
-                        R.drawable.ic_huge_play
-                    },
-                    iconTag = "episode_action_icon_play",
-                    modifier = Modifier.testTag("home_episode_play_action"),
-                    onClick = { onAction(EpisodeRowAction.Play) }
-                )
-                EpisodeSheetAction(
-                    text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
-                    iconRes = if (inPlaylist) {
-                        R.drawable.ic_huge_playlist_remove
-                    } else {
-                        R.drawable.ic_huge_playlist_add
-                    },
-                    iconTag = "episode_action_icon_playlist",
-                    modifier = Modifier.testTag("home_episode_playlist_action"),
-                    onClick = {
-                        onAction(
-                            if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist
-                            else EpisodeRowAction.AddToPlaylist
-                        )
-                    }
-                )
-            } else {
-                EpisodeSheetAction(
-                    text = if (inPlaylist) "Remove from playlist" else "Add to playlist",
-                    iconRes = if (inPlaylist) {
-                        R.drawable.ic_huge_playlist_remove
-                    } else {
-                        R.drawable.ic_huge_playlist_add
-                    },
-                    iconTag = "episode_action_icon_playlist",
-                    onClick = {
-                        onAction(
-                            if (inPlaylist) EpisodeRowAction.RemoveFromPlaylist
-                            else EpisodeRowAction.AddToPlaylist
-                        )
-                    }
-                )
-                EpisodeSheetAction(
-                    text = "Show notes",
-                    iconRes = R.drawable.ic_huge_note,
-                    iconTag = "episode_action_icon_notes",
-                    onClick = { onAction(EpisodeRowAction.ShowNotes) }
-                )
-                EpisodeSheetAction(
-                    text = if (isListened) "Mark as unlistened" else "Mark as listened",
-                    iconRes = if (isListened) {
-                        R.drawable.ic_huge_view_off
-                    } else {
-                        R.drawable.ic_huge_view
-                    },
-                    iconTag = "episode_action_icon_listened",
-                    onClick = {
-                        onAction(
-                            if (isListened) EpisodeRowAction.MarkUnlistened
-                            else EpisodeRowAction.MarkListened
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EpisodeSheetAction(
-    text: String,
-    @DrawableRes iconRes: Int,
-    iconTag: String,
-    enabled: Boolean = true,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .alpha(if (enabled) 1f else 0.45f)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            painter = painterResource(iconRes),
-            contentDescription = null,
-            modifier = Modifier
-                .size(24.dp)
-                .testTag(iconTag),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Text(
             text = text,
-            fontSize = 16.sp,
-            lineHeight = 24.sp,
-            color = MaterialTheme.colorScheme.onSurface
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            color = if (highlight) {
+                MaterialTheme.colorScheme.tertiary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+@Composable
+private fun EpisodeInlineActionButton(
+    iconRes: Int,
+    contentDescription: String,
+    testTag: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    SquareIconButton(
+        iconRes = iconRes,
+        contentDescription = contentDescription,
+        modifier = Modifier
+            .testTag(testTag)
+            .semantics {
+                this.contentDescription = contentDescription
+                role = Role.Button
+            }
+            .alpha(if (enabled) 1f else 0.45f),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.primary,
+        size = 44.dp,
+        iconSize = 24.dp,
+        radius = 10.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        elevation = 1.dp,
+        onClick = if (enabled) onClick else null
+    )
 }

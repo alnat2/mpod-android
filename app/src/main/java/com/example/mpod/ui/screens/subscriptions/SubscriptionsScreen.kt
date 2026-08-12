@@ -57,8 +57,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
-import com.example.mpod.ui.components.EpisodeRowAction
-import com.example.mpod.ui.components.EpisodeRow
+import com.example.mpod.ui.components.SubscriptionEpisodeItem
 import com.example.mpod.ui.components.UnsubscribeUndoBanner
 import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
@@ -331,31 +330,7 @@ fun SubscriptionsScreen(
                                 val latestOnAddEpisodeToPlaylist = rememberUpdatedState(onAddEpisodeToPlaylist)
                                 val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
                                 val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
-                                val rowAction = remember(episode.id) {
-                                    { action: EpisodeRowAction ->
-                                        when (action) {
-                                            EpisodeRowAction.Play -> Unit
-                                            EpisodeRowAction.AddToPlaylist -> {
-                                                latestOnAddEpisodeToPlaylist.value(episode.id)
-                                            }
-                                            EpisodeRowAction.RemoveFromPlaylist -> {
-                                                latestOnRemoveEpisodeFromPlaylist.value(episode.id)
-                                            }
-                                            EpisodeRowAction.ShowNotes -> {
-                                                showNotesEpisode = latestSelectedPodcast.value to latestEpisode.value
-                                            }
-                                            EpisodeRowAction.MarkListened -> {
-                                                latestOnSetEpisodeListened.value(episode.id, true)
-                                            }
-                                            EpisodeRowAction.MarkUnlistened -> {
-                                                latestOnSetEpisodeListened.value(episode.id, false)
-                                            }
-                                            EpisodeRowAction.MoveUp -> Unit
-                                            EpisodeRowAction.MoveDown -> Unit
-                                        }
-                                    }
-                                }
-                                EpisodeRow(
+                                SubscriptionEpisodeItem(
                                     title = episode.title,
                                     podcastName = selectedPodcast.title,
                                     duration = formatEpisodeDuration(episode.durationSeconds),
@@ -364,9 +339,22 @@ fun SubscriptionsScreen(
                                     isListened = episode.isListened,
                                     downloaded = episode.downloaded,
                                     actionsEnabled = episode.id !in state.busyEpisodeIds,
-                                    showDragHandle = false,
                                     modifier = Modifier.testTag("subscription_episode_row_${episode.id}"),
-                                    onAction = rowAction
+                                    onAddToPlaylist = {
+                                        latestOnAddEpisodeToPlaylist.value(episode.id)
+                                    },
+                                    onRemoveFromPlaylist = {
+                                        latestOnRemoveEpisodeFromPlaylist.value(episode.id)
+                                    },
+                                    onShowNotes = {
+                                        showNotesEpisode = latestSelectedPodcast.value to latestEpisode.value
+                                    },
+                                    onMarkListened = {
+                                        latestOnSetEpisodeListened.value(episode.id, true)
+                                    },
+                                    onMarkUnlistened = {
+                                        latestOnSetEpisodeListened.value(episode.id, false)
+                                    }
                                 )
                             }
                         }
