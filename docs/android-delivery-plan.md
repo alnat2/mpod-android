@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-08-09 (non-current items removed from the active backlog)
+Last updated: 2026-08-12 (episode card redesign and inline action behavior recorded)
 
 Current Android source baseline: `1.0.17 (18)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
 
@@ -42,6 +42,8 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Active episode | Stored by the backend and restored without autoplay |
 | Mark all listened | Executes immediately, without a confirmation dialog |
 | Subscription episode playback | No separate Play action exists for episodes outside the playlist |
+| Episode actions | Mobile Player playlist and Subscriptions episode actions are inline on the episode card; the episode action bottom sheet is not part of the current UX |
+| Bottom sheets/modals | Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow |
 | Subscriptions loading | First load shows a neutral loading state; later entries show the session-cached library immediately and silently reconcile with backend; a confirmed empty state is never inferred from the initial empty collection |
 | Design | Android screens and mobile components in the mpod Figma file |
 | Player time labels | Left is elapsed position; right is remaining time, clamped as `max(durationSeconds - positionSeconds, 0)` |
@@ -52,6 +54,9 @@ Figma references:
 
 - Android screens: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=880-4200>
 - Mobile components: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=700-4536>
+- Current mobile screens page: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=27-2>
+- Subscription episode item v2: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1213-4634>
+- Player playlist item states: `playlistitem-playing`, `playlistitem-inqueue`, and `playlistitem-inqueue-downloaded` in the mobile screens page
 - Podcast fallback artwork: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=757-6696>
 
 Icon-source decision confirmed on 2026-07-29: every Android UI icon must come from Hugeicons. Use the exact named asset from `@hugeicons/core-free-icons` or an exact Hugeicons export supplied through Figma; do not substitute Material Icons or a visually similar hand-authored icon. If the exact Hugeicons name or asset cannot be identified, implementation pauses for product-owner clarification. Branding, podcast artwork, and the approved fallback illustration are not UI icons.

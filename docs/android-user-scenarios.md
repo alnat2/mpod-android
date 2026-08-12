@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-07-29
+Last updated: 2026-08-12
 
 ## Purpose
 
@@ -20,7 +20,7 @@ Expected behavior is taken from these sources, in order:
 
 When a required behavior is absent or the sources disagree, the scenario is marked `Open`. It must not be implemented from an assumption.
 
-Explicit chat decisions override stale Figma states. In particular, the existing Home/Now playing destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation, and the authenticated start destination is Subscriptions. Podcast artwork is informational: the MVP has no tap action or separate podcast-detail destination.
+Explicit chat decisions override stale Figma states. In particular, the existing Home/Now playing destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation, and the authenticated start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow. Podcast artwork is informational: the MVP has no tap action or separate podcast-detail destination.
 
 ## Scenario status
 
@@ -119,7 +119,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| EPS-01 | Open an episode menu in Subscriptions | Only allowed actions are shown; there is no Play or queue-drag action outside the playlist | U | Verified |
+| EPS-01 | Use an episode action in Subscriptions | Allowed actions are shown inline on the episode card; there is no Play, manual Download, or queue-drag action outside the playlist | U | Verified |
 | EPS-02 | Add an episode to playlist | Backend playlist changes; row/count/menu update to In playlist / Remove | C,U,E | Verified |
 | EPS-03 | Add to playlist fails | Optimistic UI rolls back only the target episode and a retryable error is shown | C,U,E | Verified |
 | EPS-04 | Remove a non-active episode from playlist | Backend and both screens remove only that episode; unrelated playback is uninterrupted | C,U,E | Verified |
@@ -143,7 +143,7 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | HOM-04 | Open Home with a queue and no backend active episode | First queue item is displayed without autoplay | C,U,E | Verified |
 | HOM-05 | Open Home with saved active playback | Correct episode and saved position restore without autoplay | C,U,E,L | Verified |
 | HOM-06 | Tap a queue row | That episode becomes active and starts playing | C,U,E | Verified |
-| HOM-07 | Open a Home episode menu | Menu contains only Play/Pause and Remove from playlist, matching web behavior | U | Verified |
+| HOM-07 | Use a Player queue item action | Play/Pause and Remove from playlist are available inline on the queue item; the Player playlist does not open an episode action bottom sheet | U | Verified |
 | HOM-08 | Long-press and drag a queue row | Visible order and authoritative backend order change together | C,U,E | Verified |
 | HOM-09 | Queue reorder fails | UI returns to backend order and shows a truthful error | C,U,E | Verified |
 | HOM-10 | Queue changes from another client/backend operation | Home reconciles without duplicate/stale rows and preserves the current item when still valid | C,E,L | Verified |
@@ -250,6 +250,7 @@ The product owner confirmed on 2026-07-19:
 11. Playback completion is explicit. Ordinary progress, including a pause or seek inside the final 15 seconds or at the reported duration, never marks an episode listened and never removes it from the playlist. Android sends `completed: true` only from Media3 natural-completion events.
 12. When completion of the last playlist item returns `nextEpisodeId`, Android starts that backend-selected episode. Existing playback state is resumed; if no playback state exists, playback starts at `0:00`.
 13. Player time labels are explicit: the left label is elapsed playback position; the right label is remaining time calculated as `max(durationSeconds - positionSeconds, 0)`. The right label is not the episode's fixed total duration.
+14. Episode actions are inline on the mobile Player playlist item and Subscriptions episode card. The episode action bottom sheet is not part of the current mobile UX. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
 
 There are no known unanswered product questions blocking the functional scenario audit.
 
