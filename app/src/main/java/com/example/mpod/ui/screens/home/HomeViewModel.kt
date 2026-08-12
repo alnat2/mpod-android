@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Response
 import javax.inject.Inject
@@ -137,48 +136,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun downloadEpisode(episodeId: Int) {
-        if (episodeId in _state.value.downloadingEpisodeIds) return
-
-        viewModelScope.launch {
-            _state.value = _state.value.copy(
-                downloadingEpisodeIds = _state.value.downloadingEpisodeIds + episodeId,
-                downloadFailure = null
-            )
-            val response = runCatching { api.downloadEpisode(episodeId) }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-                    _state.value.copy(
-                        downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
-                        actionErrorMessage = error.message ?: "Could not reload playlist."
-                    )
-                }
-                _state.value = nextState.withTransientStateFrom(
-                    current = _state.value,
-                    completedDownloadEpisodeId = episodeId
-                )
-            } else {
-                val failure = DownloadFailureUi(
-                    episodeId = episodeId,
-                    message = apiErrorMessage(
-                        response?.errorBody()?.string(),
-                        "Could not download this episode. Try again."
-                    )
-                )
-                _state.value = _state.value.copy(
-                    downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
-                    downloadFailure = failure
-                )
-                delay(DOWNLOAD_FAILURE_TIMEOUT_MS)
-                if (_state.value.downloadFailure == failure) dismissDownloadFailure()
-            }
-        }
-    }
-
-    fun dismissDownloadFailure() {
-        _state.value = _state.value.copy(downloadFailure = null)
-    }
-
     fun moveEpisode(episodeId: Int, offset: Int) {
         val currentQueue = _state.value.queue
         if (episodeId in _state.value.busyEpisodeIds) return
@@ -266,31 +223,17 @@ data class HomeUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
-    val downloadFailure: DownloadFailureUi? = null,
-    val downloadingEpisodeIds: Set<Int> = emptySet(),
     val busyEpisodeIds: Set<Int> = emptySet(),
     val hasPodcasts: Boolean = true,
     val activeEpisodeId: Int? = null,
     val queue: List<HomeEpisodeUi> = emptyList()
 )
 
-data class DownloadFailureUi(
-    val episodeId: Int,
-    val message: String
-)
-
-private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
-
 internal fun HomeUiState.withTransientStateFrom(
     current: HomeUiState,
-    completedDownloadEpisodeId: Int? = null,
     completedBusyEpisodeId: Int? = null
 ): HomeUiState {
     return copy(
-        downloadFailure = current.downloadFailure,
-        downloadingEpisodeIds = completedDownloadEpisodeId?.let {
-            current.downloadingEpisodeIds - it
-        } ?: current.downloadingEpisodeIds,
         busyEpisodeIds = completedBusyEpisodeId?.let {
             current.busyEpisodeIds - it
         } ?: current.busyEpisodeIds

@@ -45,7 +45,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRow
 import com.example.mpod.ui.components.EpisodeRowAction
-import com.example.mpod.ui.components.DownloadFailureBanner
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodBottomNav
@@ -218,9 +217,7 @@ fun HomeRoute(
         onRetryLoad = viewModel::refresh,
         onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
-        onSetEpisodeListened = viewModel::setEpisodeListened,
-        onDownloadEpisode = viewModel::downloadEpisode,
-        onDismissDownloadFailure = viewModel::dismissDownloadFailure
+        onSetEpisodeListened = viewModel::setEpisodeListened
     )
 }
 
@@ -244,9 +241,7 @@ fun HomeScreen(
     onRetryLoad: () -> Unit = {},
     onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
-    onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
-    onDownloadEpisode: (Int) -> Unit = {},
-    onDismissDownloadFailure: () -> Unit = {}
+    onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> }
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
     var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
@@ -387,7 +382,6 @@ fun HomeScreen(
                         val latestOnPlayEpisode = rememberUpdatedState(onPlayEpisode)
                         val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
                         val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
-                        val latestOnDownloadEpisode = rememberUpdatedState(onDownloadEpisode)
                         val latestOnMoveEpisode = rememberUpdatedState(onMoveEpisode)
                         val latestReorderStepPx by rememberUpdatedState(reorderStepPx)
                         val rowClick = remember(episode.id) {
@@ -408,7 +402,6 @@ fun HomeScreen(
                                         latestOnRemoveEpisodeFromPlaylist.value(episode.id)
                                     }
                                     EpisodeRowAction.ShowNotes -> showNotesEpisode = latestEpisode.value
-                                    EpisodeRowAction.Download -> latestOnDownloadEpisode.value(episode.id)
                                     EpisodeRowAction.MarkListened -> {
                                         latestOnSetEpisodeListened.value(episode.id, true)
                                     }
@@ -428,7 +421,6 @@ fun HomeScreen(
                             inPlaylist = true,
                             isListened = episode.isListened,
                             downloaded = episode.downloaded,
-                            isDownloading = episode.id in state.downloadingEpisodeIds,
                             actionsEnabled = episode.id !in state.busyEpisodeIds,
                             canMoveUp = index > 0,
                             canMoveDown = index < state.queue.lastIndex,
@@ -499,17 +491,6 @@ fun HomeScreen(
             }
         }
 
-        state.downloadFailure?.let { failure ->
-            DownloadFailureBanner(
-                message = failure.message,
-                onDismiss = onDismissDownloadFailure,
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 10.dp)
-                    .align(Alignment.TopCenter)
-            )
-        }
     }
 }
 

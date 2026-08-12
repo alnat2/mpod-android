@@ -387,48 +387,6 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
-    fun downloadEpisode(episodeId: Int) {
-        if (episodeId in _state.value.downloadingEpisodeIds) return
-
-        viewModelScope.launch {
-            _state.value = _state.value.copy(
-                downloadingEpisodeIds = _state.value.downloadingEpisodeIds + episodeId,
-                downloadFailure = null
-            )
-            val response = runCatching { api.downloadEpisode(episodeId) }.getOrNull()
-            if (response?.isSuccessful == true) {
-                val nextState = runCatching { loadSubscriptionsState() }.getOrElse { error ->
-                    _state.value.copy(
-                        downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
-                        actionErrorMessage = error.message ?: "Could not reload subscriptions."
-                    )
-                }
-                _state.value = nextState.withTransientStateFrom(
-                    current = _state.value,
-                    completedEpisodeId = episodeId
-                )
-            } else {
-                val failure = SubscriptionDownloadFailureUi(
-                    episodeId = episodeId,
-                    message = apiErrorMessage(
-                        response?.errorBody()?.string(),
-                        "Could not download this episode. Try again."
-                    )
-                )
-                _state.value = _state.value.copy(
-                    downloadingEpisodeIds = _state.value.downloadingEpisodeIds - episodeId,
-                    downloadFailure = failure
-                )
-                delay(DOWNLOAD_FAILURE_TIMEOUT_MS)
-                if (_state.value.downloadFailure == failure) dismissDownloadFailure()
-            }
-        }
-    }
-
-    fun dismissDownloadFailure() {
-        _state.value = _state.value.copy(downloadFailure = null)
-    }
-
     private fun performEpisodeAction(
         episodeId: Int,
         defaultErrorMessage: String,
@@ -586,8 +544,6 @@ data class SubscriptionsUiState(
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
-    val downloadFailure: SubscriptionDownloadFailureUi? = null,
-    val downloadingEpisodeIds: Set<Int> = emptySet(),
     val pendingUnsubscribe: PendingUnsubscribeUi? = null,
     val failedUnsubscribePodcastId: Int? = null,
     val failedMarkAllListenedPodcastId: Int? = null,
@@ -598,11 +554,6 @@ data class SubscriptionsUiState(
     val unsubscribingPodcastIds: Set<Int> = emptySet(),
     val busyEpisodeIds: Set<Int> = emptySet(),
     val podcasts: List<SubscriptionPodcastUi> = emptyList()
-)
-
-data class SubscriptionDownloadFailureUi(
-    val episodeId: Int,
-    val message: String
 )
 
 data class PendingUnsubscribeUi(
@@ -623,7 +574,6 @@ enum class FailedEpisodeActionType {
     MarkUnlistened
 }
 
-private const val DOWNLOAD_FAILURE_TIMEOUT_MS = 10_000L
 private const val UNSUBSCRIBE_WINDOW_SECONDS = 15
 private const val UNSUBSCRIBE_TICK_MS = 1_000L
 private const val REFRESH_ALL_STATUS_POLL_MS = 3_000L
@@ -653,14 +603,9 @@ internal suspend fun awaitRefreshAllCompletion(
 }
 
 internal fun SubscriptionsUiState.withTransientStateFrom(
-    current: SubscriptionsUiState,
-    completedEpisodeId: Int? = null
+    current: SubscriptionsUiState
 ): SubscriptionsUiState {
     return copy(
-        downloadFailure = current.downloadFailure,
-        downloadingEpisodeIds = completedEpisodeId?.let {
-            current.downloadingEpisodeIds - it
-        } ?: current.downloadingEpisodeIds,
         pendingUnsubscribe = current.pendingUnsubscribe,
         failedUnsubscribePodcastId = current.failedUnsubscribePodcastId?.takeIf { podcastId ->
             podcasts.any { it.id == podcastId }

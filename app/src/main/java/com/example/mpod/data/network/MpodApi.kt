@@ -87,9 +87,6 @@ interface MpodApi {
         @Body request: EpisodeListenedRequest
     ): Response<Unit>
 
-    @POST("api/episodes/{episodeId}/download")
-    suspend fun downloadEpisode(@Path("episodeId") episodeId: Int): Response<Unit>
-
     @GET("api/playlist")
     suspend fun getPlaylist(): Response<PlaylistResponse>
 

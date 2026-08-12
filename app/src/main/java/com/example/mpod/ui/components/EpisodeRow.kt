@@ -1,11 +1,6 @@
 package com.example.mpod.ui.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -45,7 +39,6 @@ enum class EpisodeRowAction {
     AddToPlaylist,
     RemoveFromPlaylist,
     ShowNotes,
-    Download,
     MarkListened,
     MarkUnlistened,
     MoveUp,
@@ -63,7 +56,6 @@ fun EpisodeRow(
     inPlaylist: Boolean = false,
     isListened: Boolean = false,
     downloaded: Boolean = false,
-    isDownloading: Boolean = false,
     actionsEnabled: Boolean = true,
     canMoveUp: Boolean = false,
     canMoveDown: Boolean = false,
@@ -85,7 +77,6 @@ fun EpisodeRow(
     val showInPlaylistStatus = showStatusIcons && inPlaylist
     val hasStatusIcons = showDownloadedStatus || showInPlaylistStatus
     val statusText = when {
-        isDownloading -> "Downloading…"
         statusTextOverride != null -> statusTextOverride
         isPlaying -> "$podcastName · now playing"
         hasStatusIcons -> null
@@ -100,8 +91,6 @@ fun EpisodeRow(
             compactPlaybackActionLabel = compactPlaybackActionLabel,
             inPlaylist = inPlaylist,
             isListened = isListened,
-            downloaded = downloaded,
-            isDownloading = isDownloading,
             onDismiss = { menuExpanded = false },
             onAction = { action ->
                 menuExpanded = false
@@ -268,8 +257,6 @@ private fun EpisodeActionsBottomSheet(
     compactPlaybackActionLabel: String,
     inPlaylist: Boolean,
     isListened: Boolean,
-    downloaded: Boolean,
-    isDownloading: Boolean,
     onDismiss: () -> Unit,
     onAction: (EpisodeRowAction) -> Unit
 ) {
@@ -359,22 +346,6 @@ private fun EpisodeActionsBottomSheet(
                     onClick = { onAction(EpisodeRowAction.ShowNotes) }
                 )
                 EpisodeSheetAction(
-                    text = when {
-                        isDownloading -> "Downloading…"
-                        downloaded -> "Downloaded"
-                        else -> "Download"
-                    },
-                    iconRes = if (downloaded) {
-                        R.drawable.ic_huge_download_square_02
-                    } else {
-                        R.drawable.ic_huge_download_square_01
-                    },
-                    iconTag = "episode_action_icon_download",
-                    enabled = !downloaded && !isDownloading,
-                    showProgress = isDownloading,
-                    onClick = { onAction(EpisodeRowAction.Download) }
-                )
-                EpisodeSheetAction(
                     text = if (isListened) "Mark as unlistened" else "Mark as listened",
                     iconRes = if (isListened) {
                         R.drawable.ic_huge_view_off
@@ -400,7 +371,6 @@ private fun EpisodeSheetAction(
     @DrawableRes iconRes: Int,
     iconTag: String,
     enabled: Boolean = true,
-    showProgress: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -414,18 +384,14 @@ private fun EpisodeSheetAction(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (showProgress) {
-            HugeLoadingIcon(modifier = Modifier.size(24.dp))
-        } else {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(24.dp)
-                    .testTag(iconTag),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier
+                .size(24.dp)
+                .testTag(iconTag),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             text = text,
             fontSize = 16.sp,
@@ -433,23 +399,4 @@ private fun EpisodeSheetAction(
             color = MaterialTheme.colorScheme.onSurface
         )
     }
-}
-
-@Composable
-private fun HugeLoadingIcon(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "episode-download-loading")
-    val rotation by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = LinearEasing)
-        ),
-        label = "episode-download-loading-rotation"
-    )
-    Icon(
-        painter = painterResource(R.drawable.ic_huge_loading_02),
-        contentDescription = null,
-        modifier = modifier.rotate(rotation),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 }

@@ -59,7 +59,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
 import com.example.mpod.ui.components.EpisodeRowAction
 import com.example.mpod.ui.components.EpisodeRow
-import com.example.mpod.ui.components.DownloadFailureBanner
 import com.example.mpod.ui.components.UnsubscribeUndoBanner
 import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
@@ -103,8 +102,6 @@ fun SubscriptionsRoute(
         onAddEpisodeToPlaylist = viewModel::addEpisodeToPlaylist,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
-        onDownloadEpisode = viewModel::downloadEpisode,
-        onDismissDownloadFailure = viewModel::dismissDownloadFailure,
         onRetryLoad = viewModel::refresh,
         onRetryRefresh = viewModel::retryLastAction,
         onAddRssFeed = onAddRssFeed,
@@ -124,8 +121,6 @@ fun SubscriptionsScreen(
     onAddEpisodeToPlaylist: (Int) -> Unit = {},
     onRemoveEpisodeFromPlaylist: (Int) -> Unit = {},
     onSetEpisodeListened: (episodeId: Int, isListened: Boolean) -> Unit = { _, _ -> },
-    onDownloadEpisode: (Int) -> Unit = {},
-    onDismissDownloadFailure: () -> Unit = {},
     onRetryLoad: () -> Unit = {},
     onAddRssFeed: () -> Unit = {},
     onImportOpml: () -> Unit = {},
@@ -336,7 +331,6 @@ fun SubscriptionsScreen(
                                 val latestOnAddEpisodeToPlaylist = rememberUpdatedState(onAddEpisodeToPlaylist)
                                 val latestOnRemoveEpisodeFromPlaylist = rememberUpdatedState(onRemoveEpisodeFromPlaylist)
                                 val latestOnSetEpisodeListened = rememberUpdatedState(onSetEpisodeListened)
-                                val latestOnDownloadEpisode = rememberUpdatedState(onDownloadEpisode)
                                 val rowAction = remember(episode.id) {
                                     { action: EpisodeRowAction ->
                                         when (action) {
@@ -350,7 +344,6 @@ fun SubscriptionsScreen(
                                             EpisodeRowAction.ShowNotes -> {
                                                 showNotesEpisode = latestSelectedPodcast.value to latestEpisode.value
                                             }
-                                            EpisodeRowAction.Download -> latestOnDownloadEpisode.value(episode.id)
                                             EpisodeRowAction.MarkListened -> {
                                                 latestOnSetEpisodeListened.value(episode.id, true)
                                             }
@@ -370,7 +363,6 @@ fun SubscriptionsScreen(
                                     inPlaylist = episode.inPlaylist,
                                     isListened = episode.isListened,
                                     downloaded = episode.downloaded,
-                                    isDownloading = episode.id in state.downloadingEpisodeIds,
                                     actionsEnabled = episode.id !in state.busyEpisodeIds,
                                     showDragHandle = false,
                                     modifier = Modifier.testTag("subscription_episode_row_${episode.id}"),
@@ -396,21 +388,8 @@ fun SubscriptionsScreen(
             )
         }
 
-        if (state.pendingUnsubscribe == null) state.downloadFailure?.let { failure ->
-            DownloadFailureBanner(
-                message = failure.message,
-                onDismiss = onDismissDownloadFailure,
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 10.dp)
-                    .align(Alignment.TopCenter)
-            )
-        }
-
         if (
             state.pendingUnsubscribe == null &&
-            state.downloadFailure == null &&
             (hasRefreshError || refreshErrorMessage != null)
         ) {
             RefreshErrorBanner(

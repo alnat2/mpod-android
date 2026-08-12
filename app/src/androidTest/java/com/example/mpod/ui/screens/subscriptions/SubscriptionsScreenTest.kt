@@ -200,7 +200,7 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithTag("episode_actions_sheet").assertIsDisplayed()
         composeRule.onNodeWithTag("episode_action_icon_playlist", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag("episode_action_icon_notes", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("episode_action_icon_download", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Download").assertCountEquals(0)
         composeRule.onNodeWithTag("episode_action_icon_listened", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Add to playlist").performClick()
 
@@ -353,26 +353,22 @@ class SubscriptionsScreenTest {
     }
 
     @Test
-    fun episodeMenuDispatchesDownloadAndListenedActions() {
-        var downloadedEpisodeId: Int? = null
+    fun episodeMenuOmitsManualDownloadAndDispatchesListenedAction() {
         var listenedChange: Pair<Int, Boolean>? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
                     state = populatedState(),
-                    onDownloadEpisode = { downloadedEpisodeId = it },
                     onSetEpisodeListened = { id, listened -> listenedChange = id to listened }
                 )
             }
         }
 
         composeRule.onNodeWithContentDescription("Options for First episode").performClick()
-        composeRule.onNodeWithText("Download").performClick()
-        composeRule.onNodeWithContentDescription("Options for First episode").performClick()
+        composeRule.onAllNodesWithText("Download").assertCountEquals(0)
         composeRule.onNodeWithText("Mark as listened").performClick()
 
         composeRule.runOnIdle {
-            assertEquals(1, downloadedEpisodeId)
             assertEquals(1 to true, listenedChange)
         }
     }
@@ -442,27 +438,22 @@ class SubscriptionsScreenTest {
     }
 
     @Test
-    fun loadErrorRetryAndDownloadFailureDismissAreActionable() {
+    fun loadErrorRetryIsActionable() {
         var retries = 0
-        var dismisses = 0
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
                     state = SubscriptionsUiState(
-                        errorMessage = "Subscriptions unavailable",
-                        downloadFailure = SubscriptionDownloadFailureUi(1, "Download failed")
+                        errorMessage = "Subscriptions unavailable"
                     ),
-                    onRetryLoad = { retries += 1 },
-                    onDismissDownloadFailure = { dismisses += 1 }
+                    onRetryLoad = { retries += 1 }
                 )
             }
         }
 
         composeRule.onNodeWithText("Try again").performClick()
-        composeRule.onNodeWithContentDescription("Dismiss download error").performClick()
         composeRule.runOnIdle {
             assertEquals(1, retries)
-            assertEquals(1, dismisses)
         }
     }
 

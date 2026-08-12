@@ -162,16 +162,14 @@ class MpodApiContractTest {
     }
 
     @Test
-    fun `episode listened state and download use episode scoped endpoints`() = runBlocking {
-        repeat(3) { server.enqueue(success()) }
+    fun `episode read and listened state use episode scoped endpoints`() = runBlocking {
+        repeat(2) { server.enqueue(success()) }
 
         api.getEpisode(7)
         api.setEpisodeListened(7, EpisodeListenedRequest(isListened = true))
-        api.downloadEpisode(7)
 
         assertRequest("GET", "/api/episodes/7")
         assertJsonRequest("PATCH", "/api/episodes/7", "isListened" to true)
-        assertRequest("POST", "/api/episodes/7/download")
     }
 
     @Test
