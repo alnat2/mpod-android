@@ -319,7 +319,7 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
-                    item { StatusCard(message = "Playlist is empty") }
+                    item { PlaylistEmptyState() }
                 }
 
                 else -> {
@@ -577,6 +577,48 @@ private fun HomePlayerCard(
         onSeekTo = onSeekTo,
         onNotesClick = onNotesClick
     )
+}
+
+@Composable
+private fun PlaylistEmptyState(modifier: Modifier = Modifier) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 228.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 228.dp)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Playlist is empty",
+                fontSize = 18.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = "Add episodes from Subscriptions to start listening.",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            )
+        }
+    }
 }
 
 @Composable

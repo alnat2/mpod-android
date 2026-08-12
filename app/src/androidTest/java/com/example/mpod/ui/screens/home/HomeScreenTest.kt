@@ -204,6 +204,7 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithText("Playlist is empty").assertIsDisplayed()
+        composeRule.onNodeWithText("Add episodes from Subscriptions to start listening.").assertIsDisplayed()
         composeRule.onAllNodesWithText("Add RSS feed").assertCountEquals(0)
     }
 
