@@ -67,7 +67,7 @@ fun PlayerPlaylistItem(
         horizontalPaddingEnd = 12
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.ic_huge_drag_drop_horizontal),
+            painter = painterResource(id = R.drawable.ic_huge_menu_09),
             contentDescription = null,
             modifier = Modifier.size(32.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -142,9 +142,8 @@ fun SubscriptionEpisodeItem(
             .fillMaxWidth()
             .heightIn(min = 116.dp),
         radius = 16,
-        horizontalPaddingStart = 32,
-        horizontalPaddingEnd = 12,
-        leadingOverlayIconRes = R.drawable.ic_huge_drag_drop_vertical
+        horizontalPaddingStart = 12,
+        horizontalPaddingEnd = 12
     ) {
         Column(
             modifier = Modifier.weight(1f),
