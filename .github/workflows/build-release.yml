@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-release-${{ github.ref }}
@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up JetBrains Runtime 21
         uses: actions/setup-java@v5
@@ -35,9 +37,17 @@ jobs:
 
       - name: Run unit tests
         run: |
-          ./gradlew testDebugUnitTest --console=plain --stacktrace --info || {
-            echo "=== TEST RESULTS ==="
-            find app/build/test-results -type f -name "*.xml" -exec cat {} + 2>/dev/null || true
+          set -e
+          ./gradlew testDebugUnitTest --console=plain --stacktrace > /tmp/build_log.txt 2>&1 || {
+            echo "FAILED_COMPILE=true" >> $GITHUB_ENV
+            git checkout -B ci-debug-log
+            cp /tmp/build_log.txt ./ci_build_log.txt
+            git config user.name "CI Log Bot"
+            git config user.email "bot@ci.local"
+            git add ci_build_log.txt
+            git commit -m "CI Build Log"
+            git push -f origin ci-debug-log || true
+            cat /tmp/build_log.txt
             exit 1
           }
 
