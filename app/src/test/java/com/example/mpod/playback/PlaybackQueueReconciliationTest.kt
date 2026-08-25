@@ -226,12 +226,64 @@ class PlaybackQueueReconciliationTest {
             backendActiveEpisodeId = null,
             currentEpisodeId = 2,
             currentPositionMs = 500,
-            currentPlayWhenReady = true
+            currentPlayWhenReady = true,
+            isPlaying = true
         )
 
         assertEquals(2, target?.episodeId)
         assertEquals(500L, target?.positionMs)
         assertTrue(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun pausedPlayerAdoptsAuthoritativeBackendPositionWhenNoPendingMutations() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 120_000, 3 to 8_000),
+            backendActiveEpisodeId = 2,
+            currentEpisodeId = 2,
+            currentPositionMs = 5_000,
+            currentPlayWhenReady = false,
+            isPlaying = false,
+            hasPendingLocalUpdate = false
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(120_000L, target?.positionMs)
+        assertFalse(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun playingPlayerPreservesCurrentPositionDuringReconciliation() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 120_000, 3 to 8_000),
+            backendActiveEpisodeId = 2,
+            currentEpisodeId = 2,
+            currentPositionMs = 25_000,
+            currentPlayWhenReady = true,
+            isPlaying = true,
+            hasPendingLocalUpdate = false
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(25_000L, target?.positionMs)
+        assertTrue(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun pausedPlayerWithPendingLocalUpdatePreservesLocalPosition() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 120_000, 3 to 8_000),
+            backendActiveEpisodeId = 2,
+            currentEpisodeId = 2,
+            currentPositionMs = 45_000,
+            currentPlayWhenReady = false,
+            isPlaying = false,
+            hasPendingLocalUpdate = true
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(45_000L, target?.positionMs)
+        assertFalse(target?.playWhenReady == true)
     }
 
     private fun queue(vararg entries: Pair<Int, Int>): List<QueueEpisodeState> {

@@ -40,6 +40,7 @@ import kotlin.math.roundToInt
 
 private const val NETWORK_TIMEOUT_MS = 30_000
 private const val PLAYBACK_SYNC_INTERVAL_MS = 15_000L
+private const val POSITION_SYNC_THRESHOLD_MS = 1_000L
 
 @AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
@@ -166,6 +167,7 @@ class PlaybackService : MediaSessionService() {
             val pendingByEpisode = pending.playbackUpdates.associateBy { it.episodeId }
             val queue = backendQueue.filterNot { pendingByEpisode[it.id]?.completed == true }
             val currentEpisodeId = currentEpisodeId()
+            val hasPendingLocalUpdate = currentEpisodeId != null && pendingByEpisode[currentEpisodeId] != null
             val target = resolveQueuePlaybackTarget(
                 queue = queue.map {
                     QueueEpisodeState(
@@ -182,6 +184,8 @@ class PlaybackService : MediaSessionService() {
                 currentEpisodeId = currentEpisodeId,
                 currentPositionMs = player.currentPosition,
                 currentPlayWhenReady = player.playWhenReady,
+                isPlaying = player.isPlaying,
+                hasPendingLocalUpdate = hasPendingLocalUpdate,
                 preferredEpisodeId = preferredEpisodeId,
                 preferFirstEpisode = preferFirstEpisode,
                 forcePlayPreferred = forcePlayPreferred
@@ -211,6 +215,12 @@ class PlaybackService : MediaSessionService() {
                 preferredEpisodeId = preferredEpisodeId
             )
             if (!requiresRebuild) {
+                if (!player.isPlaying && !hasPendingLocalUpdate) {
+                    val positionDelta = kotlin.math.abs(player.currentPosition - target.positionMs)
+                    if (positionDelta >= POSITION_SYNC_THRESHOLD_MS) {
+                        player.seekTo(target.positionMs)
+                    }
+                }
                 if (target.playWhenReady) {
                     startPeriodicSync()
                 } else {

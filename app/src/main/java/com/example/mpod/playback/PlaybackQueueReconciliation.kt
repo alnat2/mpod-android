@@ -29,6 +29,8 @@ internal fun resolveQueuePlaybackTarget(
     currentEpisodeId: Int?,
     currentPositionMs: Long,
     currentPlayWhenReady: Boolean,
+    isPlaying: Boolean = false,
+    hasPendingLocalUpdate: Boolean = false,
     preferredEpisodeId: Int? = null,
     preferFirstEpisode: Boolean = false,
     forcePlayPreferred: Boolean = false
@@ -46,7 +48,13 @@ internal fun resolveQueuePlaybackTarget(
 
     val positionMs = when {
         preferred != null -> queueById.getValue(preferred).savedPositionMs
-        currentStillQueued && targetEpisodeId == currentEpisodeId -> currentPositionMs
+        currentStillQueued && targetEpisodeId == currentEpisodeId -> {
+            if (isPlaying || hasPendingLocalUpdate) {
+                currentPositionMs
+            } else {
+                queueById.getValue(targetEpisodeId).savedPositionMs
+            }
+        }
         else -> queueById.getValue(targetEpisodeId).savedPositionMs
     }.coerceAtLeast(0L)
 
