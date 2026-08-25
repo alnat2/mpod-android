@@ -19,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val appSettingsDataStore: AppSettingsDataStore,
     private val podcastRepository: PodcastRepository
 ) : ViewModel() {

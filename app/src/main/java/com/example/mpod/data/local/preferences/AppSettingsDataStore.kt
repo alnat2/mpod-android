@@ -33,7 +33,7 @@ data class AppSettings(
 
 @Singleton
 class AppSettingsDataStore @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private object Keys {
         val AUTO_REFRESH_ENABLED = booleanPreferencesKey("auto_refresh_enabled")

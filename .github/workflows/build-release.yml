@@ -33,8 +33,11 @@ jobs:
         with:
           cache-provider: basic
 
-      - name: Run unit tests and compile Android tests
-        run: ./gradlew testDebugUnitTest assembleDebugAndroidTest --console=plain --stacktrace
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --console=plain --stacktrace
+
+      - name: Assemble Android test APK
+        run: ./gradlew assembleDebugAndroidTest --console=plain --stacktrace
 
       - name: Run Android lint
         run: ./gradlew lintDebug lintRelease --console=plain --stacktrace

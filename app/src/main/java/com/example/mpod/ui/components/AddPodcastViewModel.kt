@@ -19,7 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AddPodcastViewModel @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val podcastRepository: PodcastRepository,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {

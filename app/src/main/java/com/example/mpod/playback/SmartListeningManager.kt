@@ -24,7 +24,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SmartListeningManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val playlistDao: PlaylistDao,
     private val episodeDao: EpisodeDao,
     private val appSettingsDataStore: AppSettingsDataStore,
