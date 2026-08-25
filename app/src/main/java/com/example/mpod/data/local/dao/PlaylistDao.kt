@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 import com.example.mpod.data.local.entity.PlaylistItemEntity
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import kotlinx.coroutines.flow.Flow
@@ -75,24 +74,12 @@ interface PlaylistDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlaylistItem(item: PlaylistItemEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPlaylistItems(items: List<PlaylistItemEntity>): List<Long>
+
     @Query("DELETE FROM playlist_items WHERE episodeId = :episodeId")
     suspend fun removeFromPlaylist(episodeId: Long)
 
     @Query("DELETE FROM playlist_items")
     suspend fun clearPlaylist()
-
-    @Transaction
-    suspend fun addEpisodeToPlaylist(episodeId: Long) {
-        if (isEpisodeInPlaylist(episodeId)) return
-        val nextPos = (getMaxPosition() ?: -1) + 1
-        insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
-    }
-
-    @Transaction
-    suspend fun reorderPlaylist(reorderedEpisodeIds: List<Long>) {
-        clearPlaylist()
-        reorderedEpisodeIds.forEachIndexed { index, epId ->
-            insertPlaylistItem(PlaylistItemEntity(episodeId = epId, position = index))
-        }
-    }
 }

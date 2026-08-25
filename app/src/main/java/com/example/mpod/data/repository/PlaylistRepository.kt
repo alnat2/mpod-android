@@ -1,6 +1,7 @@
 package com.example.mpod.data.repository
 
 import com.example.mpod.data.local.dao.PlaylistDao
+import com.example.mpod.data.local.entity.PlaylistItemEntity
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,7 +21,9 @@ class PlaylistRepository @Inject constructor(
     }
 
     suspend fun addEpisodeToPlaylist(episodeId: Long) = withContext(Dispatchers.IO) {
-        playlistDao.addEpisodeToPlaylist(episodeId)
+        if (playlistDao.isEpisodeInPlaylist(episodeId)) return@withContext
+        val nextPos = (playlistDao.getMaxPosition() ?: -1) + 1
+        playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
     }
 
     suspend fun removeFromPlaylist(episodeId: Long) = withContext(Dispatchers.IO) {
@@ -28,7 +31,13 @@ class PlaylistRepository @Inject constructor(
     }
 
     suspend fun reorderPlaylist(reorderedEpisodeIds: List<Long>) = withContext(Dispatchers.IO) {
-        playlistDao.reorderPlaylist(reorderedEpisodeIds)
+        playlistDao.clearPlaylist()
+        val items = reorderedEpisodeIds.mapIndexed { index, epId ->
+            PlaylistItemEntity(episodeId = epId, position = index)
+        }
+        if (items.isNotEmpty()) {
+            playlistDao.insertPlaylistItems(items)
+        }
     }
 
     suspend fun clearPlaylist() = withContext(Dispatchers.IO) {
