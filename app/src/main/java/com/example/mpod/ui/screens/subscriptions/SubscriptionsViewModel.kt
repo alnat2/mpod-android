@@ -42,7 +42,7 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     private fun observeData() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             combine(
                 podcastDao.getAllPodcastsFlow(),
                 playlistDao.getPlaylistItemsWithEpisodesFlow()

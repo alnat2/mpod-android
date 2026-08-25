@@ -11,6 +11,7 @@ import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +34,7 @@ class HomeViewModel @Inject constructor(
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             combine(
                 podcastDao.getAllPodcastsFlow(),
                 playlistDao.getPlaylistItemsWithEpisodesFlow(),
