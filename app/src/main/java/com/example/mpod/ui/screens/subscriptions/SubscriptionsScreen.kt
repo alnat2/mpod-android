@@ -102,7 +102,7 @@ fun SubscriptionsRoute(
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onRetryLoad = viewModel::refresh,
-        onRetryRefresh = viewModel::retryLastAction,
+        onRetryRefresh = viewModel::refreshAll,
         onAddRssFeed = onAddRssFeed,
         onImportOpml = onImportOpml
     )
@@ -311,11 +311,10 @@ fun SubscriptionsScreen(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             item {
-                                val isMarkingAll = selectedPodcast.id in state.markingAllListenedPodcastIds
                                 MarkAllListenedHeader(
                                     summary = podcastEpisodeSummary(selectedPodcast),
-                                    enabled = selectedPodcast.unlistenedEpisodeCount > 0 && !isMarkingAll,
-                                    isLoading = isMarkingAll,
+                                    enabled = selectedPodcast.unlistenedEpisodeCount > 0,
+                                    isLoading = false,
                                     onMarkAllListened = { onMarkAllListened(selectedPodcast.id) },
                                     modifier = Modifier.testTag("subscriptions_episode_header")
                                 )

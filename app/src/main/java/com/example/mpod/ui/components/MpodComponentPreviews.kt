@@ -19,7 +19,7 @@ import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
 
 @Preview(
-    name = "mpod catalog scroll / 360",
+    name = "mpoddy catalog scroll / 360",
     widthDp = 360,
     heightDp = 800,
     showBackground = true
@@ -114,37 +114,6 @@ private fun CardsAndFormsPreview() {
             url = "",
             onUrlChange = {}
         )
-
-        PreviewLabel("AuthCard Mobile")
-        AuthCardMobile(
-            title = "Create your account",
-            submitLabel = "Create account",
-            username = "",
-            onUsernameChange = {},
-            password = "",
-            onPasswordChange = {}
-        )
-    }
-}
-
-@Preview(
-    name = "auth shell / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun AuthShellMobilePreview() {
-    MpodTheme {
-        AuthShellMobile(
-            hero = "Create the only account for your podcast library",
-            cardTitle = "Create your account",
-            submitLabel = "Create account",
-            username = "",
-            onUsernameChange = {},
-            password = "",
-            onPasswordChange = {}
-        )
     }
 }
 
@@ -235,35 +204,6 @@ private fun MobileComponentCatalog() {
 
     PreviewLabel("Show Notes Mobile")
     ShowNotesMobile()
-
-    PreviewLabel("Logo source")
-    MpodLogo()
-
-    PreviewLabel("AuthCard Mobile")
-    AuthCardMobile(
-        title = "Create your account",
-        submitLabel = "Create account",
-        username = "",
-        onUsernameChange = {},
-        password = "",
-        onPasswordChange = {}
-    )
-
-    PreviewLabel("Auth Inputs")
-    LabeledInput(
-        label = "Username",
-        value = "",
-        onValueChange = {},
-        placeholder = "Choose a username"
-    )
-    LabeledInput(
-        label = "Password",
-        value = "",
-        onValueChange = {},
-        placeholder = "Create a password",
-        trailingIconRes = com.example.mpod.R.drawable.ic_huge_view,
-        trailingIconContentDescription = "Show password"
-    )
 
     PreviewLabel("Bottom Nav")
     MpodBottomNav(

@@ -120,10 +120,6 @@ data class SettingsUiState(
     val appBuild: String = "mpoddy v1.0.17"
 )
 
-internal fun installedEnvironment(packageName: String): String {
-    return if (packageName.endsWith(".test")) "Test" else "Production"
-}
-
 internal fun formatSchedulerTimestamp(
     rawTimestamp: String,
     zoneId: java.time.ZoneId = java.time.ZoneId.systemDefault()

@@ -343,7 +343,7 @@ fun HomeScreen(
                             episode = currentEpisode,
                             playbackStateProvider = playbackStateProvider,
                             onSpeedChange = onSpeedChange,
-                            onPlayClick = onPlayClick,
+                            onPlayClick = onPlayToggle,
                             onSeekBackward = { onSeekBy(-15) },
                             onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
