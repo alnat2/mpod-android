@@ -1,37 +1,37 @@
 package com.example.mpod.playback
 
 internal data class QueueEpisodeState(
-    val episodeId: Int,
+    val episodeId: Long,
     val savedPositionMs: Long
 )
 
 internal data class QueuePlaybackTarget(
-    val episodeId: Int,
+    val episodeId: Long,
     val positionMs: Long,
     val playWhenReady: Boolean
 )
 
 internal fun requiresPlayerQueueRebuild(
-    currentQueueEpisodeIds: List<Int>,
-    backendQueueEpisodeIds: List<Int>,
-    currentEpisodeId: Int?,
-    targetEpisodeId: Int,
-    preferredEpisodeId: Int?
+    currentQueueEpisodeIds: List<Long>,
+    roomQueueEpisodeIds: List<Long>,
+    currentEpisodeId: Long?,
+    targetEpisodeId: Long,
+    preferredEpisodeId: Long?
 ): Boolean {
     return preferredEpisodeId != null ||
-        currentQueueEpisodeIds != backendQueueEpisodeIds ||
+        currentQueueEpisodeIds != roomQueueEpisodeIds ||
         currentEpisodeId != targetEpisodeId
 }
 
 internal fun resolveQueuePlaybackTarget(
     queue: List<QueueEpisodeState>,
-    backendActiveEpisodeId: Int?,
-    currentEpisodeId: Int?,
+    savedActiveEpisodeId: Long?,
+    currentEpisodeId: Long?,
     currentPositionMs: Long,
     currentPlayWhenReady: Boolean,
     isPlaying: Boolean = false,
     hasPendingLocalUpdate: Boolean = false,
-    preferredEpisodeId: Int? = null,
+    preferredEpisodeId: Long? = null,
     preferFirstEpisode: Boolean = false,
     forcePlayPreferred: Boolean = false
 ): QueuePlaybackTarget? {
@@ -43,7 +43,7 @@ internal fun resolveQueuePlaybackTarget(
         ?: queue.first().episodeId.takeIf { preferFirstEpisode }
     val targetEpisodeId = preferred
         ?: currentEpisodeId?.takeIf(queueById::containsKey)
-        ?: backendActiveEpisodeId?.takeIf(queueById::containsKey)
+        ?: savedActiveEpisodeId?.takeIf(queueById::containsKey)
         ?: queue.first().episodeId
 
     val positionMs = when {

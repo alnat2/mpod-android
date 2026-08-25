@@ -8,33 +8,33 @@ class PlaylistReorderTest {
     @Test
     fun movesEpisodeWithinQueueBounds() {
         val reordered = reorderEpisodes(
-            episodes = episodes(1, 2, 3, 4),
-            episodeId = 2,
+            episodes = episodes(1L, 2L, 3L, 4L),
+            episodeId = 2L,
             offset = 2
         )
 
-        assertEquals(listOf(1, 3, 4, 2), reordered?.map { it.id })
+        assertEquals(listOf(1L, 3L, 4L, 2L), reordered?.map { it.id })
     }
 
     @Test
     fun clampsMoveToQueueEdges() {
         val reordered = reorderEpisodes(
-            episodes = episodes(1, 2, 3),
-            episodeId = 3,
+            episodes = episodes(1L, 2L, 3L),
+            episodeId = 3L,
             offset = -99
         )
 
-        assertEquals(listOf(3, 1, 2), reordered?.map { it.id })
+        assertEquals(listOf(3L, 1L, 2L), reordered?.map { it.id })
     }
 
     @Test
     fun returnsNullWhenMoveWouldNotChangeQueue() {
-        assertNull(reorderEpisodes(episodes(1, 2, 3), episodeId = 1, offset = -1))
-        assertNull(reorderEpisodes(episodes(1, 2, 3), episodeId = 99, offset = 1))
-        assertNull(reorderEpisodes(episodes(1, 2, 3), episodeId = 2, offset = 0))
+        assertNull(reorderEpisodes(episodes(1L, 2L, 3L), episodeId = 1L, offset = -1))
+        assertNull(reorderEpisodes(episodes(1L, 2L, 3L), episodeId = 99L, offset = 1))
+        assertNull(reorderEpisodes(episodes(1L, 2L, 3L), episodeId = 2L, offset = 0))
     }
 
-    private fun episodes(vararg ids: Int): List<HomeEpisodeUi> {
+    private fun episodes(vararg ids: Long): List<HomeEpisodeUi> {
         return ids.map { id ->
             HomeEpisodeUi(
                 id = id,

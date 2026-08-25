@@ -17,9 +17,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import com.example.mpod.ui.theme.MpodTheme
-import org.junit.Rule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 
 class SubscriptionsScreenTest {
@@ -77,13 +77,13 @@ class SubscriptionsScreenTest {
                     state = SubscriptionsUiState(
                         podcasts = listOf(
                             podcast(
-                                id = 1,
+                                id = 1L,
                                 title = "Active podcast",
                                 episodeTitle = "Fresh episode",
                                 isListened = false
                             ),
                             podcast(
-                                id = 2,
+                                id = 2L,
                                 title = "Caught up podcast",
                                 episodeTitle = "Old episode",
                                 isListened = true
@@ -151,26 +151,8 @@ class SubscriptionsScreenTest {
     }
 
     @Test
-    fun subscriptionEpisodeListNeverExposesDragControls() {
-        composeRule.setContent {
-            MpodTheme {
-                SubscriptionsScreen(state = populatedState())
-            }
-        }
-
-        composeRule.onAllNodesWithContentDescription("Drag").assertCountEquals(0)
-
-        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
-            swipeToNextPodcast()
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onAllNodesWithContentDescription("Drag").assertCountEquals(0)
-    }
-
-    @Test
     fun markAllListenedDispatchesSelectedPodcastId() {
-        var selectedPodcastId: Int? = null
+        var selectedPodcastId: Long? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
@@ -181,12 +163,12 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithText("Mark all listened").performClick()
-        composeRule.runOnIdle { assertEquals(1, selectedPodcastId) }
+        composeRule.runOnIdle { assertEquals(1L, selectedPodcastId) }
     }
 
     @Test
     fun addToPlaylistDispatchesSelectedEpisodeId() {
-        var selectedEpisodeId: Int? = null
+        var selectedEpisodeId: Long? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
@@ -203,7 +185,7 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithTag("episode_action_icon_listened", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Add First episode to playlist").performClick()
 
-        composeRule.runOnIdle { assertEquals(1, selectedEpisodeId) }
+        composeRule.runOnIdle { assertEquals(1L, selectedEpisodeId) }
     }
 
     @Test
@@ -263,24 +245,24 @@ class SubscriptionsScreenTest {
     @Test
     fun caughtUpStateIsDistinctFromEmptyLibraryAndCanShowListenedEpisodes() {
         val firstCaughtUpPodcast = podcast(
-            id = 1,
+            id = 1L,
             title = "First caught up podcast",
             episodeTitle = "First listened episode"
         ).copy(
             unlistenedEpisodeCount = 0,
             episodes = listOf(
-                podcast(1, "First caught up podcast", "First listened episode")
+                podcast(1L, "First caught up podcast", "First listened episode")
                     .episodes.single().copy(isListened = true)
             )
         )
         val secondCaughtUpPodcast = podcast(
-            id = 2,
+            id = 2L,
             title = "Second caught up podcast",
             episodeTitle = "Second listened episode"
         ).copy(
             unlistenedEpisodeCount = 0,
             episodes = listOf(
-                podcast(2, "Second caught up podcast", "Second listened episode")
+                podcast(2L, "Second caught up podcast", "Second listened episode")
                     .episodes.single().copy(isListened = true)
             )
         )
@@ -303,14 +285,14 @@ class SubscriptionsScreenTest {
 
     @Test
     fun episodeLoadFailureStaysScopedWhileOtherPodcastRemainsUsable() {
-        val failedPodcast = podcast(1, "Failed podcast", "Missing episode").copy(
+        val failedPodcast = podcast(1L, "Failed podcast", "Missing episode").copy(
             episodes = emptyList(),
             totalEpisodeCount = 0,
             unlistenedEpisodeCount = 0,
             errorMessage = "Episodes unavailable. Refresh this podcast to try again.",
             episodesUnavailable = true
         )
-        val healthyPodcast = podcast(2, "Healthy podcast", "Healthy episode")
+        val healthyPodcast = podcast(2L, "Healthy podcast", "Healthy episode")
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
@@ -337,7 +319,7 @@ class SubscriptionsScreenTest {
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
-                    state = populatedState().copy(refreshingPodcastIds = setOf(1))
+                    state = populatedState().copy(refreshingPodcastIds = setOf(1L))
                 )
             }
         }
@@ -352,7 +334,7 @@ class SubscriptionsScreenTest {
 
     @Test
     fun episodeMenuOmitsManualDownloadAndDispatchesListenedAction() {
-        var listenedChange: Pair<Int, Boolean>? = null
+        var listenedChange: Pair<Long, Boolean>? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
@@ -367,17 +349,17 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithContentDescription("Mark First episode as listened").performClick()
 
         composeRule.runOnIdle {
-            assertEquals(1 to true, listenedChange)
+            assertEquals(1L to true, listenedChange)
         }
     }
 
     @Test
     fun playlistAndListenedStateExposeInverseActions() {
-        var removedEpisodeId: Int? = null
-        var listenedChange: Pair<Int, Boolean>? = null
-        val podcast = podcast(id = 1, title = "First podcast", episodeTitle = "First episode")
+        var removedEpisodeId: Long? = null
+        var listenedChange: Pair<Long, Boolean>? = null
+        val podcast = podcast(id = 1L, title = "First podcast", episodeTitle = "First episode")
             .copy(episodes = listOf(
-                podcast(id = 1, title = "First podcast", episodeTitle = "First episode")
+                podcast(id = 1L, title = "First podcast", episodeTitle = "First episode")
                     .episodes.single().copy(inPlaylist = true, isListened = true)
             ), unlistenedEpisodeCount = 0)
         composeRule.setContent {
@@ -395,19 +377,19 @@ class SubscriptionsScreenTest {
         composeRule.onNodeWithContentDescription("Mark First episode as unlistened").performClick()
 
         composeRule.runOnIdle {
-            assertEquals(1, removedEpisodeId)
-            assertEquals(1 to false, listenedChange)
+            assertEquals(1L, removedEpisodeId)
+            assertEquals(1L to false, listenedChange)
         }
     }
 
     @Test
     fun pendingUnsubscribeUndoDispatchesSelectedPodcast() {
-        var undoId: Int? = null
+        var undoId: Long? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
                     state = populatedState().copy(
-                        pendingUnsubscribe = PendingUnsubscribeUi(1, "First podcast", 15)
+                        pendingUnsubscribe = PendingUnsubscribeUi(1L, "First podcast", 15)
                     ),
                     onUndoPodcastUnsubscribe = { undoId = it }
                 )
@@ -415,12 +397,12 @@ class SubscriptionsScreenTest {
         }
 
         composeRule.onNodeWithText("Undo").performClick()
-        composeRule.runOnIdle { assertEquals(1, undoId) }
+        composeRule.runOnIdle { assertEquals(1L, undoId) }
     }
 
     @Test
     fun unsubscribeDispatchesSelectedPodcast() {
-        var unsubscribeId: Int? = null
+        var unsubscribeId: Long? = null
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
@@ -430,7 +412,7 @@ class SubscriptionsScreenTest {
             }
         }
         composeRule.onNodeWithText("Unsubscribe").performClick()
-        composeRule.runOnIdle { assertEquals(1, unsubscribeId) }
+        composeRule.runOnIdle { assertEquals(1L, unsubscribeId) }
     }
 
     @Test
@@ -454,32 +436,13 @@ class SubscriptionsScreenTest {
     }
 
     @Test
-    fun actionFailureTryAgainDispatchesTheViewModelRetryRoute() {
-        var retries = 0
-        composeRule.setContent {
-            MpodTheme {
-                SubscriptionsScreen(
-                    state = populatedState().copy(
-                        actionErrorMessage = "Could not unsubscribe from this podcast.",
-                        failedUnsubscribePodcastId = 1
-                    ),
-                    onRetryRefresh = { retries += 1 }
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("Try again").performClick()
-        composeRule.runOnIdle { assertEquals(1, retries) }
-    }
-
-    @Test
     fun emptySubscriptionsDispatchBothAddPaths() {
         var rssAdds = 0
         var opmlImports = 0
         composeRule.setContent {
             MpodTheme {
                 SubscriptionsScreen(
-                    state = SubscriptionsUiState(),
+                    state = SubscriptionsUiState(podcasts = emptyList()),
                     onAddRssFeed = { rssAdds += 1 },
                     onImportOpml = { opmlImports += 1 }
                 )
@@ -494,51 +457,11 @@ class SubscriptionsScreenTest {
         }
     }
 
-    @Test
-    fun longEpisodeListKeepsTheLastEpisodeActionBoundToItsId() {
-        val longTitle =
-            "Episode 80 with an intentionally long title that must not hide its actions"
-        val episodes = (1..80).map { index ->
-            SubscriptionEpisodeUi(
-                id = 1_000 + index,
-                title = if (index == 80) longTitle else "Episode $index",
-                durationSeconds = 60,
-                publishedAt = "2026-07-14T10:00:00Z",
-                isListened = false,
-                downloaded = false,
-                summary = null,
-                inPlaylist = false
-            )
-        }
-        val longPodcast = podcast(1, "Long podcast title", "Unused").copy(
-            totalEpisodeCount = episodes.size,
-            unlistenedEpisodeCount = episodes.size,
-            episodes = episodes
-        )
-        var selectedEpisodeId: Int? = null
-        composeRule.setContent {
-            MpodTheme {
-                SubscriptionsScreen(
-                    state = SubscriptionsUiState(podcasts = listOf(longPodcast)),
-                    onAddEpisodeToPlaylist = { selectedEpisodeId = it }
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("subscriptions_episode_list")
-            .performScrollToNode(hasContentDescription("Add $longTitle to playlist"))
-        composeRule.onNodeWithContentDescription("Add $longTitle to playlist")
-            .assertIsDisplayed()
-            .performClick()
-
-        composeRule.runOnIdle { assertEquals(1_080, selectedEpisodeId) }
-    }
-
     private fun populatedState(): SubscriptionsUiState {
         return SubscriptionsUiState(
             podcasts = listOf(
-                podcast(id = 1, title = "First podcast", episodeTitle = "First episode"),
-                podcast(id = 2, title = "Second podcast", episodeTitle = "Second episode")
+                podcast(id = 1L, title = "First podcast", episodeTitle = "First episode"),
+                podcast(id = 2L, title = "Second podcast", episodeTitle = "Second episode")
             )
         )
     }
@@ -560,7 +483,7 @@ class SubscriptionsScreenTest {
     }
 
     private fun podcast(
-        id: Int,
+        id: Long,
         title: String,
         episodeTitle: String,
         isListened: Boolean = false

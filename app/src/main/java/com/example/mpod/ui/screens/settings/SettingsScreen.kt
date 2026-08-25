@@ -3,6 +3,11 @@ package com.example.mpod.ui.screens.settings
 import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +16,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,11 +24,14 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
@@ -39,27 +46,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
-import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.theme.ThemeMode
 import com.example.mpod.ui.theme.isDark
 
@@ -67,32 +66,24 @@ import com.example.mpod.ui.theme.isDark
 fun SettingsRoute(
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
-    onLogout: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner, viewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.onResume()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
     val opmlExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/x-opml")
     ) { uri ->
         viewModel.exportOpml(uri)
     }
+
     SettingsScreen(
         state = state,
-        installedAppBuildInfo = currentInstalledAppBuildInfo(),
         themeMode = themeMode,
         onThemeModeChange = onThemeModeChange,
+        onAutoRefreshToggle = viewModel::setAutoRefreshEnabled,
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
-        onProxyEnabledChange = viewModel::setProxyEnabled,
-        onExportOpml = { opmlExportLauncher.launch("mpod-subscriptions.opml") },
-        onLogout = onLogout
+        onProxyToggle = viewModel::setProxyEnabled,
+        onSaveProxySettings = viewModel::saveProxySettings,
+        onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
 
@@ -100,20 +91,27 @@ fun SettingsRoute(
 @Composable
 fun SettingsScreen(
     state: SettingsUiState = SettingsUiState(),
-    installedAppBuildInfo: InstalledAppBuildInfo = InstalledAppBuildInfo.Unknown,
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
+    onAutoRefreshToggle: (Boolean) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
-    onProxyEnabledChange: (Boolean) -> Unit = {},
-    onExportOpml: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onProxyToggle: (Boolean) -> Unit = {},
+    onSaveProxySettings: (String, Int, String) -> Unit = { _, _, _ -> },
+    onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
+
+    var proxyHostInput by rememberSaveable { mutableStateOf(state.proxyHost) }
+    var proxyPortInput by rememberSaveable { mutableStateOf(state.proxyPort.toString()) }
     val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
+    }
+    LaunchedEffect(state.proxyHost, state.proxyPort) {
+        proxyHostInput = state.proxyHost
+        proxyPortInput = state.proxyPort.toString()
     }
 
     Column(
@@ -123,12 +121,12 @@ fun SettingsScreen(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 16.dp),
+            .padding(top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         PageHeader(
             title = "Settings",
-            subtitle = "${state.refreshHeaderText}\n${state.proxyHeaderText}"
+            subtitle = state.lastRefreshHeaderText
         )
 
         if (state.errorMessage != null) {
@@ -144,130 +142,189 @@ fun SettingsScreen(
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.tertiary,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
+        // Card 1: Auto refresh + Daily refresh time accordion
         SettingCard(
-            title = "Feed daily refresh",
-            description = "Feeds are refreshed once per day at a single global time."
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (state.isRefreshLoading) {
-                    SettingsSectionStatus(message = "Loading refresh settings…")
-                } else if (state.refreshErrorMessage != null) {
-                    SettingsSectionStatus(
-                        message = state.refreshErrorMessage,
-                        isError = true
-                    )
-                }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+            title = "Auto refresh",
+            description = "Turn on for a scheduled update.",
+            action = {
+                MpodSwitch(
+                    checked = state.isAutoRefreshEnabled,
+                    onCheckedChange = onAutoRefreshToggle,
+                    contentDescription = "Auto refresh"
+                )
+            },
+            content = {
+                AnimatedVisibility(
+                    visible = state.isAutoRefreshEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        DailyRefreshTimeField(
-                            value = if (state.hasConfirmedSettings) feedRefreshTime else "—",
-                            enabled = state.hasConfirmedSettings &&
-                                !state.isSavingRefreshTime && !state.isRefreshLoading,
-                            onClick = { showTimePicker = true },
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "Feed daily refresh",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                        Text(
+                            text = "Feeds are refreshed once per day at a single global time.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DailyRefreshTimeField(
+                                value = feedRefreshTime,
+                                enabled = true,
+                                onClick = { showTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                            SettingsPrimaryButton(
+                                text = "Save time",
+                                enabled = feedRefreshTime != state.dailyRefreshTime,
+                                onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                            )
+                        }
+                    }
+                }
+            }
+        )
+
+        // Card 2: SOCKS5 Proxy + Proxy settings accordion with Save button
+        SettingCard(
+            title = "Use SOCKS5 proxy",
+            description = "Turn on if direct connection update fails.",
+            action = {
+                MpodSwitch(
+                    checked = state.isProxyEnabled,
+                    onCheckedChange = onProxyToggle,
+                    contentDescription = "Use SOCKS5 proxy"
+                )
+            },
+            content = {
+                AnimatedVisibility(
+                    visible = state.isProxyEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Proxy settings",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Fill out to connect to the server",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = proxyHostInput,
+                            onValueChange = { proxyHostInput = it },
+                            label = { Text("Host / IP Address") },
+                            placeholder = { Text("127.0.0.1 or proxy.example.com") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = proxyPortInput,
+                            onValueChange = { proxyPortInput = it.filter { ch -> ch.isDigit() } },
+                            label = { Text("Port") },
+                            placeholder = { Text("1080") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+
+                        if (state.proxyMessage != null) {
+                            Text(
+                                text = state.proxyMessage,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        val portNumber = proxyPortInput.toIntOrNull()
+                        val isSaveEnabled = proxyHostInput.isNotBlank() && portNumber != null && portNumber in 1..65535
+
                         SettingsPrimaryButton(
-                            text = "Save time",
-                            enabled = state.hasConfirmedSettings &&
-                                feedRefreshTime != state.dailyRefreshTime &&
-                                !state.isSavingRefreshTime && !state.isRefreshLoading,
-                            onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                            text = "Save Proxy",
+                            width = 120.dp,
+                            height = 36.dp,
+                            enabled = isSaveEnabled,
+                            onClick = {
+                                if (portNumber != null) {
+                                    onSaveProxySettings(proxyHostInput, portNumber, "SOCKS5")
+                                }
+                            }
                         )
                     }
                 }
             }
-        }
+        )
 
+        // Card 3: Dark theme toggle
         SettingCard(
-            title = "Use SOCKS5 proxy",
-            descriptionContent = {
-                when {
-                    state.isProxyLoading -> SettingsSectionStatus("Loading proxy status…")
-                    state.proxyErrorMessage != null -> SettingsSectionStatus(
-                        state.proxyErrorMessage,
-                        isError = true
-                    )
-                    else -> SettingsSectionStatus(
-                        "Turn on if direct connection update fails."
-                    )
-                }
-            },
+            title = "Use dark theme",
+            description = "Use this option if it feels more comfortable for you.",
             action = {
-                if (!state.isProxyLoading) {
-                    MpodSwitch(
-                        checked = state.proxyEnabled,
-                        onCheckedChange = onProxyEnabledChange,
-                        enabled = state.hasConfirmedSettings && state.proxyConfigured &&
-                            !state.isSavingProxy,
-                        contentDescription = "Use SOCKS5 proxy"
-                    )
-                }
+                MpodSwitch(
+                    checked = themeMode.isDark(isSystemInDarkTheme()),
+                    onCheckedChange = { useDarkTheme ->
+                        onThemeModeChange(if (useDarkTheme) ThemeMode.Dark else ThemeMode.Light)
+                    },
+                    contentDescription = "Use dark theme"
+                )
             }
         )
 
+        // Card 4: Export OPML
         SettingCard(
-                title = "Use dark theme",
-                description = "Use this option if it feels more comfortable for you.",
-                action = {
-                    MpodSwitch(
-                        checked = themeMode.isDark(isSystemInDarkTheme()),
-                        onCheckedChange = { useDarkTheme ->
-                            onThemeModeChange(
-                                if (useDarkTheme) ThemeMode.Dark else ThemeMode.Light
-                            )
-                        },
-                        contentDescription = "Use dark theme"
-                    )
-                }
-        )
-
-        SettingCard(
-                title = "Export OPML",
-                description = "Download the current subscription list as an OPML file.",
-                action = {
-                    SettingsPrimaryButton(
-                        text = if (state.isExportingOpml) "Exporting" else "Export OPML",
-                        width = 113.dp,
-                        height = 32.dp,
-                        radius = 6.dp,
-                        enabled = !state.isExportingOpml,
-                        onClick = onExportOpml
-                    )
-                }
-        )
-
-        SettingCard(
-                title = "Session",
-                description = "End the current app session",
-                action = {
-                    MpodButton(
-                        text = "Log out",
-                        primary = false,
-                        height = 32.dp,
-                        radius = 6.dp,
-                        modifier = Modifier.width(113.dp),
-                        onClick = onLogout
-                    )
-                }
+            title = "Export OPML",
+            description = "Download the current subscription list as an OPML file.",
+            action = {
+                SettingsPrimaryButton(
+                    text = if (state.isExportingOpml) "Exporting" else "Export OPML",
+                    width = 113.dp,
+                    height = 32.dp,
+                    radius = 6.dp,
+                    enabled = !state.isExportingOpml,
+                    onClick = onExportOpml
+                )
+            }
         )
 
         Text(
-            text = "Current app build: ${installedAppBuildInfo.versionName}",
+            text = "Current app build: ${state.appBuild}",
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
@@ -378,20 +435,6 @@ private fun SettingsStatusCard(
 }
 
 @Composable
-private fun SettingsSectionStatus(
-    message: String,
-    isError: Boolean = false
-) {
-    Text(
-        text = message,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        color = if (isError) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-@Composable
 private fun SettingsPrimaryButton(
     text: String,
     width: Dp = 100.dp,
@@ -425,41 +468,10 @@ private fun SettingsPrimaryButton(
     }
 }
 
-@Preview(
-    name = "Settings loading / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun SettingsLoadingPreview() {
-    MpodTheme {
-        SettingsScreen(state = SettingsUiState(isLoading = true))
-    }
-}
-
-@Preview(
-    name = "Settings error / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun SettingsErrorPreview() {
-    MpodTheme {
-        SettingsScreen(
-            state = SettingsUiState(
-                errorMessage = "Could not load settings."
-            )
-        )
-    }
-}
-
 @Composable
 private fun SettingCard(
     title: String,
     description: String? = null,
-    descriptionContent: (@Composable () -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
 ) {
@@ -471,7 +483,7 @@ private fun SettingCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -489,9 +501,8 @@ private fun SettingCard(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    when {
-                        descriptionContent != null -> descriptionContent()
-                        description != null -> Text(
+                    if (description != null) {
+                        Text(
                             text = description,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,

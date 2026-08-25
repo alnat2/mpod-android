@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.home
 
+import android.content.ComponentName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -8,9 +9,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,35 +26,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
-import android.content.ComponentName
 import androidx.core.content.ContextCompat
-import androidx.media3.common.Player
-import androidx.media3.session.MediaController
-import androidx.media3.session.SessionToken
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import com.example.mpod.R
+import com.example.mpod.playback.PlaybackService
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
-import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PlayerPlaylistItem
 import com.example.mpod.ui.components.PlayerView
 import com.example.mpod.ui.components.ShowNotesMobile
 import com.example.mpod.ui.components.figmaDropShadow
-import com.example.mpod.ui.navigation.Screen
-import com.example.mpod.playback.PlaybackService
-import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.util.formatEpisodeDuration
 import com.example.mpod.ui.util.formatProgressTime
 import com.example.mpod.ui.util.formatRemainingTime
@@ -221,27 +217,22 @@ fun HomeRoute(
 
 @Composable
 fun HomeScreen(
-    hasPodcasts: Boolean = true,
-    state: HomeUiState = remember(hasPodcasts) { previewHomeState(hasPodcasts) },
+    state: HomeUiState = HomeUiState(),
     playbackSummary: HomePlaybackSummaryUiState = HomePlaybackSummaryUiState(),
-    playbackStateProvider: () -> HomePlaybackUiState = { HomePlaybackUiState(
-        positionSeconds = 23 * 60 + 14,
-        durationSeconds = 37 * 60 + 17,
-        speedLabel = "1.5"
-    ) },
+    playbackStateProvider: () -> HomePlaybackUiState = { HomePlaybackUiState() },
     onPlayToggle: () -> Unit = {},
     onSeekBy: (Int) -> Unit = {},
     onSeekTo: (Float) -> Unit = {},
     onSpeedChange: (String) -> Unit = {},
-    onPlayEpisode: (Int) -> Unit = {},
+    onPlayEpisode: (Long) -> Unit = {},
     onAddRssFeed: () -> Unit = {},
     onImportOpml: () -> Unit = {},
     onRetryLoad: () -> Unit = {},
-    onMoveEpisode: (episodeId: Int, offset: Int) -> Unit = { _, _ -> },
-    onRemoveEpisodeFromPlaylist: (Int) -> Unit = {}
+    onMoveEpisode: (episodeId: Long, offset: Int) -> Unit = { _, _ -> },
+    onRemoveEpisodeFromPlaylist: (Long) -> Unit = {}
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
-    var draggedEpisodeId by remember { mutableStateOf<Int?>(null) }
+    var draggedEpisodeId by remember { mutableStateOf<Long?>(null) }
     var dragAccumulatorPx by remember { mutableStateOf(0f) }
     val reorderStepPx = with(LocalDensity.current) { 80.dp.toPx() }
     val currentEpisode = state.queue.firstOrNull { it.id == playbackSummary.currentEpisodeId }
@@ -352,7 +343,7 @@ fun HomeScreen(
                             episode = currentEpisode,
                             playbackStateProvider = playbackStateProvider,
                             onSpeedChange = onSpeedChange,
-                            onPlayClick = onPlayToggle,
+                            onPlayClick = onPlayClick,
                             onSeekBackward = { onSeekBy(-15) },
                             onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
@@ -454,7 +445,6 @@ fun HomeScreen(
                 )
             }
         }
-
     }
 }
 
@@ -601,17 +591,17 @@ private fun queueSummary(episodes: List<HomeEpisodeUi>): String {
 }
 
 data class HomePlaybackSummaryUiState(
-    val currentEpisodeId: Int? = null,
+    val currentEpisodeId: Long? = null,
     val isPlaying: Boolean = false,
     val errorMessage: String? = null
 )
 
 data class HomePlaybackUiState(
-    val currentEpisodeId: Int? = null,
+    val currentEpisodeId: Long? = null,
     val positionSeconds: Int = 0,
     val durationSeconds: Int = 0,
     val isPlaying: Boolean = false,
-    val speedLabel: String = "1.3",
+    val speedLabel: String = "1.0",
     val errorMessage: String? = null
 ) {
     val remainingSeconds: Int
@@ -622,7 +612,7 @@ data class HomePlaybackUiState(
             (positionSeconds.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
         } else {
             0f
-    }
+        }
 }
 
 private fun HomePlaybackUiState.toSummary(): HomePlaybackSummaryUiState {
@@ -634,18 +624,17 @@ private fun HomePlaybackUiState.toSummary(): HomePlaybackSummaryUiState {
 }
 
 private fun Player?.toHomePlaybackUiState(
-    activeEpisodeId: Int?,
+    activeEpisodeId: Long?,
     queue: List<HomeEpisodeUi>
 ): HomePlaybackUiState {
-    val episodeId = this?.currentMediaItem?.mediaId?.toIntOrNull()
+    val episodeId = this?.currentMediaItem?.mediaId?.toLongOrNull()
         ?: activeEpisodeId
         ?: queue.firstOrNull()?.id
     val episode = queue.firstOrNull { it.id == episodeId }
     val durationMs = this?.duration?.takeIf { it > 0 }
         ?: ((episode?.durationSeconds ?: 0) * 1_000L)
     val positionMs = this?.currentPosition
-        ?: episode?.playbackPositionSeconds?.times(1_000L)
-        ?: 0L
+        ?: (episode?.playbackPositionSeconds?.toLong()?.times(1_000L) ?: 0L)
 
     return HomePlaybackUiState(
         currentEpisodeId = episodeId,
@@ -668,52 +657,12 @@ private fun Float?.toSpeedLabel(): String = when (this) {
     1.3f -> "1.3"
     1.5f -> "1.5"
     2f -> "2.0"
-    else -> "1.3"
+    else -> "1.0"
 }
 
 private const val PLAYING_PLAYBACK_SNAPSHOT_INTERVAL_MS = 500L
 private const val IDLE_PLAYBACK_SNAPSHOT_INTERVAL_MS = 1_500L
 private const val PLAYBACK_ROUTE_REFRESH_DELAY_MS = 500L
-
-private fun previewHomeState(hasPodcasts: Boolean): HomeUiState {
-    if (!hasPodcasts) return HomeUiState(hasPodcasts = false)
-
-    return HomeUiState(
-        hasPodcasts = true,
-        queue = listOf(
-            HomeEpisodeUi(
-                id = 1,
-                title = "Why store loyalty cards became a UX minefield",
-                podcastTitle = "Decoder Ring",
-                durationSeconds = 54 * 60,
-                playbackPositionSeconds = 0,
-                isListened = false,
-                downloaded = false,
-                summary = "A story about loyalty cards, UX traps, and the tiny design decisions that become habits."
-            ),
-            HomeEpisodeUi(
-                id = 2,
-                title = "How public transit maps teach invisible habits",
-                podcastTitle = "Decoder Ring",
-                durationSeconds = 36 * 60,
-                playbackPositionSeconds = 0,
-                isListened = false,
-                downloaded = false,
-                summary = "Transit maps look simple, but the choices behind them shape how people move through cities."
-            ),
-            HomeEpisodeUi(
-                id = 3,
-                title = "The app menu nobody understands but everyone...",
-                podcastTitle = "Decoder Ring",
-                durationSeconds = 43 * 60,
-                playbackPositionSeconds = 0,
-                isListened = false,
-                downloaded = false,
-                summary = "A short note about menu design and why obvious labels are sometimes the hardest thing to ship."
-            )
-        )
-    )
-}
 
 @Composable
 private fun NoPodcastsEmptyState(
@@ -793,99 +742,5 @@ private fun NoPodcastsEmptyState(
                 )
             }
         }
-    }
-}
-
-@Preview(
-    name = "No podcasts screen / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun NoPodcastsScreenPreview() {
-    MpodTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                HomeScreen(hasPodcasts = false)
-            }
-            MpodBottomNav(
-                currentRoute = Screen.Home.route,
-                onNavigate = {},
-                modifier = Modifier.padding(horizontal = 20.dp)
-            )
-        }
-    }
-}
-
-@Preview(
-    name = "Home loading / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun HomeLoadingPreview() {
-    MpodTheme {
-        HomePreviewShell {
-            HomeScreen(state = HomeUiState(isLoading = true))
-        }
-    }
-}
-
-@Preview(
-    name = "Home load error / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun HomeLoadErrorPreview() {
-    MpodTheme {
-        HomePreviewShell {
-            HomeScreen(state = HomeUiState(errorMessage = "Could not load playlist."))
-        }
-    }
-}
-
-@Preview(
-    name = "Home empty playlist / 360",
-    widthDp = 360,
-    heightDp = 800,
-    showBackground = true
-)
-@Composable
-private fun HomeEmptyPlaylistPreview() {
-    MpodTheme {
-        HomePreviewShell {
-            HomeScreen(
-                state = HomeUiState(
-                    hasPodcasts = true,
-                    queue = emptyList()
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun HomePreviewShell(content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            content()
-        }
-        MpodBottomNav(
-            currentRoute = Screen.Home.route,
-            onNavigate = {},
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
     }
 }

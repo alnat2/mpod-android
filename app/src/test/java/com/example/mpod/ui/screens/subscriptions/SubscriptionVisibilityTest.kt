@@ -15,13 +15,13 @@ class SubscriptionVisibilityTest {
     @Test
     fun headerSubtitleCountsPodcastsWithUnlistenedEpisodes() {
         val podcasts = listOf(
-            podcast(id = 1, episodes = listOf(episode(id = 1, isListened = false))),
-            podcast(id = 2, episodes = listOf(episode(id = 2, isListened = true))),
+            podcast(id = 1L, episodes = listOf(episode(id = 1L, isListened = false))),
+            podcast(id = 2L, episodes = listOf(episode(id = 2L, isListened = true))),
             podcast(
-                id = 3,
+                id = 3L,
                 episodes = listOf(
-                    episode(id = 3, isListened = false),
-                    episode(id = 4, isListened = false)
+                    episode(id = 3L, isListened = false),
+                    episode(id = 4L, isListened = false)
                 )
             )
         )
@@ -35,22 +35,22 @@ class SubscriptionVisibilityTest {
     @Test
     fun unlistenedVisibilityHidesCaughtUpPodcastsAndListenedEpisodes() {
         val activePodcast = podcast(
-            id = 1,
+            id = 1L,
             episodes = listOf(
-                episode(id = 1, isListened = true),
-                episode(id = 2, isListened = false)
+                episode(id = 1L, isListened = true),
+                episode(id = 2L, isListened = false)
             )
         )
         val caughtUpPodcast = podcast(
-            id = 2,
-            episodes = listOf(episode(id = 3, isListened = true))
+            id = 2L,
+            episodes = listOf(episode(id = 3L, isListened = true))
         )
 
         val visible = listOf(activePodcast, caughtUpPodcast)
             .visibleFor(SubscriptionVisibility.Unlistened)
 
-        assertEquals(listOf(1), visible.map { it.id })
-        assertEquals(listOf(2), visible.single().episodes.map { it.id })
+        assertEquals(listOf(1L), visible.map { it.id })
+        assertEquals(listOf(2L), visible.single().episodes.map { it.id })
         assertEquals(2, visible.single().totalEpisodeCount)
         assertEquals(1, visible.single().unlistenedEpisodeCount)
     }
@@ -58,21 +58,21 @@ class SubscriptionVisibilityTest {
     @Test
     fun allVisibilityKeepsEveryPodcastAndEveryEpisode() {
         val podcasts = listOf(
-            podcast(id = 1, episodes = (1..25).map { episode(it, isListened = it <= 20) }),
-            podcast(id = 2, episodes = listOf(episode(id = 26, isListened = true)))
+            podcast(id = 1L, episodes = (1L..25L).map { episode(it, isListened = it <= 20L) }),
+            podcast(id = 2L, episodes = listOf(episode(id = 26L, isListened = true)))
         )
 
         val visible = podcasts.visibleFor(SubscriptionVisibility.All)
 
         assertSame(podcasts, visible)
         assertEquals(25, visible.first().episodes.size)
-        assertEquals(listOf(1, 2), visible.map { it.id })
+        assertEquals(listOf(1L, 2L), visible.map { it.id })
     }
 
     @Test
     fun unlistenedVisibilityReturnsEmptyForAllCaughtUpLibrary() {
         val podcasts = listOf(
-            podcast(id = 1, episodes = listOf(episode(id = 1, isListened = true)))
+            podcast(id = 1L, episodes = listOf(episode(id = 1L, isListened = true)))
         )
 
         assertEquals(
@@ -83,7 +83,7 @@ class SubscriptionVisibilityTest {
 
     @Test
     fun unlistenedVisibilityKeepsPodcastWhoseEpisodesFailedToLoad() {
-        val failedPodcast = podcast(id = 1, episodes = emptyList()).copy(
+        val failedPodcast = podcast(id = 1L, episodes = emptyList()).copy(
             errorMessage = "Episodes unavailable.",
             episodesUnavailable = true
         )
@@ -103,7 +103,7 @@ class SubscriptionVisibilityTest {
     }
 
     private fun podcast(
-        id: Int,
+        id: Long,
         episodes: List<SubscriptionEpisodeUi>
     ): SubscriptionPodcastUi {
         return SubscriptionPodcastUi(
@@ -117,7 +117,7 @@ class SubscriptionVisibilityTest {
         )
     }
 
-    private fun episode(id: Int, isListened: Boolean): SubscriptionEpisodeUi {
+    private fun episode(id: Long, isListened: Boolean): SubscriptionEpisodeUi {
         return SubscriptionEpisodeUi(
             id = id,
             title = "Episode $id",

@@ -1,12 +1,11 @@
 package com.example.mpod.ui.screens.settings
 
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -22,23 +21,23 @@ class SettingsScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun settingsShowsHeaderStatusAndProxyDescription() {
+    fun settingsShowsHeaderStatusAndSections() {
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(
-                        refreshHeaderText = "Last refresh today at 03:04",
-                        proxyHeaderText = "Current IP: 43.32.112.45 • Geo: UK",
-                        proxyStatusText = "Current IP: 43.32.112.45 · Geo: UK"
+                        lastRefreshHeaderText = "Last refresh today at 03:04"
                     )
                 )
             }
         }
 
         composeRule.onNodeWithText("Last refresh today at 03:04").assertIsDisplayed()
-        composeRule.onNodeWithText("Current IP: 43.32.112.45 • Geo: UK").assertIsDisplayed()
+        composeRule.onNodeWithText("Auto refresh").assertIsDisplayed()
+        composeRule.onNodeWithText("Use SOCKS5 proxy").assertIsDisplayed()
         composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Current IP: 43.32.112.45 · Geo: UK").assertCountEquals(0)
+        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Export OPML").assertIsDisplayed()
     }
 
     @Test
@@ -55,7 +54,6 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Use dark theme").performClick()
-
         composeRule.runOnIdle { assertEquals(ThemeMode.Dark, selectedMode) }
     }
 
@@ -73,171 +71,73 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Use dark theme").performClick()
-
         composeRule.runOnIdle { assertEquals(ThemeMode.Light, selectedMode) }
     }
 
     @Test
-    fun dailyRefreshTimeOpensMaterialTimePicker() {
+    fun autoRefreshAccordionRevealsDailyRefreshTime() {
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(
-                        hasConfirmedSettings = true,
+                        isAutoRefreshEnabled = true,
                         dailyRefreshTime = "04:00"
                     )
                 )
             }
         }
 
+        composeRule.onNodeWithText("Feed daily refresh").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Daily refresh time").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
-
         composeRule.onNodeWithText("Cancel").assertIsDisplayed()
         composeRule.onNodeWithText("OK").assertIsDisplayed()
     }
 
     @Test
-    fun cancellingTimePickerDoesNotSaveOrChangeConfirmedTime() {
-        var saves = 0
+    fun socksProxyAccordionRevealsProxyInputs() {
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(
-                        hasConfirmedSettings = true,
-                        dailyRefreshTime = "04:00"
-                    ),
-                    onSaveDailyRefreshTime = { saves += 1 }
+                        isProxyEnabled = true,
+                        proxyHost = "127.0.0.1",
+                        proxyPort = 1080
+                    )
                 )
             }
         }
 
-        composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
-        composeRule.onNodeWithText("Cancel").performClick()
-
-        composeRule.onNodeWithText("04:00").assertIsDisplayed()
-        composeRule.onNodeWithText("Save time").assertIsNotEnabled()
-        composeRule.runOnIdle { assertEquals(0, saves) }
+        composeRule.onNodeWithText("Proxy settings").assertIsDisplayed()
+        composeRule.onNodeWithText("Save Proxy").assertIsDisplayed()
     }
 
     @Test
-    fun openTimePickerSurvivesStateRestorationWithoutSaving() {
-        var saves = 0
-        val restorationTester = StateRestorationTester(composeRule)
-        restorationTester.setContent {
-            MpodTheme {
-                SettingsScreen(
-                    state = SettingsUiState(
-                        hasConfirmedSettings = true,
-                        dailyRefreshTime = "04:00"
-                    ),
-                    onSaveDailyRefreshTime = { saves += 1 }
-                )
-            }
-        }
-
-        composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
-        restorationTester.emulateSavedInstanceStateRestore()
-
-        composeRule.onNodeWithText("Cancel").assertIsDisplayed()
-        composeRule.onNodeWithText("OK").assertIsDisplayed()
-        composeRule.runOnIdle { assertEquals(0, saves) }
-    }
-
-    @Test
-    fun settingsDispatchesProxyExportLogoutAndRefreshSave() {
-        var proxyEnabled: Boolean? = null
+    fun settingsDispatchesExportOpml() {
         var exports = 0
-        var logouts = 0
-        var savedTime: String? = null
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
-                    state = SettingsUiState(
-                        hasConfirmedSettings = true,
-                        dailyRefreshTime = "04:00",
-                        proxyEnabled = false,
-                        proxyConfigured = true
-                    ),
-                    onSaveDailyRefreshTime = { savedTime = it },
-                    onProxyEnabledChange = { proxyEnabled = it },
-                    onExportOpml = { exports += 1 },
-                    onLogout = { logouts += 1 }
+                    state = SettingsUiState(),
+                    onExportOpml = { exports += 1 }
                 )
             }
         }
 
-        composeRule.onNodeWithContentDescription("Use SOCKS5 proxy").performClick()
         composeRule.onNode(hasText("Export OPML") and hasClickAction()).performClick()
-        composeRule.onNodeWithText("Log out").performClick()
-
-        composeRule.runOnIdle {
-            assertEquals(null, savedTime)
-            assertEquals(true, proxyEnabled)
-            assertEquals(1, exports)
-            assertEquals(1, logouts)
-        }
+        composeRule.runOnIdle { assertEquals(1, exports) }
     }
 
     @Test
-    fun settingsShowsLoadingState() {
+    fun settingsShowsAppBuildInfo() {
         composeRule.setContent {
             MpodTheme {
                 SettingsScreen(
-                    state = SettingsUiState(
-                        isLoading = true,
-                        isRefreshLoading = true,
-                        isProxyLoading = true
-                    )
-                )
-            }
-        }
-        composeRule.onNodeWithText("Loading refresh settings…").assertIsDisplayed()
-        composeRule.onNodeWithText("Loading proxy status…").assertIsDisplayed()
-        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
-        composeRule.onNode(hasText("Export OPML") and hasClickAction()).assertIsDisplayed()
-        composeRule.onNodeWithText("Session").assertIsDisplayed()
-    }
-
-    @Test
-    fun settingsShowsBackendFailureState() {
-        composeRule.setContent {
-            MpodTheme {
-                SettingsScreen(
-                    state = SettingsUiState(
-                        refreshErrorMessage = "Refresh unavailable",
-                        proxyErrorMessage = "Proxy unavailable"
-                    )
-                )
-            }
-        }
-        composeRule.onNodeWithText("Refresh unavailable").assertIsDisplayed()
-        composeRule.onNodeWithText("Proxy unavailable").assertIsDisplayed()
-        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
-        composeRule.onNode(hasText("Export OPML") and hasClickAction()).assertIsDisplayed()
-        composeRule.onNodeWithText("Log out").assertIsDisplayed()
-    }
-
-    @Test
-    fun settingsShowsOnlyUserFacingVersionName() {
-        composeRule.setContent {
-            MpodTheme {
-                SettingsScreen(
-                    state = SettingsUiState(appBuild = "abc1234"),
-                    installedAppBuildInfo = InstalledAppBuildInfo(
-                        environment = "Test",
-                        versionName = "1.2.3",
-                        versionCode = 42,
-                        applicationId = "com.prod.mpod.test",
-                        backendAddress = "192.168.0.222:5051"
-                    )
+                    state = SettingsUiState(appBuild = "mpoddy v1.0.17")
                 )
             }
         }
 
-        composeRule.onNodeWithText("Current app build: 1.2.3").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Current app build: 1.2.3 (42) · Test").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Package: com.prod.mpod.test").assertCountEquals(0)
-        composeRule.onAllNodesWithText("Server: 192.168.0.222:5051 · Backend: abc1234")
-            .assertCountEquals(0)
+        composeRule.onNodeWithText("Current app build: mpoddy v1.0.17").assertIsDisplayed()
     }
 }

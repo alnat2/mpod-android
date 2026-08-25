@@ -2,246 +2,114 @@ package com.example.mpod.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.mpod.data.network.MpodApi
-import com.example.mpod.data.network.model.EpisodeListenedRequest
-import com.example.mpod.data.network.model.PlaybackQueueEpisodeDto
-import com.example.mpod.data.network.model.PlaylistReorderRequest
+import com.example.mpod.data.local.dao.EpisodeDao
+import com.example.mpod.data.local.dao.PlaylistDao
+import com.example.mpod.data.local.dao.PodcastDao
+import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.repository.PlaylistRepository
+import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.util.cleanFeedText
-import com.example.mpod.ui.util.apiErrorMessage
-import com.example.mpod.ui.util.toDurationSeconds
-import com.example.mpod.ui.util.missingApiPayload
-import com.example.mpod.ui.util.requireApiBody
-import com.example.mpod.ui.util.userFacingApiMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import retrofit2.Response
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val api: MpodApi,
+    private val podcastDao: PodcastDao,
+    private val playlistDao: PlaylistDao,
+    private val episodeDao: EpisodeDao,
+    private val playlistRepository: PlaylistRepository,
+    private val podcastRepository: PodcastRepository,
+    private val appSettingsDataStore: AppSettingsDataStore,
     private val queueInvalidator: PlaybackQueueInvalidator
 ) : ViewModel() {
+
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
-    private var refreshInFlight = false
 
     init {
-        refresh()
         viewModelScope.launch {
-            queueInvalidator.homeRefreshEvents.collectLatest {
-                reloadNow(invalidatePlaybackQueue = false)
+            combine(
+                podcastDao.getAllPodcastsFlow(),
+                playlistDao.getPlaylistItemsWithEpisodesFlow(),
+                appSettingsDataStore.settingsFlow
+            ) { podcasts, playlistItems, settings ->
+                val hasPodcasts = podcasts.isNotEmpty()
+                val queueUis = playlistItems.map { item ->
+                    val ep = item.episode
+                    HomeEpisodeUi(
+                        id = ep.id,
+                        title = cleanFeedText(ep.title).ifBlank { "Untitled episode" },
+                        podcastTitle = cleanFeedText(item.podcastTitle).ifBlank { "Podcast" },
+                        durationSeconds = ep.durationSeconds.toInt(),
+                        playbackPositionSeconds = (ep.playbackPositionMs / 1000L).toInt(),
+                        isListened = ep.isListened,
+                        downloaded = ep.isDownloaded,
+                        summary = ep.description.ifBlank { null }
+                    )
+                }
+                HomeUiState(
+                    isLoading = false,
+                    hasPodcasts = hasPodcasts,
+                    activeEpisodeId = settings.activeEpisodeId,
+                    queue = queueUis
+                )
+            }.collect { nextState ->
+                _state.value = nextState
             }
         }
     }
 
     fun refresh(invalidatePlaybackQueue: Boolean = true) {
-        if (refreshInFlight) return
-        refreshInFlight = true
-        viewModelScope.launch {
-            try {
-                reloadNow(invalidatePlaybackQueue = invalidatePlaybackQueue)
-            } finally {
-                refreshInFlight = false
-            }
-        }
-    }
-
-    private suspend fun reloadNow(invalidatePlaybackQueue: Boolean) {
-        val current = _state.value
-        _state.value = current.copy(
-            isLoading = current.isLoading,
-            errorMessage = null,
-            actionErrorMessage = null
-        )
-        val loadResult = runCatching { loadHomeState() }
-        val nextState = loadResult.getOrElse { error ->
-            val message = error.userFacingApiMessage("Could not load playlist.")
-            if (current.isLoading) {
-                HomeUiState(errorMessage = message)
-            } else {
-                current.copy(
-                    isLoading = false,
-                    errorMessage = null,
-                    actionErrorMessage = message
-                )
-            }
-        }
-        _state.value = nextState.withTransientStateFrom(_state.value)
-        if (invalidatePlaybackQueue && loadResult.isSuccess) {
+        if (invalidatePlaybackQueue) {
             queueInvalidator.invalidate()
         }
     }
 
-    private suspend fun loadHomeState(): HomeUiState {
-        val podcasts = api.getPodcasts()
-            .requireApiBody("Could not load podcasts.")
-            .podcasts
-            ?: missingApiPayload("Could not load podcasts.")
-        if (podcasts.isEmpty()) {
-            return HomeUiState(hasPodcasts = false)
-        }
-
-        val playbackQueue = api.getPlaybackQueue()
-            .requireApiBody("Could not load playback queue.")
-        val queue = playbackQueue.queue
-            ?: missingApiPayload("Could not load playback queue.")
-
-        return HomeUiState(
-            hasPodcasts = true,
-            activeEpisodeId = playbackQueue.activePlayback?.episodeId,
-            queue = queue.map { it.toHomeEpisode() }
-        )
-    }
-
-    private fun PlaybackQueueEpisodeDto.toHomeEpisode(): HomeEpisodeUi {
-        return HomeEpisodeUi(
-            id = id,
-            title = cleanFeedText(title).ifBlank { "Untitled episode" },
-            podcastTitle = cleanFeedText(podcastTitle).ifBlank { "Podcast" },
-            durationSeconds = duration.toDurationSeconds(),
-            playbackPositionSeconds = playback?.positionSeconds ?: 0,
-            isListened = isListened,
-            downloaded = downloaded,
-            summary = cleanFeedText(showNotes ?: description).ifBlank { null }
-        )
-    }
-
-    fun removeEpisodeFromPlaylist(episodeId: Int) {
-        performEpisodeAction(
-            episodeId = episodeId,
-            defaultErrorMessage = "Could not remove episode from playlist.",
-            invalidatePlaybackQueue = true
-        ) {
-            api.removeFromPlaylist(episodeId)
+    fun removeEpisodeFromPlaylist(episodeId: Long) {
+        viewModelScope.launch {
+            playlistRepository.removeFromPlaylist(episodeId)
+            queueInvalidator.invalidate()
         }
     }
 
-    fun setEpisodeListened(episodeId: Int, isListened: Boolean) {
-        performEpisodeAction(
-            episodeId = episodeId,
-            defaultErrorMessage = if (isListened) {
-                "Could not mark episode as listened."
-            } else {
-                "Could not mark episode as unlistened."
-            },
-            invalidatePlaybackQueue = isListened
-        ) {
-            api.setEpisodeListened(episodeId, EpisodeListenedRequest(isListened = isListened))
+    fun setEpisodeListened(episodeId: Long, isListened: Boolean) {
+        viewModelScope.launch {
+            podcastRepository.setEpisodeListened(episodeId, isListened)
+            if (isListened) {
+                playlistRepository.removeFromPlaylist(episodeId)
+            }
+            queueInvalidator.invalidate()
         }
     }
 
-    fun moveEpisode(episodeId: Int, offset: Int) {
+    fun moveEpisode(episodeId: Long, offset: Int) {
         val currentQueue = _state.value.queue
-        if (episodeId in _state.value.busyEpisodeIds) return
-
-        val nextQueue = reorderEpisodes(
-            episodes = currentQueue,
-            episodeId = episodeId,
-            offset = offset
-        ) ?: return
-
-        _state.value = _state.value.copy(
-            queue = nextQueue,
-            busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
-            actionErrorMessage = null
-        )
+        val nextQueue = reorderEpisodes(currentQueue, episodeId, offset) ?: return
         viewModelScope.launch {
-            val response = runCatching {
-                api.reorderPlaylist(PlaylistReorderRequest(nextQueue.map { it.id }))
-            }.getOrNull()
-
-            if (response?.isSuccessful == true) {
-                queueInvalidator.invalidate()
-                val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-                    _state.value.copy(
-                        busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
-                        actionErrorMessage = error.message ?: "Could not reload playlist."
-                    )
-                }
-                _state.value = nextState.withTransientStateFrom(
-                    current = _state.value,
-                    completedBusyEpisodeId = episodeId
-                )
-            } else {
-                _state.value = _state.value.copy(
-                    queue = currentQueue,
-                    busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
-                    actionErrorMessage = response.errorMessage("Could not reorder playlist.")
-                )
-            }
+            playlistRepository.reorderPlaylist(nextQueue.map { it.id })
+            queueInvalidator.invalidate()
         }
     }
-
-    private fun performEpisodeAction(
-        episodeId: Int,
-        defaultErrorMessage: String,
-        invalidatePlaybackQueue: Boolean = false,
-        request: suspend () -> Response<Unit>
-    ) {
-        if (episodeId in _state.value.busyEpisodeIds) return
-        _state.value = _state.value.copy(
-            busyEpisodeIds = _state.value.busyEpisodeIds + episodeId,
-            actionErrorMessage = null
-        )
-
-        viewModelScope.launch {
-            val response = runCatching { request() }.getOrNull()
-            if (response?.isSuccessful == true) {
-                if (invalidatePlaybackQueue) queueInvalidator.invalidate()
-                val nextState = runCatching { loadHomeState() }.getOrElse { error ->
-                    _state.value.copy(
-                        busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
-                        actionErrorMessage = error.message ?: "Could not reload playlist."
-                    )
-                }
-                _state.value = nextState.withTransientStateFrom(
-                    current = _state.value,
-                    completedBusyEpisodeId = episodeId
-                )
-            } else {
-                _state.value = _state.value.copy(
-                    busyEpisodeIds = _state.value.busyEpisodeIds - episodeId,
-                    actionErrorMessage = response.errorMessage(defaultErrorMessage)
-                )
-            }
-        }
-    }
-
-    private fun Response<*>?.errorMessage(defaultMessage: String): String {
-        return apiErrorMessage(this?.errorBody()?.string(), defaultMessage)
-    }
-
 }
 
 data class HomeUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
-    val busyEpisodeIds: Set<Int> = emptySet(),
+    val busyEpisodeIds: Set<Long> = emptySet(),
     val hasPodcasts: Boolean = true,
-    val activeEpisodeId: Int? = null,
+    val activeEpisodeId: Long? = null,
     val queue: List<HomeEpisodeUi> = emptyList()
 )
 
-internal fun HomeUiState.withTransientStateFrom(
-    current: HomeUiState,
-    completedBusyEpisodeId: Int? = null
-): HomeUiState {
-    return copy(
-        busyEpisodeIds = completedBusyEpisodeId?.let {
-            current.busyEpisodeIds - it
-        } ?: current.busyEpisodeIds
-    )
-}
-
 data class HomeEpisodeUi(
-    val id: Int,
+    val id: Long,
     val title: String,
     val podcastTitle: String,
     val durationSeconds: Int?,
@@ -253,7 +121,7 @@ data class HomeEpisodeUi(
 
 internal fun reorderEpisodes(
     episodes: List<HomeEpisodeUi>,
-    episodeId: Int,
+    episodeId: Long,
     offset: Int
 ): List<HomeEpisodeUi>? {
     val currentIndex = episodes.indexOfFirst { it.id == episodeId }
