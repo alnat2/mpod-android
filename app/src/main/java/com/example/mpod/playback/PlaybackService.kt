@@ -307,14 +307,12 @@ class PlaybackService : MediaSessionService() {
 
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
                 serviceScope.launch {
-                    val completion = completeEpisode(finishedEpisodeId)
-                    if (completion != null) {
-                        reconcileQueueWithBackend(
-                            preferFirstEpisode = true,
-                            forcePlayPreferred = true
-                        )
-                        queueInvalidator.refreshHome()
+                    completeEpisode(finishedEpisodeId)
+                    if (nextEpisodeId != null) {
+                        playbackSyncManager.submitActive(nextEpisodeId)
                     }
+                    reconcileQueueWithBackend()
+                    queueInvalidator.refreshHome()
                 }
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
                 serviceScope.launch {
@@ -329,7 +327,7 @@ class PlaybackService : MediaSessionService() {
             if (lastCompletedEpisodeId == episodeId) return
             lastCompletedEpisodeId = episodeId
             serviceScope.launch {
-                val completion = completeEpisode(episodeId) ?: return@launch
+                completeEpisode(episodeId)
                 reconcileQueueWithBackend(
                     preferFirstEpisode = true,
                     forcePlayPreferred = true

@@ -40,12 +40,12 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun refresh() {
+    fun refresh(invalidatePlaybackQueue: Boolean = true) {
         if (refreshInFlight) return
         refreshInFlight = true
         viewModelScope.launch {
             try {
-                reloadNow(invalidatePlaybackQueue = true)
+                reloadNow(invalidatePlaybackQueue = invalidatePlaybackQueue)
             } finally {
                 refreshInFlight = false
             }

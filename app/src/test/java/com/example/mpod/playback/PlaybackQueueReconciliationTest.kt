@@ -219,6 +219,21 @@ class PlaybackQueueReconciliationTest {
         assertFalse(target?.playWhenReady == true)
     }
 
+    @Test
+    fun genericReconciliationDuringActiveTransitionPreservesPlayingState() {
+        val target = resolveQueuePlaybackTarget(
+            queue = queue(2 to 0, 3 to 8_000),
+            backendActiveEpisodeId = null,
+            currentEpisodeId = 2,
+            currentPositionMs = 500,
+            currentPlayWhenReady = true
+        )
+
+        assertEquals(2, target?.episodeId)
+        assertEquals(500L, target?.positionMs)
+        assertTrue(target?.playWhenReady == true)
+    }
+
     private fun queue(vararg entries: Pair<Int, Int>): List<QueueEpisodeState> {
         return entries.map { (episodeId, positionMs) ->
             QueueEpisodeState(episodeId = episodeId, savedPositionMs = positionMs.toLong())

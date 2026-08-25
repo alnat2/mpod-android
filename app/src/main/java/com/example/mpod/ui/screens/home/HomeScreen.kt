@@ -161,7 +161,7 @@ fun HomeRoute(
         val episodeId = playbackSummary.currentEpisodeId ?: return@LaunchedEffect
         if (episodeId != state.activeEpisodeId) {
             delay(PLAYBACK_ROUTE_REFRESH_DELAY_MS)
-            viewModel.refresh()
+            viewModel.refresh(invalidatePlaybackQueue = false)
         }
     }
 
