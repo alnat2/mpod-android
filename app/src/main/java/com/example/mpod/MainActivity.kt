@@ -58,6 +58,6 @@ class MainActivity : ComponentActivity() {
         private const val THEME_PREFERENCES = "mpod_appearance"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val THEME_SCHEMA_KEY = "theme_schema"
-        private const val THEME_SCHEMA_VERSION = 1
+        private const val THEME_SCHEMA_VERSION = 2
     }
 }
