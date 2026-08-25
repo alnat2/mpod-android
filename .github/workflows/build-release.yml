@@ -34,7 +34,12 @@ jobs:
           cache-provider: basic
 
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --console=plain --stacktrace
+        run: |
+          ./gradlew testDebugUnitTest --console=plain --stacktrace --info || {
+            echo "=== TEST RESULTS ==="
+            find app/build/test-results -type f -name "*.xml" -exec cat {} + 2>/dev/null || true
+            exit 1
+          }
 
       - name: Assemble Android test APK
         run: ./gradlew assembleDebugAndroidTest --console=plain --stacktrace
