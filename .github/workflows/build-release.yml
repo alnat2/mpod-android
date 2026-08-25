@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-release-${{ github.ref }}
@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up JetBrains Runtime 21
         uses: actions/setup-java@v5
@@ -34,7 +36,19 @@ jobs:
           cache-provider: basic
 
       - name: Run unit tests and compile Android tests
-        run: ./gradlew testDebugUnitTest assembleDebugAndroidTest --console=plain
+        run: |
+          ./gradlew testDebugUnitTest assembleDebugAndroidTest --console=plain > /tmp/test_log.txt 2>&1 || {
+            git checkout -B ci-test-log
+            cp /tmp/test_log.txt ./ci_test_log.txt
+            find app/build/test-results -type f -name "*.xml" -exec cp {} ./ \; 2>/dev/null || true
+            git config user.name "CI Log Bot"
+            git config user.email "bot@ci.local"
+            git add .
+            git commit -m "CI Test Failure Log"
+            git push -f origin ci-test-log || true
+            cat /tmp/test_log.txt
+            exit 1
+          }
 
       - name: Run Android lint
         run: ./gradlew lintDebug lintRelease --console=plain
