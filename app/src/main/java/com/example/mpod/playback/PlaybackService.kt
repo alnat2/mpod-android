@@ -215,7 +215,7 @@ class PlaybackService : MediaSessionService() {
                 preferredEpisodeId = preferredEpisodeId
             )
             if (!requiresRebuild) {
-                if (!player.isPlaying && !hasPendingLocalUpdate) {
+                if (!player.isPlaying && !player.playWhenReady && !hasPendingLocalUpdate) {
                     val positionDelta = kotlin.math.abs(player.currentPosition - target.positionMs)
                     if (positionDelta >= POSITION_SYNC_THRESHOLD_MS) {
                         player.seekTo(target.positionMs)

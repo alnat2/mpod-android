@@ -49,7 +49,7 @@ internal fun resolveQueuePlaybackTarget(
     val positionMs = when {
         preferred != null -> queueById.getValue(preferred).savedPositionMs
         currentStillQueued && targetEpisodeId == currentEpisodeId -> {
-            if (isPlaying || hasPendingLocalUpdate) {
+            if (isPlaying || currentPlayWhenReady || hasPendingLocalUpdate) {
                 currentPositionMs
             } else {
                 queueById.getValue(targetEpisodeId).savedPositionMs
