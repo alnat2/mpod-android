@@ -20,39 +20,39 @@ interface EpisodeDao {
     fun getAllEpisodesWithPodcastFlow(): Flow<List<EpisodeWithPodcast>>
 
     @Query("SELECT * FROM episodes WHERE id = :id LIMIT 1")
-    suspend fun getEpisodeById(id: Long): EpisodeEntity?
+    fun getEpisodeById(id: Long): EpisodeEntity?
 
     @Transaction
     @Query("SELECT * FROM episodes WHERE id = :id LIMIT 1")
-    suspend fun getEpisodeWithPodcastById(id: Long): EpisodeWithPodcast?
+    fun getEpisodeWithPodcastById(id: Long): EpisodeWithPodcast?
 
     @Query("SELECT * FROM episodes WHERE podcastId = :podcastId AND guid = :guid LIMIT 1")
-    suspend fun getEpisodeByPodcastIdAndGuid(podcastId: Long, guid: String): EpisodeEntity?
+    fun getEpisodeByPodcastIdAndGuid(podcastId: Long, guid: String): EpisodeEntity?
 
     @Query("SELECT * FROM episodes WHERE podcastId = :podcastId ORDER BY publishedAt DESC")
-    suspend fun getEpisodesByPodcastId(podcastId: Long): List<EpisodeEntity>
+    fun getEpisodesByPodcastId(podcastId: Long): List<EpisodeEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertEpisode(episode: EpisodeEntity): Long
+    fun insertEpisode(episode: EpisodeEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertEpisodes(episodes: List<EpisodeEntity>): List<Long>
+    fun insertEpisodes(episodes: List<EpisodeEntity>): List<Long>
 
     @Update
-    suspend fun update(episode: EpisodeEntity)
+    fun update(episode: EpisodeEntity)
 
     @Query("UPDATE episodes SET isListened = :listened WHERE id = :episodeId")
-    suspend fun setListened(episodeId: Long, listened: Boolean)
+    fun setListened(episodeId: Long, listened: Boolean)
 
     @Query("UPDATE episodes SET isListened = :listened WHERE podcastId = :podcastId")
-    suspend fun setAllListenedForPodcast(podcastId: Long, listened: Boolean)
+    fun setAllListenedForPodcast(podcastId: Long, listened: Boolean)
 
     @Query("UPDATE episodes SET playbackPositionMs = :positionMs WHERE id = :episodeId")
-    suspend fun updatePlaybackPosition(episodeId: Long, positionMs: Long)
+    fun updatePlaybackPosition(episodeId: Long, positionMs: Long)
 
     @Query("UPDATE episodes SET isDownloaded = :isDownloaded, localFilePath = :localFilePath WHERE id = :episodeId")
-    suspend fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?)
+    fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?)
 
     @Query("SELECT * FROM episodes WHERE isDownloaded = 1")
-    suspend fun getDownloadedEpisodes(): List<EpisodeEntity>
+    fun getDownloadedEpisodes(): List<EpisodeEntity>
 }

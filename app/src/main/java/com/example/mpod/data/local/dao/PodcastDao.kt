@@ -14,23 +14,23 @@ interface PodcastDao {
     fun getAllPodcastsFlow(): Flow<List<PodcastEntity>>
 
     @Query("SELECT * FROM podcasts ORDER BY title ASC")
-    suspend fun getAllPodcasts(): List<PodcastEntity>
+    fun getAllPodcasts(): List<PodcastEntity>
 
     @Query("SELECT * FROM podcasts WHERE id = :id LIMIT 1")
-    suspend fun getPodcastById(id: Long): PodcastEntity?
+    fun getPodcastById(id: Long): PodcastEntity?
 
     @Query("SELECT * FROM podcasts WHERE feedUrl = :feedUrl LIMIT 1")
-    suspend fun getPodcastByFeedUrl(feedUrl: String): PodcastEntity?
+    fun getPodcastByFeedUrl(feedUrl: String): PodcastEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(podcast: PodcastEntity): Long
+    fun insert(podcast: PodcastEntity): Long
 
     @Update
-    suspend fun update(podcast: PodcastEntity)
+    fun update(podcast: PodcastEntity)
 
     @Query("DELETE FROM podcasts WHERE id = :id")
-    suspend fun deleteById(id: Long)
+    fun deleteById(id: Long)
 
     @Query("DELETE FROM podcasts")
-    suspend fun deleteAll()
+    fun deleteAll()
 }

@@ -60,26 +60,26 @@ interface PlaylistDao {
         INNER JOIN podcasts pod ON e.podcastId = pod.id
         ORDER BY p.position ASC
     """)
-    suspend fun getPlaylistItemsWithEpisodes(): List<PlaylistItemWithEpisode>
+    fun getPlaylistItemsWithEpisodes(): List<PlaylistItemWithEpisode>
 
     @Query("SELECT * FROM playlist_items ORDER BY position ASC")
-    suspend fun getAllPlaylistItems(): List<PlaylistItemEntity>
+    fun getAllPlaylistItems(): List<PlaylistItemEntity>
 
     @Query("SELECT MAX(position) FROM playlist_items")
-    suspend fun getMaxPosition(): Int?
+    fun getMaxPosition(): Int?
 
     @Query("SELECT EXISTS(SELECT 1 FROM playlist_items WHERE episodeId = :episodeId)")
-    suspend fun isEpisodeInPlaylist(episodeId: Long): Boolean
+    fun isEpisodeInPlaylist(episodeId: Long): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPlaylistItem(item: PlaylistItemEntity): Long
+    fun insertPlaylistItem(item: PlaylistItemEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPlaylistItems(items: List<PlaylistItemEntity>): List<Long>
+    fun insertPlaylistItems(items: List<PlaylistItemEntity>): List<Long>
 
     @Query("DELETE FROM playlist_items WHERE episodeId = :episodeId")
-    suspend fun removeFromPlaylist(episodeId: Long)
+    fun removeFromPlaylist(episodeId: Long)
 
     @Query("DELETE FROM playlist_items")
-    suspend fun clearPlaylist()
+    fun clearPlaylist()
 }
