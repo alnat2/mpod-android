@@ -1,7 +1,7 @@
 package com.example.mpod.data.rss
 
-import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.StringReader
 import java.text.SimpleDateFormat
@@ -30,6 +30,12 @@ data class ParsedEpisodeItem(
 
 object RssFeedParser {
 
+    private val parserFactory: XmlPullParserFactory by lazy {
+        XmlPullParserFactory.newInstance().apply {
+            isNamespaceAware = false
+        }
+    }
+
     private val dateFormats = listOf(
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US),
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US),
@@ -39,16 +45,14 @@ object RssFeedParser {
     )
 
     fun parse(inputStream: InputStream): ParsedPodcastFeed {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        val parser = parserFactory.newPullParser()
         parser.setInput(inputStream, null)
         parser.nextTag()
         return readRss(parser)
     }
 
     fun parse(xmlString: String): ParsedPodcastFeed {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        val parser = parserFactory.newPullParser()
         parser.setInput(StringReader(xmlString))
         parser.nextTag()
         return readRss(parser)

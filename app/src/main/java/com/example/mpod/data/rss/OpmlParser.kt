@@ -1,8 +1,8 @@
 package com.example.mpod.data.rss
 
-import android.util.Xml
 import com.example.mpod.data.local.entity.PodcastEntity
 import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.StringReader
 import java.text.SimpleDateFormat
@@ -17,17 +17,21 @@ data class OpmlItem(
 
 object OpmlParser {
 
+    private val parserFactory: XmlPullParserFactory by lazy {
+        XmlPullParserFactory.newInstance().apply {
+            isNamespaceAware = false
+        }
+    }
+
     fun parse(inputStream: InputStream): List<OpmlItem> {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        val parser = parserFactory.newPullParser()
         parser.setInput(inputStream, null)
         parser.nextTag()
         return readOpml(parser)
     }
 
     fun parse(xmlString: String): List<OpmlItem> {
-        val parser = Xml.newPullParser()
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        val parser = parserFactory.newPullParser()
         parser.setInput(StringReader(xmlString))
         parser.nextTag()
         return readOpml(parser)

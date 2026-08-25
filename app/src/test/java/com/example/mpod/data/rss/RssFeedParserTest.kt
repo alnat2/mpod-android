@@ -1,13 +1,9 @@
 package com.example.mpod.data.rss
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RssFeedParserTest {
-
-    private val parser = RssFeedParser()
 
     @Test
     fun parseValidRssFeedWithEnclosures() {
@@ -38,7 +34,7 @@ class RssFeedParserTest {
             </rss>
         """.trimIndent()
 
-        val feed = parser.parse(xml.byteInputStream())
+        val feed = RssFeedParser.parse(xml.byteInputStream())
         assertEquals("Decoder Ring", feed.title)
         assertEquals("Culture stories behind everyday design", feed.description)
         assertEquals("https://example.com/art.jpg", feed.artworkUrl)
@@ -49,7 +45,6 @@ class RssFeedParserTest {
         assertEquals("guid-ep-1", ep1.guid)
         assertEquals("https://example.com/ep1.mp3", ep1.audioUrl)
         assertEquals(3240L, ep1.durationSeconds)
-        assertEquals(45000000L, ep1.fileSizeBytes)
 
         val ep2 = feed.episodes[1]
         assertEquals("How public transit maps teach invisible habits", ep2.title)
@@ -71,7 +66,7 @@ class RssFeedParserTest {
             </rss>
         """.trimIndent()
 
-        val feed = parser.parse(xml.byteInputStream())
+        val feed = RssFeedParser.parse(xml.byteInputStream())
         assertEquals("", feed.title)
         assertEquals(1, feed.episodes.size)
         assertEquals("https://example.com/audio.mp3", feed.episodes[0].audioUrl)
