@@ -1,6 +1,6 @@
 package com.example.mpod.ui.screens.home
 
-import androidx.compose.geometry.Offset
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click

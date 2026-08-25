@@ -12,7 +12,7 @@ class PlaybackQueueReconciliationTest {
         assertFalse(
             requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = listOf(1L, 2L, 3L),
-                backendQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 2L, 3L),
                 currentEpisodeId = 2L,
                 targetEpisodeId = 2L,
                 preferredEpisodeId = null
@@ -25,7 +25,7 @@ class PlaybackQueueReconciliationTest {
         assertTrue(
             requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = listOf(1L, 2L, 3L),
-                backendQueueEpisodeIds = listOf(1L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 3L),
                 currentEpisodeId = 1L,
                 targetEpisodeId = 1L,
                 preferredEpisodeId = null
@@ -38,7 +38,7 @@ class PlaybackQueueReconciliationTest {
         assertTrue(
             requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = listOf(1L, 2L, 3L),
-                backendQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 2L, 3L),
                 currentEpisodeId = 2L,
                 targetEpisodeId = 2L,
                 preferredEpisodeId = 2L
@@ -51,7 +51,7 @@ class PlaybackQueueReconciliationTest {
         assertNull(
             resolveQueuePlaybackTarget(
                 queue = emptyList(),
-                backendActiveEpisodeId = null,
+                savedActiveEpisodeId = null,
                 currentEpisodeId = 1L,
                 currentPositionMs = 10_000,
                 currentPlayWhenReady = true
@@ -63,7 +63,7 @@ class PlaybackQueueReconciliationTest {
     fun reorderPreservesCurrentEpisodePositionAndPlayingState() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(3L to 0L, 1L to 20_000L, 2L to 0L),
-            backendActiveEpisodeId = 1L,
+            savedActiveEpisodeId = 1L,
             currentEpisodeId = 1L,
             currentPositionMs = 42_000,
             currentPlayWhenReady = true
@@ -78,7 +78,7 @@ class PlaybackQueueReconciliationTest {
     fun removingInactiveEpisodeDoesNotInterruptPlayback() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(1L to 20_000L, 3L to 0L),
-            backendActiveEpisodeId = 1L,
+            savedActiveEpisodeId = 1L,
             currentEpisodeId = 1L,
             currentPositionMs = 45_000,
             currentPlayWhenReady = true
@@ -93,7 +93,7 @@ class PlaybackQueueReconciliationTest {
     fun removingActiveEpisodeSelectsBackendTargetWithoutAutoplay() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(2L to 12_000L, 3L to 0L),
-            backendActiveEpisodeId = 2L,
+            savedActiveEpisodeId = 2L,
             currentEpisodeId = 1L,
             currentPositionMs = 45_000,
             currentPlayWhenReady = true
@@ -108,7 +108,7 @@ class PlaybackQueueReconciliationTest {
     fun initialLoadUsesSavedActivePositionWithoutAutoplay() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(1L to 2_000L, 2L to 32_000L),
-            backendActiveEpisodeId = 2L,
+            savedActiveEpisodeId = 2L,
             currentEpisodeId = null,
             currentPositionMs = 0,
             currentPlayWhenReady = false
