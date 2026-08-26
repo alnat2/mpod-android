@@ -67,8 +67,6 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(PlayPauseOnlyMediaNotificationProvider(this))
 
-        smartListeningManager.startObserving()
-
         val okHttpClient = proxyHttpClientFactory.createClient()
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
