@@ -16,6 +16,7 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
@@ -70,7 +71,7 @@ class PlaybackService : MediaSessionService() {
 
         val okHttpClient = proxyHttpClientFactory.createClient()
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent("mpoddy/1.0.17 (Android Podcast Player)")
+            .setUserAgent("mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
         val defaultDataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)
 
         val audioAttributes = AudioAttributes.Builder()

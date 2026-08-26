@@ -1,5 +1,6 @@
 package com.example.mpod.data.repository
 
+import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.entity.EpisodeEntity
@@ -218,7 +219,7 @@ class PodcastRepository @Inject constructor(
         val client = proxyHttpClientFactory.createClient(settings)
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "mpoddy/1.0.17 (Android Podcast Player)")
+            .header("User-Agent", "mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
             .build()
 
         client.newCall(request).execute().use { response ->

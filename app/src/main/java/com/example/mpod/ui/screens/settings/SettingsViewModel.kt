@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.repository.PodcastRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,7 +44,7 @@ class SettingsViewModel @Inject constructor(
                     } else {
                         "Last refresh never"
                     },
-                    appBuild = "mpoddy v1.0.17"
+                    appBuild = "mpoddy v${BuildConfig.VERSION_NAME}"
                 )
             }
         }
@@ -117,7 +118,7 @@ data class SettingsUiState(
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,
     val errorMessage: String? = null,
-    val appBuild: String = "mpoddy v1.0.17"
+    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}"
 )
 
 internal fun formatSchedulerTimestamp(
