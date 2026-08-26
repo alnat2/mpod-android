@@ -80,17 +80,6 @@ fun SubscriptionsRoute(
     viewModel: SubscriptionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, viewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    LaunchedEffect(refreshKey) {
-        if (refreshKey > 0) viewModel.refresh()
-    }
     SubscriptionsScreen(
         state = state,
         onRefreshAll = viewModel::refreshAll,

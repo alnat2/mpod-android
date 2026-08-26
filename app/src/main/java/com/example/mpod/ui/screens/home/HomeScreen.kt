@@ -93,13 +93,7 @@ fun HomeRoute(
         }
     }
 
-    DisposableEffect(lifecycleOwner, viewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+
 
     DisposableEffect(controllerFuture) {
         controllerFuture.addListener(

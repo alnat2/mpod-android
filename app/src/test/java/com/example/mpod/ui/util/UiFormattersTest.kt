@@ -39,4 +39,13 @@ class UiFormattersTest {
             cleanFeedText("&lt;strong&gt;Encoded&lt;/strong&gt; tag")
         )
     }
+
+    @Test
+    fun formatPublishedDateFormatsIsoAndRfcDates() {
+        assertEquals("26.08.26", formatPublishedDate("2026-08-26T14:30:00Z"))
+        assertEquals("12.08.26", formatPublishedDate("Wed, 12 Aug 2026 13:11:45 +0000"))
+        assertEquals("12.08.26", formatPublishedDate("12 Aug 2026 13:11:45 GMT"))
+        assertEquals(null, formatPublishedDate(null))
+        assertEquals(null, formatPublishedDate(""))
+    }
 }

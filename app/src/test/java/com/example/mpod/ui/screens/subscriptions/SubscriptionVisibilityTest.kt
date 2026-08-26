@@ -13,6 +13,16 @@ class SubscriptionVisibilityTest {
     }
 
     @Test
+    fun defaultVisibilityIsAllAndShowsAllPodcasts() {
+        val podcasts = listOf(
+            podcast(id = 1L, episodes = listOf(episode(id = 1L, isListened = true))),
+            podcast(id = 2L, episodes = listOf(episode(id = 2L, isListened = false)))
+        )
+        val visible = podcasts.visibleFor(SubscriptionVisibility.All)
+        assertEquals(2, visible.size)
+    }
+
+    @Test
     fun headerSubtitleCountsPodcastsWithUnlistenedEpisodes() {
         val podcasts = listOf(
             podcast(id = 1L, episodes = listOf(episode(id = 1L, isListened = false))),
