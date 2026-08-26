@@ -147,6 +147,15 @@ private fun OpmlImportResultMobile(
             lineHeight = 24.sp,
             color = MaterialTheme.colorScheme.onSurface
         )
+        if (result.errors.isNotEmpty()) {
+            Text(
+                text = result.errors.joinToString("\n") { "• $it" },
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
         MpodButton(
             text = "Done",
             modifier = Modifier.fillMaxWidth(),

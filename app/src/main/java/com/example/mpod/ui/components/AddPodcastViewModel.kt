@@ -106,10 +106,14 @@ class AddPodcastViewModel @Inject constructor(
             }
 
             if (result.isSuccess) {
-                val importedCount = result.getOrDefault(0)
+                val summary = result.getOrThrow()
                 _state.value = _state.value.copy(
                     isSubmitting = false,
-                    importResult = OpmlImportResultUi(imported = importedCount, skipped = 0)
+                    importResult = OpmlImportResultUi(
+                        imported = summary.imported,
+                        skipped = summary.skipped,
+                        errors = summary.errors
+                    )
                 )
                 onSuccess()
             } else {
@@ -137,7 +141,8 @@ data class AddPodcastUiState(
 
 data class OpmlImportResultUi(
     val imported: Int,
-    val skipped: Int
+    val skipped: Int,
+    val errors: List<String> = emptyList()
 )
 
 private const val MODE_KEY = "add_podcast_mode"

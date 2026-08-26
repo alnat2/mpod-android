@@ -179,15 +179,25 @@ class PodcastRepository @Inject constructor(
         episodeDao.updatePlaybackPosition(episodeId, positionMs)
     }
 
-    suspend fun importOpml(inputStream: InputStream): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun importOpml(inputStream: InputStream): Result<OpmlImportSummary> = withContext(Dispatchers.IO) {
         try {
             val items = OpmlParser.parse(inputStream)
-            var count = 0
+            var imported = 0
+            val errors = mutableListOf<String>()
             for (item in items) {
-                val res = addPodcastByFeedUrl(item.xmlUrl)
-                if (res.isSuccess) count++
+                addPodcastByFeedUrl(item.xmlUrl)
+                    .onSuccess { imported++ }
+                    .onFailure { e ->
+                        errors.add("${item.title}: ${e.message ?: "failed to import"}")
+                    }
             }
-            Result.success(count)
+            Result.success(
+                OpmlImportSummary(
+                    imported = imported,
+                    skipped = items.size - imported,
+                    errors = errors
+                )
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -214,4 +224,10 @@ class PodcastRepository @Inject constructor(
             return RssFeedParser.parse(body)
         }
     }
+
+    data class OpmlImportSummary(
+        val imported: Int,
+        val skipped: Int,
+        val errors: List<String> = emptyList()
+    )
 }
