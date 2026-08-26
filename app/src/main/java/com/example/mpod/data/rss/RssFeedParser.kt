@@ -238,6 +238,6 @@ object RssFeedParser {
     }
 
     fun parseDate(dateStr: String): Long {
-        return parseDateOrNull(dateStr) ?: System.currentTimeMillis()
+        return parseDateOrNull(dateStr) ?: 0L
     }
 }
