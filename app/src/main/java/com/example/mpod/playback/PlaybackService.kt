@@ -57,7 +57,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var savePositionJob: Job? = null
     private var previousEpisodeId: Long? = null
-    private var lastCompletedEpisodeId: Long? = null
+    private val completedEpisodeIds = HashSet<Long>()
     private var applyingSettingsSpeed = false
     private val queueReconciliationMutex = Mutex()
 
@@ -269,17 +269,9 @@ class PlaybackService : MediaSessionService() {
             val nextEpisodeId = mediaItem?.mediaId?.toLongOrNull()
             val finishedEpisodeId = previousEpisodeId
             previousEpisodeId = nextEpisodeId
-            lastCompletedEpisodeId = null
 
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
-                serviceScope.launch {
-                    completeEpisode(finishedEpisodeId)
-                    if (nextEpisodeId != null) {
-                        appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
-                    }
-                    reconcileQueueWithDatabase()
-                    queueInvalidator.refreshHome()
-                }
+                handleEpisodeCompleted(finishedEpisodeId, nextEpisodeId)
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
                 serviceScope.launch {
                     appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
@@ -288,19 +280,10 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState != Player.STATE_ENDED) return
-            val episodeId = currentEpisodeId() ?: return
-            if (lastCompletedEpisodeId == episodeId) return
-            lastCompletedEpisodeId = episodeId
-            serviceScope.launch {
-                completeEpisode(episodeId)
-                reconcileQueueWithDatabase(
-                    preferFirstEpisode = true,
-                    forcePlayPreferred = true
-                )
-                queueInvalidator.refreshHome()
-            }
-        }
+        if (playbackState != Player.STATE_ENDED) return
+        val episodeId = currentEpisodeId() ?: return
+        handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
+    }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
             if (applyingSettingsSpeed) return
@@ -334,6 +317,21 @@ class PlaybackService : MediaSessionService() {
         }
         playlistRepository.removeFromPlaylist(episodeId)
         smartListeningManager.cleanupEpisodeFile(episodeId)
+    }
+
+    private fun handleEpisodeCompleted(
+        episodeId: Long,
+        nextEpisodeId: Long? = null,
+        preferFirstEpisode: Boolean = false,
+        forcePlayPreferred: Boolean = false
+    ) {
+        if (!completedEpisodeIds.add(episodeId)) return
+        serviceScope.launch {
+            if (nextEpisodeId != null) appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
+            completeEpisode(episodeId)
+            reconcileQueueWithDatabase(preferFirstEpisode = preferFirstEpisode, forcePlayPreferred = forcePlayPreferred)
+            queueInvalidator.refreshHome()
+        }
     }
 
     private fun currentEpisodeId(): Long? = player.currentMediaItem?.mediaId?.toLongOrNull()
