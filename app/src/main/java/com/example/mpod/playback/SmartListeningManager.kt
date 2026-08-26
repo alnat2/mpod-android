@@ -86,7 +86,9 @@ class SmartListeningManager @Inject constructor(
     suspend fun downloadAudioFile(episodeId: Long, audioUrl: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val podcastsDir = File(context.filesDir, "podcasts").apply { if (!exists()) mkdirs() }
-            val fileName = "ep_${episodeId}_${System.currentTimeMillis()}.mp3"
+            val ext = audioUrl.substringBefore('?').substringAfterLast('.', "")
+                .takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } } ?: "mp3"
+            val fileName = "ep_${episodeId}_${System.currentTimeMillis()}.$ext"
             val targetFile = File(podcastsDir, fileName)
 
             val settings = appSettingsDataStore.settingsFlow.first()
