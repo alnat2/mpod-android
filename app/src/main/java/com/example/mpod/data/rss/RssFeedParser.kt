@@ -39,9 +39,14 @@ object RssFeedParser {
     private val dateFormats = listOf(
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US),
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US),
+        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US),
         SimpleDateFormat("dd MMM yyyy HH:mm:ss Z", Locale.US),
+        SimpleDateFormat("dd MMM yyyy HH:mm:ss z", Locale.US),
+        SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.US),
+        SimpleDateFormat("EEE, dd MMM yy HH:mm:ss Z", Locale.US),
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd", Locale.US)
     )
 
     fun parse(inputStream: InputStream): ParsedPodcastFeed {
@@ -220,15 +225,19 @@ object RssFeedParser {
         }
     }
 
-    fun parseDate(dateStr: String): Long {
+    fun parseDateOrNull(dateStr: String): Long? {
         val trimmed = dateStr.trim()
-        if (trimmed.isEmpty()) return System.currentTimeMillis()
+        if (trimmed.isEmpty()) return null
         for (format in dateFormats) {
             try {
                 val parsed = format.parse(trimmed)
                 if (parsed != null) return parsed.time
             } catch (_: Exception) {}
         }
-        return System.currentTimeMillis()
+        return null
+    }
+
+    fun parseDate(dateStr: String): Long {
+        return parseDateOrNull(dateStr) ?: System.currentTimeMillis()
     }
 }

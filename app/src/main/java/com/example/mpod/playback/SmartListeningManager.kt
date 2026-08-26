@@ -58,21 +58,26 @@ class SmartListeningManager @Inject constructor(
     }
 
     private fun scheduleDebouncedDownload(episodeId: Long, audioUrl: String) {
+        android.util.Log.d("SmartListening", "Scheduling debounced download (15s) for episode $episodeId ($audioUrl)")
         val job = scope.launch {
             delay(15_000) // 15 seconds Smart Listening requirement
             val inPlaylist = playlistDao.isEpisodeInPlaylist(episodeId)
             if (!inPlaylist) {
+                android.util.Log.d("SmartListening", "Episode $episodeId is no longer in playlist, skipping download")
                 pendingDownloadJobs.remove(episodeId)
                 return@launch
             }
 
             val episode = episodeDao.getEpisodeById(episodeId)
             if (episode == null || episode.isDownloaded || audioUrl.isBlank()) {
+                android.util.Log.d("SmartListening", "Episode $episodeId already downloaded or empty URL, skipping")
                 pendingDownloadJobs.remove(episodeId)
                 return@launch
             }
 
-            downloadAudioFile(episodeId, audioUrl)
+            android.util.Log.d("SmartListening", "Starting background audio download for episode $episodeId: $audioUrl")
+            val success = downloadAudioFile(episodeId, audioUrl)
+            android.util.Log.d("SmartListening", "Download finished for episode $episodeId, success=$success")
             pendingDownloadJobs.remove(episodeId)
         }
         pendingDownloadJobs[episodeId] = job
@@ -92,7 +97,10 @@ class SmartListeningManager @Inject constructor(
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext false
+                if (!response.isSuccessful) {
+                    android.util.Log.w("SmartListening", "Download HTTP failed with code ${response.code} for $audioUrl")
+                    return@withContext false
+                }
                 val body = response.body ?: return@withContext false
 
                 body.byteStream().use { input ->
@@ -108,12 +116,14 @@ class SmartListeningManager @Inject constructor(
                     isDownloaded = true,
                     localFilePath = targetFile.absolutePath
                 )
+                android.util.Log.i("SmartListening", "Saved episode $episodeId to ${targetFile.absolutePath} (${targetFile.length()} bytes)")
                 true
             } else {
                 targetFile.delete()
                 false
             }
         } catch (e: Exception) {
+            android.util.Log.e("SmartListening", "Error downloading episode $episodeId: ${e.message}", e)
             false
         }
     }

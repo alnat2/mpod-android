@@ -18,8 +18,11 @@ import com.example.mpod.ui.navigation.AppNavigation
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var smartListeningManager: com.example.mpod.playback.SmartListeningManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        smartListeningManager.startObserving()
         enableEdgeToEdge()
         val preferences = getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE)
         if (preferences.getInt(THEME_SCHEMA_KEY, 0) < THEME_SCHEMA_VERSION) {

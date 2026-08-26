@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -255,7 +256,9 @@ class PlaybackService : MediaSessionService() {
                         ?.toLongOrNull()
                     if (oldEpisodeId != null) {
                         serviceScope.launch {
-                            episodeDao.updatePlaybackPosition(oldEpisodeId, oldPosition.positionMs)
+                            withContext(Dispatchers.IO) {
+                                episodeDao.updatePlaybackPosition(oldEpisodeId, oldPosition.positionMs)
+                            }
                         }
                     }
                 }
@@ -320,11 +323,15 @@ class PlaybackService : MediaSessionService() {
     private suspend fun saveCurrentPosition() {
         val episodeId = currentEpisodeId() ?: return
         val pos = player.currentPosition.coerceAtLeast(0L)
-        episodeDao.updatePlaybackPosition(episodeId, pos)
+        withContext(Dispatchers.IO) {
+            episodeDao.updatePlaybackPosition(episodeId, pos)
+        }
     }
 
     private suspend fun completeEpisode(episodeId: Long) {
-        episodeDao.setListened(episodeId, true)
+        withContext(Dispatchers.IO) {
+            episodeDao.setListened(episodeId, true)
+        }
         playlistRepository.removeFromPlaylist(episodeId)
         smartListeningManager.cleanupEpisodeFile(episodeId)
     }

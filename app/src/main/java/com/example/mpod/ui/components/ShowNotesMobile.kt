@@ -66,7 +66,10 @@ fun ShowNotesMobile(
     onOpenLink: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val notesText = notes ?: rememberDefaultShowNotes()
+    val defaultNotes = rememberDefaultShowNotes()
+    val notesText = remember(notes, defaultNotes) {
+        notes?.let { formatShowNotesText(it) }?.ifBlank { null } ?: defaultNotes
+    }
     val linkColor = MaterialTheme.colorScheme.primary
     val uriHandler = LocalUriHandler.current
     val openLink = onOpenLink ?: uriHandler::openUri
@@ -207,6 +210,22 @@ private fun StaticScrollbar() {
                 .background(Color(0xFF696867))
         )
     }
+}
+
+internal fun formatShowNotesText(rawNotes: String?): String {
+    if (rawNotes.isNullOrBlank()) return ""
+    val text = if (rawNotes.contains("<") && rawNotes.contains(">")) {
+        try {
+            android.text.Html.fromHtml(rawNotes, android.text.Html.FROM_HTML_MODE_LEGACY)
+                .toString()
+                .trim()
+        } catch (_: Exception) {
+            com.example.mpod.ui.util.cleanFeedText(rawNotes)
+        }
+    } else {
+        rawNotes
+    }
+    return text.replace(Regex("\n{3,}"), "\n\n").trim()
 }
 
 @Composable

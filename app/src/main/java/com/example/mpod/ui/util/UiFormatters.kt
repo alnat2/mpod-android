@@ -36,11 +36,17 @@ fun formatRemainingTime(durationSeconds: Int, positionSeconds: Int): String =
     formatProgressTime((durationSeconds - positionSeconds).coerceAtLeast(0))
 
 fun formatPublishedDate(value: String?): String? {
-    val date = value?.take(10)?.takeIf { it.length == 10 } ?: return null
-    val year = date.substring(2, 4)
-    val month = date.substring(5, 7)
-    val day = date.substring(8, 10)
-    return "$day.$month.$year"
+    if (value.isNullOrBlank()) return null
+    val trimmed = value.trim()
+    if (trimmed.length >= 10 && trimmed[4] == '-' && trimmed[7] == '-') {
+        val year = trimmed.substring(2, 4)
+        val month = trimmed.substring(5, 7)
+        val day = trimmed.substring(8, 10)
+        return "$day.$month.$year"
+    }
+    val epochMillis = com.example.mpod.data.rss.RssFeedParser.parseDateOrNull(trimmed) ?: return trimmed.take(10)
+    val sdf = java.text.SimpleDateFormat("dd.MM.yy", java.util.Locale.US)
+    return sdf.format(java.util.Date(epochMillis))
 }
 
 fun cleanFeedText(value: String?): String {
