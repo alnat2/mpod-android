@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -378,9 +379,7 @@ fun MpodSwitch(
     val thumb = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.background
     Box(
         modifier = modifier
-            .size(width = 44.dp, height = 24.dp)
-            .clip(CircleShape)
-            .background(track)
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .then(
                 if (contentDescription == null) {
                     Modifier
@@ -398,16 +397,24 @@ fun MpodSwitch(
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange
-            )
-            .padding(2.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+            ),
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(20.dp)
+                .size(width = 44.dp, height = 24.dp)
                 .clip(CircleShape)
-                .background(thumb)
-        )
+                .background(track)
+                .padding(2.dp),
+            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(thumb)
+            )
+        }
     }
 }
 
