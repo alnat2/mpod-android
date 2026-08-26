@@ -82,4 +82,10 @@ interface PlaylistDao {
 
     @Query("DELETE FROM playlist_items")
     fun clearPlaylist()
+
+    @Transaction
+    fun reorderPlaylist(items: List<PlaylistItemEntity>) {
+        clearPlaylist()
+        insertPlaylistItems(items)
+    }
 }

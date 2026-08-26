@@ -31,12 +31,13 @@ class PlaylistRepository @Inject constructor(
     }
 
     suspend fun reorderPlaylist(reorderedEpisodeIds: List<Long>) = withContext(Dispatchers.IO) {
-        playlistDao.clearPlaylist()
         val items = reorderedEpisodeIds.mapIndexed { index, epId ->
             PlaylistItemEntity(episodeId = epId, position = index)
         }
         if (items.isNotEmpty()) {
-            playlistDao.insertPlaylistItems(items)
+            playlistDao.reorderPlaylist(items)
+        } else {
+            playlistDao.clearPlaylist()
         }
     }
 
