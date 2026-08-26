@@ -140,17 +140,18 @@ class PodcastRepository @Inject constructor(
 
     suspend fun refreshAllPodcasts(): Result<Unit> = withContext(Dispatchers.IO) {
         val podcasts = podcastDao.getAllPodcasts()
-        var lastError: Exception? = null
+        val failures = mutableListOf<String>()
         for (pod in podcasts) {
-            val res = refreshPodcast(pod.id)
-            if (res.isFailure) {
-                lastError = res.exceptionOrNull() as? Exception
+            refreshPodcast(pod.id).onFailure { e ->
+                failures.add("${pod.title}: ${e.message ?: "refresh failed"}")
             }
         }
         val formatter = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
         appSettingsDataStore.setLastRefreshTime("Last refresh today at ${formatter.format(Date())}")
-        if (lastError != null && podcasts.size == 1) {
-            Result.failure(lastError)
+        if (failures.isNotEmpty()) {
+            Result.failure(
+                Exception("Failed to refresh ${failures.size} podcast(s):\n" + failures.joinToString("\n"))
+            )
         } else {
             Result.success(Unit)
         }
