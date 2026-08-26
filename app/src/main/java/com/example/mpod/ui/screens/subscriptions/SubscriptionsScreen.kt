@@ -125,7 +125,7 @@ fun SubscriptionsScreen(
     onImportOpml: () -> Unit = {},
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
-    var visibility by remember { mutableStateOf(SubscriptionVisibility.Unlistened) }
+    var visibility by remember { mutableStateOf(SubscriptionVisibility.All) }
     val podcasts = remember(state.podcasts, visibility) {
         state.podcasts.visibleFor(visibility)
     }
