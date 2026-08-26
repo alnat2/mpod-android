@@ -36,7 +36,7 @@ object RssFeedParser {
         }
     }
 
-    private val dateFormats = listOf(
+    private fun newDateFormats() = listOf(
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US),
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US),
         SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US),
@@ -228,7 +228,7 @@ object RssFeedParser {
     fun parseDateOrNull(dateStr: String): Long? {
         val trimmed = dateStr.trim()
         if (trimmed.isEmpty()) return null
-        for (format in dateFormats) {
+        for (format in newDateFormats()) {
             try {
                 val parsed = format.parse(trimmed)
                 if (parsed != null) return parsed.time
