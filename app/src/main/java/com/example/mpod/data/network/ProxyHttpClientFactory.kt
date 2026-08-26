@@ -11,13 +11,32 @@ import javax.inject.Singleton
 @Singleton
 class ProxyHttpClientFactory @Inject constructor() {
 
+    @Volatile
+    private var directClient: OkHttpClient? = null
+    @Volatile
+    private var cachedProxyKey: String? = null
+    @Volatile
+    private var cachedProxyClient: OkHttpClient? = null
+
     fun createClient(settings: AppSettings? = null): OkHttpClient {
-        return createOkHttpClient(
-            proxyEnabled = settings?.isProxyEnabled == true,
-            proxyHost = settings?.proxyHost.orEmpty(),
-            proxyPort = settings?.proxyPort ?: 1080,
-            proxyType = settings?.proxyType ?: "SOCKS5"
+        val proxyEnabled = settings?.isProxyEnabled == true
+        val host = settings?.proxyHost.orEmpty()
+        val port = settings?.proxyPort ?: 1080
+        val type = settings?.proxyType ?: "SOCKS5"
+        if (!proxyEnabled || host.isBlank()) {
+            return directClient ?: createOkHttpClient(proxyEnabled = false).also { directClient = it }
+        }
+        val key = "$host:$port:$type"
+        cachedProxyClient?.let { if (cachedProxyKey == key) return it }
+        val client = createOkHttpClient(
+            proxyEnabled = true,
+            proxyHost = host,
+            proxyPort = port,
+            proxyType = type
         )
+        cachedProxyKey = key
+        cachedProxyClient = client
+        return client
     }
 
     companion object {

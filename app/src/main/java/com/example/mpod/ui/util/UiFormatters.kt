@@ -44,7 +44,7 @@ fun formatPublishedDate(value: String?): String? {
         val day = trimmed.substring(8, 10)
         return "$day.$month.$year"
     }
-    val epochMillis = com.example.mpod.data.rss.RssFeedParser.parseDateOrNull(trimmed) ?: return trimmed.take(10)
+    val epochMillis = com.example.mpod.data.rss.RssFeedParser.parseDateOrNull(trimmed) ?: return null
     val sdf = java.text.SimpleDateFormat("dd.MM.yy", java.util.Locale.US)
     return sdf.format(java.util.Date(epochMillis))
 }
