@@ -4,64 +4,46 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.core.content.edit
+import androidx.lifecycle.lifecycleScope
+import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.playback.SmartListeningManager
+import com.example.mpod.ui.navigation.AppNavigation
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.theme.ThemeMode
-
 import dagger.hilt.android.AndroidEntryPoint
-import com.example.mpod.ui.navigation.AppNavigation
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var smartListeningManager: com.example.mpod.playback.SmartListeningManager
+    @Inject lateinit var smartListeningManager: SmartListeningManager
+    @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         smartListeningManager.startObserving()
         enableEdgeToEdge()
-        val preferences = getSharedPreferences(THEME_PREFERENCES, MODE_PRIVATE)
-        if (preferences.getInt(THEME_SCHEMA_KEY, 0) < THEME_SCHEMA_VERSION) {
-            preferences.edit {
-                putString(THEME_MODE_KEY, ThemeMode.System.storageValue)
-                putInt(THEME_SCHEMA_KEY, THEME_SCHEMA_VERSION)
-            }
-        }
+
         setContent {
-            var themeMode by remember {
-                mutableStateOf(ThemeMode.fromStorage(preferences.getString(THEME_MODE_KEY, null)))
-            }
-            DisposableEffect(preferences) {
-                val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key == THEME_MODE_KEY) {
-                        themeMode = ThemeMode.fromStorage(preferences.getString(key, null))
-                    }
-                }
-                preferences.registerOnSharedPreferenceChangeListener(listener)
-                onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
-            }
+            val themeMode by remember {
+                appSettingsDataStore.settingsFlow
+                    .map { ThemeMode.fromStorage(it.themeMode) }
+            }.collectAsState(initialValue = ThemeMode.System)
 
             MpodTheme(themeMode = themeMode) {
                 AppNavigation(
                     themeMode = themeMode,
                     onThemeModeChange = { nextMode ->
-                        themeMode = nextMode
-                        preferences.edit { putString(THEME_MODE_KEY, nextMode.storageValue) }
+                        lifecycleScope.launch {
+                            appSettingsDataStore.setThemeMode(nextMode.storageValue)
+                        }
                     }
                 )
             }
         }
-    }
-
-    companion object {
-        private const val THEME_PREFERENCES = "mpod_appearance"
-        private const val THEME_MODE_KEY = "theme_mode"
-        private const val THEME_SCHEMA_KEY = "theme_schema"
-        private const val THEME_SCHEMA_VERSION = 2
     }
 }
