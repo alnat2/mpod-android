@@ -15,6 +15,7 @@ import com.example.mpod.ui.theme.ThemeMode
 
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.mpod.ui.navigation.AppNavigation
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
