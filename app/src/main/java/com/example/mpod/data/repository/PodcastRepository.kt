@@ -48,7 +48,7 @@ class PodcastRepository @Inject constructor(
 
     suspend fun addPodcastByFeedUrl(feedUrl: String): Result<PodcastEntity> = withContext(Dispatchers.IO) {
         try {
-            val normalizedUrl = feedUrl.trim()
+            val normalizedUrl = normalizeFeedUrl(feedUrl)
             val existing = podcastDao.getPodcastByFeedUrl(normalizedUrl)
             if (existing != null) {
                 return@withContext Result.success(existing)
@@ -236,4 +236,20 @@ class PodcastRepository @Inject constructor(
         val skipped: Int,
         val errors: List<String> = emptyList()
     )
+
+    private fun normalizeFeedUrl(url: String): String {
+        val trimmed = url.trim()
+        return try {
+            val u = java.net.URI(trimmed)
+            val scheme = u.scheme?.lowercase() ?: return trimmed
+            val host = u.host?.lowercase() ?: return trimmed
+            val port = if (u.port != -1 && u.port == u.defaultPort) -1 else u.port
+            var path = u.path?.trimEnd('/') ?: ""
+            if (path.isEmpty()) path = "/"
+            val query = if (!u.query.isNullOrBlank()) "?${u.query}" else ""
+            "$scheme://$host${if (port != -1) ":$port" else ""}$path$query"
+        } catch (_: Exception) {
+            trimmed
+        }
+    }
 }
