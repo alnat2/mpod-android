@@ -165,7 +165,11 @@ class PodcastRepository @Inject constructor(
                 if (f.exists()) f.delete()
             }
         }
+        val activeEpisodeId = appSettingsDataStore.getActiveEpisodeId()
         podcastDao.deleteById(podcastId)
+        if (activeEpisodeId != null && episodeDao.getEpisodeById(activeEpisodeId) == null) {
+            appSettingsDataStore.setActiveEpisodeId(null)
+        }
     }
 
     suspend fun setEpisodeListened(episodeId: Long, isListened: Boolean) = withContext(Dispatchers.IO) {

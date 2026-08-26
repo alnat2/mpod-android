@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -96,6 +97,10 @@ class AppSettingsDataStore @Inject constructor(
                 it[Keys.ACTIVE_EPISODE_ID] = episodeId
             }
         }
+    }
+
+    suspend fun getActiveEpisodeId(): Long? {
+        return context.dataStore.data.first()[Keys.ACTIVE_EPISODE_ID]
     }
 
     suspend fun setPlaybackSpeed(speed: Float) {
