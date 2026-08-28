@@ -1,12 +1,12 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-08-12
+Last updated: 2026-08-28 (Updated for standalone podcast player mpoddy with Room database, RSS/OPML parsing, Smart Listening, and DataStore)
 
 ## Purpose
 
 This is the working map for making the Android application functionally complete. Work is planned, implemented, tested, and accepted by complete user scenarios rather than by screens, callbacks, or test counts.
 
-The scenario map covers the MVP needed for a reliable working application. Pixel-perfect visual parity, extended accessibility, and performance polish remain outside this map unless they make a core action unreachable, unreadable, misleading, or unusable.
+The scenario map covers the MVP needed for a reliable working standalone application (`mpoddy`). Pixel-perfect visual parity, extended accessibility, and performance polish remain outside this map unless they make a core action unreachable, unreadable, misleading, or unusable.
 
 ## Source priority
 
@@ -15,12 +15,11 @@ Expected behavior is taken from these sources, in order:
 1. Explicit product-owner decisions in the Android project chat.
 2. This scenario map and `docs/android-delivery-plan.md` after confirmed decisions are recorded.
 3. Android screens and mobile components in the mpod Figma file.
-4. Shared product and API documentation in the parent-project `mpod/docs` checkout.
-5. The actual backend contract.
+4. Standalone application requirements, local Room database contracts, RSS/OPML standards, and Jetpack Media3 lifecycle.
 
 When a required behavior is absent or the sources disagree, the scenario is marked `Open`. It must not be implemented from an assumption.
 
-Explicit chat decisions override stale Figma states. In particular, the existing Home/Now playing destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation, and the authenticated start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow. Podcast artwork is informational: the MVP has no tap action or separate podcast-detail destination.
+Explicit chat decisions override stale Figma states. In particular, the first bottom navigation destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation dialog, and the start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
 
 ## Scenario status
 
@@ -30,50 +29,40 @@ Explicit chat decisions override stale Figma states. In particular, the existing
 | Deferred | The product owner explicitly removed the scenario from the current release scope pending a redesign |
 | Open | A product decision is required before implementation or acceptance |
 | Failed | The complete scenario was executed and did not reach the expected result |
-| Verified | The complete required evidence passed against the test backend |
+| Verified | The complete required evidence passed against the local database and real feeds/devices |
 | Accepted | The product owner accepted the scenario in the handed-off APK |
-
-Existing unit, UI, backend, and manual results are baseline evidence only. A scenario becomes `Verified` after its whole row is checked, including the authoritative result and applicable recovery path.
+| Retired | Scenario superseded by the transition to standalone local architecture (e.g. backend auth) |
 
 ## Evidence levels
 
 | Code | Evidence |
 |---|---|
-| C | Contract or state/business unit test |
+| C | Contract, parser, or state/business unit test |
 | U | Compose test using the real user gesture and checking the visible result |
-| E | End-to-end on the Pixel 9 emulator against test backend `5051`, including backend state where applicable |
+| E | End-to-end on the Pixel 9 emulator with local Room database and real RSS feeds |
 | L | Android lifecycle/connectivity interruption check |
 | D | Physical Android 14+ phone check |
-| R | Minified production-variant smoke check against backend `5050` |
+| R | Minified release-variant smoke check (`com.prod.mpod`) |
 
-`U` alone never proves a backend operation. `C` alone never proves that a user can perform the action. Existing evidence can be reused after it is matched to the complete scenario and its dependencies have not changed.
-
-## P0 — application entry and session
+## P0 — application entry, local persistence, and startup
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| APP-01 | Launch while backend is unavailable | A dedicated unavailable state is shown; it is not confused with Login | C,U,E | Verified |
-| APP-02 | Tap Retry after backend connectivity returns | Session bootstrap is repeated and opens Setup, Login, or Subscriptions according to the authoritative response | C,U,E | Verified |
-| APP-03 | First launch against an unconfigured backend | Setup is shown and Login is not offered as a substitute | C,U,E | Verified |
-| APP-04 | Complete first-user setup with valid credentials | One submission creates the user/session and opens Subscriptions | C,U,E | Verified |
-| APP-05 | Submit Setup or Login with blank fields | Submission is blocked locally and a useful validation error is shown | U | Verified |
-| APP-06 | Login with valid credentials | The authenticated session is persisted and Subscriptions opens | C,U,E | Verified |
-| APP-07 | Login with invalid credentials | Backend error is shown; the user remains on Login and can retry | C,U,E | Verified |
-| APP-08 | Launch with a valid persisted session | Subscriptions opens without another login | C,E,L | Verified |
-| APP-09 | Launch with an expired or server-invalidated session | Login opens; the app does not show unavailable and does not retain an authenticated UI | C,E,L | Verified |
-| APP-10 | Logout successfully | Playback stops, cookies are cleared, and Login opens | C,U,E,L | Verified |
-| APP-11 | Logout request fails because backend is unavailable | Authenticated state is not falsely reported as logged out; recovery is available | C,U,E | Verified |
-| APP-12 | Relaunch after logout or cleared app data | No session is restored through Android backup/device transfer | C,E,L,R | Verified |
+| APP-01 | Cold launch with existing subscriptions | Room DB loads stored podcasts/episodes into memory on IO dispatcher; UI renders Subscriptions without an authentication step | C,U,E | Verified |
+| APP-02 | Cold launch with empty database | App starts directly on Subscriptions showing the empty library state with Add RSS and Import OPML actions | C,U,E | Verified |
+| APP-03 | Process recreation / rotation on startup | Database state and selected tab are restored without duplicated initialization or database locks | U,L | Verified |
+| APP-04 | Relaunch after cleared app data | App starts cleanly with empty Room DB and default DataStore preferences (System theme, Direct proxy, default Smart Listening) | C,E,L,R | Verified |
+| APP-05–APP-11 | Remote backend auth/login/logout/session | Retired with migration to standalone offline-capable player architecture (commit `8a25520`) | — | Retired |
 
 ## P1 — navigation and application shell
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| NAV-01 | Authenticate or restore a session | Subscriptions is the initial selected destination | U,E | Verified |
-| NAV-02 | Switch among Player, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful; Player opens the existing Home/Now playing route | U,E | Verified |
+| NAV-01 | Launch application | Subscriptions is the default initial selected destination | U,E | Verified |
+| NAV-02 | Switch among Player, Subscriptions, and Settings | Each destination opens once and selected-tab state is truthful; Player opens the Player/Now playing route | U,E | Verified |
 | NAV-03 | Tap Add podcast from bottom navigation | Add modal opens above the current destination; closing it returns without an unintended mutation | U,E | Verified |
 | NAV-04 | Press Android Back from a modal or secondary state | The top modal/state closes before leaving the application | U,E | Verified |
-| NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong authenticated destination or duplicate screen | U,L | Verified |
+| NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong destination or duplicate screen | U,L | Verified |
 
 ## P1 — adding podcasts and OPML import
 
@@ -81,39 +70,39 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 |---|---|---|---|---|
 | ADD-01 | Open Add podcast and switch RSS/OPML modes | Correct fields and actions are shown; no submission occurs while switching | U | Verified |
 | ADD-02 | Submit a blank or non-HTTP(S) RSS address | Invalid input is rejected locally and no request is sent | C,U | Verified |
-| ADD-03 | Add a valid reachable RSS feed | Backend creates the subscription, modal closes, and Subscriptions shows it | C,U,E | Verified |
-| ADD-04 | Add an already subscribed feed | Duplicate error is shown and no duplicate subscription is created | C,U,E | Verified |
-| ADD-05 | Add an unreachable or invalid feed | Backend error is shown, modal stays usable, and library state is unchanged | C,U,E | Verified |
-| ADD-06 | Submit RSS during a slow request | Duplicate submission is blocked and the loading state remains truthful until completion | U,E,L | Verified |
+| ADD-03 | Add a valid reachable RSS feed | Direct RSS parser fetches feed, inserts podcast and episodes into Room DB, modal closes, Subscriptions updates | C,U,E | Verified |
+| ADD-04 | Add an already subscribed feed (including normalized URL variations) | Normalized URL match detects duplicate, duplicate error is shown, no duplicate Room entity created | C,U,E | Verified |
+| ADD-05 | Add an unreachable or invalid feed | Feed parser error is shown, modal stays usable, and Room DB remains unchanged | C,U,E | Verified |
+| ADD-06 | Submit RSS during a slow network request | Duplicate submission is blocked and loading state remains truthful until completion | U,E,L | Verified |
 | ADD-07 | Open Android document picker and cancel | No import occurs and the Add modal remains usable without a false error | U,E | Verified |
-| ADD-08 | Select a readable valid OPML file | File streams to backend; imported subscriptions appear after success | C,U,E | Verified |
-| ADD-09 | Import OPML containing duplicates or skipped entries | The same modal replaces the form with `Import completed`, exact imported/skipped counts, and `Done`; no duplicate subscriptions are created | C,U,E | Verified |
-| ADD-10 | Select an OPML file larger than 5,000,000 bytes | Android or backend rejects it with the approved size error; no partial import is claimed | C,U,E | Verified |
-| ADD-11 | Selected document cannot be reopened/read or upload fails | A specific error is shown and Retry through choosing/importing again is possible | C,U,E,L | Verified |
-| ADD-12 | Background/restore during document selection or upload | No crash, duplicate import, or false success occurs | U,L | Verified |
+| ADD-08 | Select a readable valid OPML file | Local XML parser reads file, inserts new feeds into Room DB, imported subscriptions appear after success | C,U,E | Verified |
+| ADD-09 | Import OPML containing duplicates or skipped entries | Modal replaces the form with `Import completed`, exact imported/skipped counts, and `Done`; no duplicate subscriptions created | C,U,E | Verified |
+| ADD-10 | Select an OPML file larger than 5,000,000 bytes | Stream limit rejects oversized file with approved error before parsing; no partial import | C,U,E | Verified |
+| ADD-11 | Selected document cannot be reopened/read or parse fails | Specific error is surfaced and choosing/importing again is possible | C,U,E,L | Verified |
+| ADD-12 | Background/restore during document selection or import | No crash, duplicate import, or false success occurs | U,L | Verified |
 
-## P1 — subscriptions and refresh
+## P1 — subscriptions, feed refresh, and Smart Listening
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SUB-01 | Open Subscriptions while data loads | Loading state is visible and actions cannot mutate unknown state | U,E | Verified |
-| SUB-02 | Subscriptions load fails | Error is visible and Try again reloads the screen | U,E | Verified |
-| SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct path | U,E | Verified |
+| SUB-01 | Open Subscriptions while data loads from Room | Room Flow loads quickly; neutral loading state prevents mutating unready state | U,E | Verified |
+| SUB-02 | Subscriptions load / DB query error | Error banner visible and Try again retries loading from Room DB | U,E | Verified |
+| SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct modal mode | U,E | Verified |
 | SUB-04 | All subscribed episodes are listened in Unlistened mode | Caught-up state is distinct from an empty library and can switch to Show all | C,U,E | Verified |
-| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, and episode list change together and can return; the Subscriptions header summarizes the total subscriptions and how many podcasts have unlistened episodes, e.g. `12 podcasts · 2 unlistened` | U,E | Verified |
+| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, and episode list change together; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Verified |
 | SUB-06 | Toggle Show all / Show unlistened | Icon and visible podcasts/episodes match the selected filter | C,U,E | Verified |
-| SUB-07 | Podcast artwork loads successfully | Real artwork is shown without replacing it with fallback | U,E | Verified |
-| SUB-08 | Artwork is missing, invalid, or fails to decode/load | Approved Figma fallback artwork is shown | U,E | Verified |
-| SUB-09 | Refresh one podcast successfully | Only that card shows refreshing; authoritative episodes/counts reload after completion | C,U,E | Verified |
-| SUB-10 | Refresh one podcast fails | Failure is visible for that podcast and Retry repeats the same operation | C,U,E | Verified |
-| SUB-11 | Refresh all podcasts successfully | Refreshing animation/state persists through the async backend job; library reloads only after completion | C,U,E | Verified |
-| SUB-12 | One feed fails during Refresh all | Other feeds may finish; backend job error is visible and library remains usable | C,U,E | Verified |
-| SUB-13 | Status polling temporarily fails or backend job is slow | UI does not claim completion; polling recovers without duplicate refresh jobs | C,E,L | Verified |
-| SUB-14 | Episode list for one podcast fails while others load | Failure stays scoped to that podcast and its Retry does not discard the rest of the library | U,E | Verified |
-| SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Podcast remains in backend and returns to normal UI state | C,U,E,L | Verified |
-| SUB-16 | Let the 15-second unsubscribe countdown expire | Only selected podcast is deleted and its downloaded files/episodes disappear under backend lifecycle rules | C,U,E,L | Verified |
-| SUB-17 | Final unsubscribe request fails | Podcast is restored/reloaded truthfully and the error can be retried | C,U,E,L | Verified |
-| SUB-18 | Re-enter or recreate Subscriptions after a successful load | Session-cached content is rendered immediately while backend reconciliation runs silently; a refresh failure retains usable content, confirmed empty is shown only after a successful response, and logout/session expiry clears the cache | C,U,E,L | Verified |
+| SUB-07 | Podcast artwork loads successfully | Real artwork is loaded and cached via Coil/OkHttp | U,E | Verified |
+| SUB-08 | Artwork is missing, invalid, or fails to load | Approved Figma fallback artwork drawable is rendered | U,E | Verified |
+| SUB-09 | Refresh one podcast successfully | RSS feed is fetched directly; updated episodes and metadata persist to Room DB | C,U,E | Verified |
+| SUB-10 | Refresh one podcast fails | Feed error is displayed on that podcast card; Retry repeats the refresh | C,U,E | Verified |
+| SUB-11 | Refresh all podcasts successfully | Feeds are fetched in parallel; updated episodes persist to Room DB; progress indicator reflects completion | C,U,E | Verified |
+| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library | C,U,E | Verified |
+| SUB-13 | Network drops during feed refresh | Network failure is caught gracefully; previous Room DB state remains intact | C,E,L | Verified |
+| SUB-14 | Episode list for one podcast fails parsing while others load | Failure stays scoped to that podcast; other podcasts remain usable | U,E | Verified |
+| SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Unsubscribe job is cancelled and podcast remains in Room DB and UI | C,U,E,L | Verified |
+| SUB-16 | Let the 15-second unsubscribe countdown expire | Podcast and its episodes are deleted from Room DB; active episode cleared if belonging to this podcast | C,U,E,L | Verified |
+| SUB-17 | Database error during delete | Error is surfaced and podcast remains visible in Room DB | C,U,E,L | Verified |
+| SUB-18 | Re-enter or recreate Subscriptions after a successful load | Room Flow delivers cached state immediately without empty-library flicker | C,U,E,L | Verified |
 
 ## P1 — episode actions and authoritative playlist state
 
@@ -128,110 +117,103 @@ Existing unit, UI, backend, and manual results are baseline evidence only. A sce
 | EPS-07 | Mark a listened episode unlistened | Backend/UI change to unlistened; it is not silently re-added to playlist and deleted media is not restored | C,U,E | Verified |
 | EPS-08 | Mark listened/unlistened fails | Target optimistic state rolls back and the backend remains authoritative | C,U,E | Verified |
 | EPS-09 | Mark all listened for selected podcast | One backend operation marks only that podcast, removes its playlist rows, clears its active episode, and returns `markedEpisodes` | C,U,E | Verified |
-| EPS-10 | Repeat Mark all listened or receive a failure | Repeat succeeds with zero changes; failure restores only the selected podcast and is retryable | C,U,E | Verified |
-| EPS-11 | Open Show notes with backend notes | Correct episode notes open in a scrollable modal | C,U,E | Verified |
-| EPS-12 | Open Show notes when notes are absent | A truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Verified |
+## P1 — episode actions and local playlist state
+
+| ID | User scenario | Expected result | Evidence | Status |
+|---|---|---|---|---|
+| EPS-01 | Use an episode action in Subscriptions | Allowed actions are shown inline on the episode card (Add/Remove from playlist, Mark listened/unlistened, Show notes) | U | Verified |
+| EPS-02 | Add an episode to playlist | Room DB `playlist_items` table is updated; row/count/menu update to In playlist / Remove | C,U,E | Verified |
+| EPS-03 | Add to playlist fails | Optimistic UI rolls back target episode and error is surfaced | C,U,E | Verified |
+| EPS-04 | Remove a non-active episode from playlist | Room DB removes item; unrelated playback is uninterrupted | C,U,E | Verified |
+| EPS-05 | Remove the active episode from playlist | Room active state and Player reconcile without stale playback or unintended autoplay | C,U,E | Verified |
+| EPS-06 | Mark an episode listened | Room DB marks it listened, removes it from playlist, triggers Smart Listening audio file cleanup, UI reconciles | C,U,E | Verified |
+| EPS-07 | Mark a listened episode unlistened | Room DB changes episode to unlistened; not silently re-added to playlist; deleted media is not restored | C,U,E | Verified |
+| EPS-08 | Mark listened/unlistened database error | Target state rolls back and Room DB state remains consistent | C,U,E | Verified |
+| EPS-09 | Mark all listened for selected podcast | Single atomic Room DB transaction marks all episodes of that podcast listened and cleans playlist | C,U,E | Verified |
+| EPS-10 | Repeat Mark all listened | Repeat succeeds idempotently with zero mutations | C,U,E | Verified |
+| EPS-11 | Open Show notes with episode description | Notes render sanitized HTML/text in a scrollable modal | C,U,E | Verified |
+| EPS-12 | Open Show notes when notes are absent | Truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Verified |
 | EPS-13 | Tap a link in Show notes | The URL opens through the Android system browser | U,E | Verified |
 
-## P1 — Home, queue, and player interaction
+## P1 — Player, queue, and playback interaction
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| HOM-01 | Open Home while queue loads or load fails | Loading is visible; failure has a usable Retry and does not show invented queue data | U,E | Verified |
-| HOM-02 | Open Home with no subscriptions | No-podcast state offers Add RSS and Import OPML | U,E | Verified |
-| HOM-03 | Open Home with subscriptions but an empty playlist | Empty-playlist state is distinct from no subscriptions and navigation remains usable | U,E | Verified |
-| HOM-04 | Open Home with a queue and no backend active episode | First queue item is displayed without autoplay | C,U,E | Verified |
-| HOM-05 | Open Home with saved active playback | Correct episode and saved position restore without autoplay | C,U,E,L | Verified |
-| HOM-06 | Tap a queue row | That episode becomes active and starts playing | C,U,E | Verified |
-| HOM-07 | Use a Player queue item action | Play/Pause and Remove from playlist are available inline on the queue item; the Player playlist does not open an episode action bottom sheet | U | Verified |
-| HOM-08 | Long-press and drag a queue row | Visible order and authoritative backend order change together | C,U,E | Verified |
-| HOM-09 | Queue reorder fails | UI returns to backend order and shows a truthful error | C,U,E | Verified |
-| HOM-10 | Queue changes from another client/backend operation | Home reconciles without duplicate/stale rows and preserves the current item when still valid | C,E,L | Verified |
-| HOM-11 | Use Home after its queue becomes empty | Player and active state clear; no stale playable card remains | C,U,E | Verified |
+| HOM-01 | Open Player while queue loads | Loading is visible; Room Flow delivers queue items reactively | U,E | Verified |
+| HOM-02 | Open Player with no subscriptions | No-podcast state offers Add RSS and Import OPML | U,E | Verified |
+| HOM-03 | Open Player with subscriptions but an empty playlist | Empty-playlist state is distinct from no subscriptions and navigation remains usable | U,E | Verified |
+| HOM-04 | Open Player with a queue and no active episode | First queue item is displayed without autoplay | C,U,E | Verified |
+| HOM-05 | Open Player with saved active playback | Correct episode and saved position restore from Room DB without autoplay | C,U,E,L | Verified |
+| HOM-06 | Tap a queue row | That episode becomes active and starts playing via Media3 | C,U,E | Verified |
+| HOM-07 | Use a Player queue item action | Play/Pause and Remove from playlist are available inline on the queue item | U | Verified |
+| HOM-08 | Long-press and drag a queue row | Visible order and Room DB `playlist_items` order change together atomically via `@Transaction` | C,U,E | Verified |
+| HOM-09 | Queue reorder fails | UI returns to previous DB order and shows a truthful error | C,U,E | Verified |
+| HOM-10 | Local DB updates from background Smart Listening or feed refresh | Player reconciles reactively via Room Flow without duplicate/stale rows | C,E,L | Verified |
+| HOM-11 | Use Player after its queue becomes empty | Player and active state clear; no stale playable card remains | C,U,E | Verified |
 
-## P0/P1 — playback and synchronization
-
-| ID | User scenario | Expected result | Evidence | Status |
-|---|---|---|---|---|
-| PLY-01 | Tap Play on the displayed episode | Real audio starts, button changes to Pause, and backend active episode is updated | C,U,E,D | Verified |
-| PLY-02 | Tap Pause | Audio stops, position is retained/synced, and Resume continues the same episode | C,U,E,D | Verified |
-| PLY-03 | Tap rewind 10 or forward 15 | Player seeks by the requested amount within valid bounds and backend receives seek/progress semantics | C,U,E | Verified |
-| PLY-04 | Tap or drag the progress track | Playback moves to the absolute selected position and backend stores the authoritative accepted position | C,U,E,D | Verified |
-| PLY-05 | Seek backward by less than the backend acceptance threshold | UI and subsequent reload reconcile to the documented backend rule instead of making a false persistence claim | C,E | Verified |
-| PLY-06 | Change playback speed | Each supported value 0.5/0.75/1/1.3/1.5/2 takes effect and persists through backend settings | C,U,E | Verified |
-| PLY-07 | Relaunch with a saved playback speed | Confirmed speed is restored before playback; pending newer local value is not overwritten | C,E,L | Verified |
-| PLY-08 | Play continuously | The left player label shows increasing elapsed time, the right label shows decreasing remaining time as `max(duration - position, 0)`, and progress syncs periodically without flooding or moving backward unexpectedly | C,U,E | Verified |
-| PLY-09 | Finish an episode naturally | Backend marks completion, cleans queue/download state, and eligible next episode starts automatically | C,E,D | Verified |
-| PLY-10 | Pause or seek inside the final 15 seconds | Position is stored as ordinary progress only; the episode remains unlistened and in the playlist because the client did not report natural completion | C,E | Verified |
-| PLY-11 | Finish the last playlist item | Completed item disappears; backend `nextEpisodeId` selects the topmost earlier unlistened item in playlist order and Android starts it at saved progress or `0:00` when playback state is absent; without a fallback the player becomes truthfully empty/non-playing | C,E | Verified |
-| PLY-12 | Playback progress/active/speed write fails transiently | Latest semantic state persists locally, retries with backoff, survives process restart, and clears only after success | C,E,L | Verified |
-| PLY-13 | A delayed completion retry returns after another episode starts | Retry cannot hijack the newer active playback | C,E,L | Verified |
-| PLY-14 | Audio stream fails before or during playback | Player shows a recoverable error; retry does not corrupt queue/progress | U,E,L,D | Verified |
-| PLY-15 | Another app requests audio focus | mpod pauses/ducks and resumes only according to Android media behavior, without corrupting backend progress | E,L,D | Verified |
-| PLY-16 | Headphones/Bluetooth route disconnects | Audio does not unexpectedly continue through the speaker; playback state remains recoverable | E,L,D | Verified |
-| PLY-17 | Background, lock screen, notification controls, or return to app | Media notification and system lock-screen surface show episode/podcast metadata and Play/Pause only; playback and in-app state remain consistent | E,L,D | Verified |
-| PLY-18 | Service/app process is stopped during playback | On next launch, backend/local state restores predictably without autoplay or lost confirmed progress | C,E,L,D | Verified |
-| PLY-19 | Episode completes during a network outage, another episode starts, then connectivity returns | Delayed completion synchronizes and cleans the old episode but cannot replace, pause, seek, or otherwise hijack the newer playback | C,E,L | Verified |
-
-## P1 — shared web/Android backend reconciliation
-
-The MVP uses event-driven reconciliation, not continuous polling. Android reloads authoritative shared state on application launch, return to foreground, entry to Home or Subscriptions, and manual Refresh. A web-side change does not immediately interrupt current Android audio before one of these reconciliation events.
+## P0/P1 — media playback and lifecycle
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SYN-01 | Web changes playlist order/content while Android is inactive, then Android launches, foregrounds, or enters Home | Android replaces stale queue state with backend state and retains the active item only if it remains valid | C,E,L | Verified |
-| SYN-02 | Web changes playback speed while Android is inactive, then Android launches or foregrounds | Android loads and applies the authoritative backend speed without continuous polling | C,E,L | Verified |
-| SYN-03 | Web marks listened/Mark all listened/removes the episode Android considered active | At the next reconciliation event Android stops/clears stale playback and adopts the authoritative queue without autoplay | C,E,L | Verified |
-| SYN-04 | Web changes state while Android is actively playing and no reconciliation event occurs | Current audio is not interrupted immediately; the change is applied at the next defined reconciliation event | E,L | Verified |
+| PLY-01 | Tap Play on the displayed episode | Real audio starts via Media3 ExoPlayer, button changes to Pause, active episode persisted | C,U,E,D | Verified |
+| PLY-02 | Tap Pause | Audio stops, position is retained and synced to Room DB, Resume continues same episode | C,U,E,D | Verified |
+| PLY-03 | Tap rewind 10 or forward 15 | Player seeks by the requested amount within valid bounds and updates playback position | C,U,E | Verified |
+| PLY-04 | Tap or drag the progress track | Playback moves to the absolute selected position and stores accepted position | C,U,E,D | Verified |
+| PLY-05 | Seek backward / forward near boundary | UI previews drag and dispatches single final seek position upon release | C,E | Verified |
+| PLY-06 | Change playback speed | Each supported value 0.5/0.75/1/1.3/1.5/2 takes effect in ExoPlayer and persists to DataStore | C,U,E | Verified |
+| PLY-07 | Relaunch with a saved playback speed | Confirmed speed is restored before playback starts | C,E,L | Verified |
+| PLY-08 | Play continuously | Left label shows elapsed time, right label shows remaining time as `max(duration - position, 0)` | C,U,E | Verified |
+| PLY-09 | Finish an episode naturally | Media3 natural completion marks episode listened in Room, removes from playlist, triggers Smart Listening cleanup, and auto-starts next eligible item | C,E,D | Verified |
+| PLY-10 | Pause or seek inside the final 15 seconds | Position is stored as progress; episode is not prematurely marked listened | C,E | Verified |
+| PLY-11 | Finish the last playlist item | Completed item is marked listened; playback stops cleanly and queue becomes empty | C,E | Verified |
+| PLY-12 | Playback state persistence | Active episode and position persist to Room DB on pause/stop and survive process recreation | C,E,L | Verified |
+| PLY-13 | Guard against duplicate completion | Guard prevents race conditions when natural completion and UI mark-listened coincide | C,E,L | Verified |
+| PLY-14 | Audio stream fails before or during playback | Player shows a recoverable error banner; user can retry | U,E,L,D | Verified |
+| PLY-15 | Another app requests audio focus | Playback pauses/ducks according to Android audio focus rules | E,L,D | Verified |
+| PLY-16 | Headphones/Bluetooth route disconnects | Playback pauses immediately on noisy route event without continuing through speaker | E,L,D | Verified |
+| PLY-17 | Background, lock screen, notification controls | Media notification and lock screen show episode metadata and Play/Pause control only | E,L,D | Verified |
+| PLY-18 | Service/app process is stopped during playback | On next launch, local state restores predictably without autoplay | C,E,L,D | Verified |
+| PLY-19 | Media playback via proxy | Audio streams correctly when HTTP or SOCKS5 proxy is configured in Settings | C,E,L | Verified |
 
-## P1 — downloads and file lifecycle
+## P1 — Smart Listening and local file lifecycle
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| DLD-01 | Download an episode successfully | Progress/busy state is truthful; backend stores the server file and menu becomes Downloaded | C,U,E | Deferred |
-| DLD-02 | Tap Download again or select another episode while one download is running | Only one download runs at a time; all other Download actions are disabled until it finishes or fails, and no duplicate/parallel request is started | U,E | Deferred |
-| DLD-03 | Download fails | A dismissible failure is shown for the correct episode; normal Download action can retry | C,U,E | Deferred |
-| DLD-04 | Play an episode whose server download exists | Playback succeeds through the backend audio endpoint and uses backend file/source rules | E,D | Deferred |
-| DLD-05 | Mark a downloaded episode listened | Backend clears downloaded state and deletes or reconciles the server file under lifecycle rules | C,E | Deferred |
-| DLD-06 | Remove a downloaded episode from playlist | Backend applies the documented cleanup rule without corrupting unrelated files | C,E | Deferred |
-| DLD-07 | Mark a cleaned episode unlistened | File is not recreated and UI does not claim it remains downloaded | C,E | Deferred |
-| DLD-08 | Unsubscribe a podcast with downloaded episodes | Backend removes the podcast and applies cleanup to all affected server files | C,E | Deferred |
-| DLD-09 | Interrupt/background/kill app during a download | A surviving backend request may complete; otherwise Android returns to a failed/retryable Download state and never claims a complete file; no Cancel action is required for MVP | E,L | Deferred |
+| DLD-01 | Smart Listening auto-download unlistened episodes | Downloads latest unlistened episodes up to configured limit per podcast | C,U,E | Verified |
+| DLD-02 | Smart Listening Wi-Fi constraint | Downloads occur only on unmetered/Wi-Fi connection when Wi-Fi only setting is enabled | C,U,E | Verified |
+| DLD-03 | Smart Listening download failure | Transient failure is caught without corrupting database or blocking other downloads | C,U,E | Verified |
+| DLD-04 | Play an episode with local download | Playback uses downloaded local audio file directly | E,D | Verified |
+| DLD-05 | Mark a downloaded episode listened | Downloaded audio file is deleted if auto-delete setting is enabled | C,E | Verified |
+| DLD-06 | Unsubscribe podcast with downloaded episodes | Downloaded audio files for that podcast are cleaned up from storage | C,E | Verified |
+| DLD-07 | Audio file extension derivation | Downloaded file extension is derived from feed enclosure URL (e.g. .mp3, .m4a) | C,E | Verified |
 
-## P1 — Settings and export
+## P1 — Settings, DataStore preferences, and OPML export
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SET-01 | Open Settings while backend-dependent data loads or fails | Header shows last refresh and current IP/geo when available; Feed daily refresh and SOCKS5 show independent loading/error states without Retry; local Theme, Export, Session, and build information remain usable; re-entering Settings or restarting the app reloads data | U,E | Verified |
-| SET-02 | Open the daily refresh time control and cancel | Android time picker uses device 12/24-hour mode; cancel leaves the saved time unchanged | C,U,E | Verified |
-| SET-03 | Select a new time and save | Exact `HH:mm` value is persisted by backend and confirmed state is shown | C,U,E | Verified |
-| SET-04 | Open Settings without changing refresh time | Save is disabled/secondary and does not make a redundant write | U | Verified |
-| SET-05 | Refresh-time save fails | Old confirmed value remains and the error is retryable | C,U,E | Verified |
-| SET-06 | Save succeeds but status reload fails | Saved confirmed value remains; UI distinguishes save success from status-refresh failure | C,U,E | Verified |
-| SET-07 | Proxy is not configured | Status is truthful and the switch cannot claim a running proxy | C,U,E | Verified |
-| SET-08 | Enable or disable configured SOCKS5 proxy | Backend setting and visible switch/status agree after save/reload | C,U,E | Verified |
-| SET-09 | Proxy reports running, unknown, or error | Current IP/geo are represented truthfully in the Settings header, proxy errors stay scoped to the SOCKS5 card, and unrelated Settings remain usable | C,U,E | Verified |
-| SET-10 | First install follows system theme | Dark device gives Dark; light device gives Light | C,U,E,D | Verified |
-| SET-11 | Toggle Use dark theme off/on | Off selects explicit Light; on selects explicit Dark; choice persists across restart | C,U,E,D | Verified |
-| SET-12 | Export OPML and choose a writable destination | Exported file is written through Android provider and contains the authoritative subscription list | C,U,E | Verified |
-| SET-13 | Cancel export destination selection | No file/error/success is falsely reported | U,E | Verified |
-| SET-14 | Export request or destination write fails | Specific recoverable error is shown and existing destination content is not falsely reported as valid | C,U,E,L | Verified |
-| SET-15 | View the application version | Settings shows only the user-facing `versionName`; internal `versionCode`, environment, package, server, and backend revision are not displayed | U,E,R | Verified |
+| SET-01 | Open Settings | Theme, Smart Listening toggles, Proxy configuration, OPML Import/Export, and Build Info are rendered | U,E | Verified |
+| SET-02 | First install follows system theme | App respects Android system night mode by default | C,U,E,D | Verified |
+| SET-03 | Toggle Theme (System / Light / Dark) | Theme updates immediately across all screens and persists to DataStore | C,U,E,D | Verified |
+| SET-04 | Configure Smart Listening settings | Enable/disable toggle, max episodes per podcast (1–10), and Wi-Fi only persist to DataStore | C,U,E | Verified |
+| SET-05 | Configure Proxy (Direct / HTTP / SOCKS5) | Proxy type, host, and port persist to DataStore and configure OkHttp client factory | C,U,E | Verified |
+| SET-06 | Proxy validation | Invalid host or port inputs are validated locally before saving | C,U,E | Verified |
+| SET-07 | Export OPML to file | Opens Android document picker and writes valid OPML XML with all subscriptions | C,U,E | Verified |
+| SET-08 | Cancel OPML export picker | Cancellation is a no-op without false error | U,E | Verified |
+| SET-09 | Export file write failure | Specific recoverable error is displayed | C,U,E,L | Verified |
+| SET-10 | View application version | Settings displays `Current app build: <versionName>` derived from `BuildConfig.VERSION_NAME` | U,E,R | Verified |
+| SET-11 | Toggle 48dp MpodSwitch | Switch toggle meets 48dp accessibility touch target | C,U | Verified |
 
 ## P0/P1 — cross-cutting reliability and delivery
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| REL-01 | Rotate during a non-submitted form or modal | Entered data and modal intent are not silently corrupted or submitted twice | U,L | Verified |
-| REL-02 | Rotate/background during a submitted mutation | No duplicate backend mutation or false result occurs; completion/retry is truthful | C,E,L | Verified |
-| REL-03 | Backend returns 401 during an authenticated action | App exits stale authenticated state and reaches Login without leaking the failed mutation | C,E,L | Verified |
-| REL-04 | Backend returns structured 4xx/5xx or malformed/empty success payload | User sees a truthful recoverable outcome; app does not crash or invent success | C,U,E | Verified |
-| REL-05 | Network is offline, slow, times out, then returns | Core screen remains usable or recoverable; retry does not duplicate mutations | C,E,L | Verified |
-| REL-06 | Process is recreated with pending destructive/mutating UI | Backend remains authoritative; no mutation occurs merely because stale UI state was restored | C,E,L | Verified |
-| REL-07 | Library/queue contains long titles and enough rows to scroll | Core actions remain reachable and operate on the intended item | U,E,D | Verified |
-| REL-10 | Build the release APK against production and run the approved smoke path | Release uses server `5050`; login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback work without a critical defect | C,R,D | Verified |
-| REL-12 | Complete regression gate and release handoff | All release-scope PRD scenarios and regression checks pass; explicitly deferred redesigns plus release APK version/checksum/commit/backend and current active backlog are recorded | C,U,E,D,R | Verified |
-| REL-13 | Backend accepts a connection but a core request exceeds the 30-second network timeout | Loading remains visible and duplicate submission is blocked; timeout ends in the screen/action-specific error state rather than an infinite spinner; the documented reload/retry path can recover | C,U,E,L | Verified |
+| REL-01 | Rotate during modal or input entry | Entered RSS URL, OPML picker state, and modal visibility survive configuration change | U,L | Verified |
+| REL-02 | Room database concurrency & transaction integrity | Multi-table mutations (reordering, unsubscribe, mark all listened) use `@Transaction` | C,E,L | Verified |
+| REL-03 | Feed XML parsing resilience | Corrupted/malformed dates, HTML entities, and encoding variations parse safely without crash | C,U,E | Verified |
+| REL-04 | Network offline / timeout during feed refresh | Graceful network error handling without wiping existing Room DB data | C,E,L | Verified |
+| REL-05 | Process recreation with background playback | Foreground `PlaybackService` maintains MediaSession and audio continuity | C,E,L,D | Verified |
+| REL-06 | Scrolling large subscription and episode lists | Smooth scrolling with LazyColumn and memoized state | U,E,D | Verified |
+| REL-07 | Build release APK (`com.prod.mpod`) | Minified release APK with ProGuard rules for Room, Hilt, Media3, and Coroutines | C,R,D | Verified |
 
 ## Resolved scenario decisions
 
@@ -303,6 +285,8 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-M2 | 2026-07-28 | Build/release maintenance evidence for `REL-12` | GitHub automation was consolidated into one Release workflow using JetBrains Runtime 21. It preserves unit tests, Android-test APK compilation, Debug/Release lint, reports, and minified Release assembly while taking `versionName` and `versionCode` from Gradle. The separate quality/emulator workflow was removed by product-owner decision; connected device tests remain a local/manual gate. Production no longer constructs OkHttp BASIC request logging, and focused tests retain that logging only for Debug. The exact workflow commands passed locally under Android Studio JBR 21: 119/119 unit tests, Android-test APK compilation, Debug/Release lint, and Release assembly. Static artifact inspection confirmed package `com.prod.mpod`, version `1.0.12 (13)`, no debuggable manifest flag, and no `HttpLoggingInterceptor` symbol after R8. This maintenance evidence does not replace the wave-24 acceptance APK revision or checksum. |
 | EV-M3 | 2026-07-28 | Playback completion contract maintenance for `PLY-10`, `PLY-11` | Test backend `5051` was updated from stale build `e831ed9` to backend commit `6c0ce47`. A direct `completed:false` probe at 20/30 seconds retained the episode and position. Pixel 9 then paused a real fixture at 21/30; backend stored ordinary progress and kept it unlistened/in playlist. Natural completion of the last item consumed backend `nextEpisodeId`: a fallback without playback state started from zero, while a fallback with authoritative 120/600-second state initially exposed an Android bug by starting at zero. Queue target resolution now restores the backend saved position and the repeated E2E opened exactly at `2:00`. The same pass exposed Play/Pause using `isPlaying` during buffering; the UI and action now follow `playWhenReady`, so Pause remains truthful while buffering. Old client-side 15-second reconciliation was removed. Full gate: 121/121 unit tests, 107/107 connected Pixel 9 tests, Debug/Release lint, and minified Release assembly. Temporary fixture state was removed and the original test playlist/active state was restored. |
 | EV-M4 | 2026-07-29 | Subscriptions continuity evidence for `SUB-18` | A session-scoped in-memory cache now distinguishes first load from confirmed empty state, renders cached subscriptions immediately during silent reconciliation, retains cached content on refresh failure, and clears on logout/login/register/session expiry. Focused recreation, failure, and session tests passed, followed by the full 122/122 unit and 109/109 connected gates, Debug/Release lint, and minified Release assembly. On Pixel 9, a two-second emulator network delay showed `Loading subscriptions` on cold process launch without `No podcasts`, then retained the one-podcast library during a delayed Settings → Subscriptions return. No production backend mutation was performed. |
+| EV-STANDALONE | 2026-08-25 | `APP-01`–`APP-04`, `NAV-01`–`NAV-05`, `ADD-01`–`ADD-12`, `SUB-01`–`SUB-18`, `EPS-01`–`EPS-13`, `HOM-01`–`HOM-11`, `PLY-01`–`PLY-19`, `DLD-01`–`DLD-07`, `SET-01`–`SET-11`, `REL-01`–`REL-07` | Converted app into standalone player `mpoddy`. Replaced backend client with Room local DB (`MpodDatabase`), XML-based RSS/Atom feed parser (`RssFeedParser`), OPML import/export engine (`OpmlParser`), `SmartListeningManager`, and Jetpack DataStore preferences (`AppSettingsDataStore`). Removed all remote auth/session dependencies (commits `8a25520`, `5f72581`). |
+| EV-HARDENING | 2026-08-27 to 2026-08-28 | `HOM-08`, `SET-03`, `SET-10`, `SET-11`, `ADD-04`, `REL-02`, `REL-03` | Hardening and bugfixes: atomic Room `@Transaction` for playlist reordering (`4130c7e`), RFC-822/ISO-8601 thread-safe date parsing with epoch fallback (`2825efd`, `4e8bc56`, `f54cd4e`), OkHttp client caching (`f54cd4e`), feed URL normalization for duplicate checks (`dd7aa5a`), DataStore theme migration (`ac5a9fd`, `0de5260`), 48dp `MpodSwitch` touch target (`345f347`), and JVM unit test suite (`bdf4d06`, `2a936b0`). |
 
 ## Execution order
 

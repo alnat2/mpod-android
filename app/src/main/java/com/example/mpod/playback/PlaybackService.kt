@@ -206,7 +206,6 @@ class PlaybackService : MediaSessionService() {
             player.removeListener(playerListener)
             player.setMediaItems(playlistItems.map { it.toMediaItem() }, targetIndex, target.positionMs)
             previousEpisodeId = target.episodeId
-            lastCompletedEpisodeId = null
             player.prepare()
             player.playWhenReady = target.playWhenReady
             player.addListener(playerListener)
@@ -329,7 +328,7 @@ class PlaybackService : MediaSessionService() {
             if (nextEpisodeId != null) appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
             completeEpisode(episodeId)
             reconcileQueueWithDatabase(preferFirstEpisode = preferFirstEpisode, forcePlayPreferred = forcePlayPreferred)
-            queueInvalidator.refreshHome()
+            queueInvalidator.invalidate()
         }
     }
 

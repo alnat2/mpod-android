@@ -99,7 +99,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = result.exceptionOrNull()?.message ?: "Failed to refresh some podcasts."
                     )
                 }
-                queueInvalidator.refreshHome()
+                queueInvalidator.invalidate()
             } finally {
                 refreshInFlight = false
                 _state.value = _state.value.copy(isRefreshingAll = false)
@@ -121,7 +121,7 @@ class SubscriptionsViewModel @Inject constructor(
                         actionErrorMessage = result.exceptionOrNull()?.message ?: "Could not refresh podcast."
                     )
                 }
-                queueInvalidator.refreshHome()
+                queueInvalidator.invalidate()
             } finally {
                 _state.value = _state.value.copy(
                     refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId
@@ -174,7 +174,7 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 podcastRepository.unsubscribe(podcastId)
-                queueInvalidator.refreshHome()
+                queueInvalidator.invalidate()
             } finally {
                 _state.value = _state.value.copy(
                     unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId
@@ -187,22 +187,27 @@ class SubscriptionsViewModel @Inject constructor(
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
         if (podcast.unlistenedEpisodeCount == 0) return
         viewModelScope.launch {
+            val episodes = withContext(Dispatchers.IO) { episodeDao.getEpisodesByPodcastId(podcastId) }
             podcastRepository.markAllEpisodesListened(podcastId, true)
-            queueInvalidator.refreshHome()
+            for (ep in episodes) {
+                playlistRepository.removeFromPlaylist(ep.id)
+            }
+            queueInvalidator.invalidate()
         }
     }
 
     fun addEpisodeToPlaylist(episodeId: Long) {
         viewModelScope.launch {
+            podcastRepository.setEpisodeListened(episodeId, false)
             playlistRepository.addEpisodeToPlaylist(episodeId)
-            queueInvalidator.refreshHome()
+            queueInvalidator.invalidate()
         }
     }
 
     fun removeEpisodeFromPlaylist(episodeId: Long) {
         viewModelScope.launch {
             playlistRepository.removeFromPlaylist(episodeId)
-            queueInvalidator.refreshHome()
+            queueInvalidator.invalidate()
         }
     }
 
@@ -212,7 +217,7 @@ class SubscriptionsViewModel @Inject constructor(
             if (isListened) {
                 playlistRepository.removeFromPlaylist(episodeId)
             }
-            queueInvalidator.refreshHome()
+            queueInvalidator.invalidate()
         }
     }
 

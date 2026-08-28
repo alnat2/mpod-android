@@ -32,13 +32,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +80,7 @@ fun SubscriptionsRoute(
     onImportOpml: () -> Unit = {},
     viewModel: SubscriptionsViewModel = hiltViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     SubscriptionsScreen(
         state = state,
         onRefreshAll = viewModel::refreshAll,
@@ -114,7 +115,7 @@ fun SubscriptionsScreen(
     onImportOpml: () -> Unit = {},
     onRetryRefresh: () -> Unit = onRefreshAll
 ) {
-    var visibility by remember { mutableStateOf(SubscriptionVisibility.All) }
+    var visibility by rememberSaveable { mutableStateOf(SubscriptionVisibility.Unlistened) }
     val podcasts = remember(state.podcasts, visibility) {
         state.podcasts.visibleFor(visibility)
     }
@@ -211,13 +212,12 @@ fun SubscriptionsScreen(
                     val carouselPodcastIds = remember(podcasts) { podcasts.map { it.id } }
                     val pagerState = key(loopsContinuously, carouselPodcastIds) {
                         rememberPagerState(
-                            initialPage = 0,
+                            initialPage = if (loopsContinuously) 1 else 0,
                             pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
                         )
                     }
                     LaunchedEffect(pagerState, carouselPodcastIds) {
                         if (loopsContinuously) {
-                            pagerState.scrollToPage(1)
                             snapshotFlow { pagerState.settledPage }
                                 .collect { settledPage ->
                                     when (settledPage) {
@@ -228,7 +228,7 @@ fun SubscriptionsScreen(
                         }
                     }
                     val selectedPodcast = podcasts[
-                        podcastIndexForCarouselPage(pagerState.currentPage, podcasts.size)
+                        podcastIndexForCarouselPage(pagerState.settledPage, podcasts.size)
                     ]
                     BoxWithConstraints(
                         modifier = Modifier

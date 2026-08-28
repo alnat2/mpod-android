@@ -243,7 +243,8 @@ class PodcastRepository @Inject constructor(
             val u = java.net.URI(trimmed)
             val scheme = u.scheme?.lowercase() ?: return trimmed
             val host = u.host?.lowercase() ?: return trimmed
-            val port = if (u.port != -1 && u.port == u.defaultPort) -1 else u.port
+            val defaultPort = if (scheme == "https") 443 else 80
+            val port = if (u.port != -1 && u.port == defaultPort) -1 else u.port
             var path = u.path?.trimEnd('/') ?: ""
             if (path.isEmpty()) path = "/"
             val query = if (!u.query.isNullOrBlank()) "?${u.query}" else ""

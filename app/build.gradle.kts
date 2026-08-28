@@ -1,20 +1,31 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
+configurations.all {
+    resolutionStrategy.eachDependency {
+        when (requested.group) {
+            "androidx.lifecycle" -> useVersion("2.8.7")
+            "androidx.activity" -> useVersion("1.9.3")
+            "androidx.core" -> useVersion("1.13.1")
+        }
+    }
+}
+
 android {
     namespace = "com.example.mpod"
-    compileSdk = 37
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.prod.mpod"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 18
         versionName = "1.0.17"
 
@@ -60,6 +71,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
     buildFeatures {
         buildConfig = true
         compose = true
@@ -75,6 +89,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     
     // Retrofit & OkHttp
     implementation(libs.retrofit)
@@ -85,7 +100,7 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
+    kapt(libs.androidx.room.compiler)
 
     // DataStore & WorkManager
     implementation(libs.androidx.datastore.preferences)
@@ -93,7 +108,7 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
+    kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
     // Media3 ExoPlayer

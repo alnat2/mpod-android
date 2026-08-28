@@ -1,8 +1,8 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-08-12 (episode card redesign and inline action behavior recorded)
+Last updated: 2026-08-28 (Converted to standalone podcast player mpoddy with Room database, RSS/OPML parsing, Smart Listening, and DataStore)
 
-Current Android source baseline: `1.0.17 (18)`; Stage 6 release acceptance completed for the historical `1.0.11 (12)` artifact, with subsequent owner-reviewed maintenance
+Current Android source baseline: `1.0.17 (18)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
 
 ## Purpose
 
@@ -20,8 +20,7 @@ New decisions made in chat must be incorporated here in the same documentation s
 1. Explicit decisions confirmed by the product owner in the Android project chat.
 2. This living Android plan after it has been updated with those decisions.
 3. The Android Figma screens and mobile components.
-4. Parent-project product and API documentation under `/Users/cross/Documents/mpod` for shared product/backend behavior.
-5. The actual backend contract and behavior.
+4. Standalone application requirements, local Room contracts, RSS/OPML standards, and Jetpack Media3 lifecycle.
 
 If the sources disagree or required information is absent, stop and ask. Do not invent product behavior.
 
@@ -29,23 +28,24 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 
 | Area | Confirmed decision |
 |---|---|
+| Architecture | Standalone native Android podcast player (`mpoddy`) without backend dependency |
 | Distribution | APK, outside Google Play for the current scope |
 | Minimum OS | Android 8.0+ (API 26) |
 | UI language | English |
-| Development backend | Development and scenario verification use `192.168.0.222:5051` |
-| Production backend | Before release assembly, release configuration uses `192.168.0.222:5050` |
-| Release package | One release APK with package `com.prod.mpod`; no separate test application or APK-coexistence requirement |
-| Backend storage | Downloads remain on the mpod server, as in the web application |
-| Default authenticated route | Subscriptions |
-| Primary navigation | Player (existing Home/Now playing route), Subscriptions, Settings, Add podcast |
-| Theme | Follow the system by default; Settings exposes the approved Light/Dark switch behavior |
-| Active episode | Stored by the backend and restored without autoplay |
-| Mark all listened | Executes immediately, without a confirmation dialog |
-| Subscription episode playback | No separate Play action exists for episodes outside the playlist |
-| Episode actions | Mobile Player playlist and Subscriptions episode actions are inline on the episode card; the episode action bottom sheet is not part of the current UX |
-| Bottom sheets/modals | Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow |
-| Subscriptions loading | First load shows a neutral loading state; later entries show the session-cached library immediately and silently reconcile with backend; a confirmed empty state is never inferred from the initial empty collection |
-| Design | Android screens and mobile components in the mpod Figma file |
+| Release package | One release APK with package `com.prod.mpod`; debug package `com.prod.mpod.test` |
+| Local Database | Room database (`MpodDatabase`) storing `podcasts`, `episodes`, and `playlist_items` |
+| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, Smart Listening, and Proxy settings |
+| Feed & OPML Engines | Direct RSS 2.0 / Atom parser (`RssFeedParser`) and OPML import/export (`OpmlParser`) |
+| Network & Proxy | OkHttp with HTTP/HTTPS cleartext support (e.g. for Radio-T) and configurable Direct/HTTP/SOCKS5 proxy (`ProxyHttpClientFactory`) |
+| Smart Listening | `SmartListeningManager` for automated background downloading of latest unlistened episodes with auto-cleanup |
+| Default start route | Subscriptions |
+| Primary navigation | Player (Home/Now playing), Subscriptions, Settings, Add podcast modal |
+| Theme | Follow system by default; Settings exposes Light/Dark/System switch backed by DataStore |
+| Active episode | Stored in Room database and restored without autoplay |
+| Mark all listened | Executes immediately on local Room DB and updates playlist/queue atomically |
+| Episode actions | Player playlist and Subscriptions episode actions are inline on the episode card |
+| Bottom sheets/modals | Bottom sheets for playback speed; Add podcast modal for direct RSS URL and OPML import |
+| Design & Icons | Material 3 tokens, Hugeicons vector drawables (`menu-09` drag handles), Figma mobile components |
 | Player time labels | Left is elapsed position; right is remaining time, clamped as `max(durationSeconds - positionSeconds, 0)` |
 
 Delivery order decision confirmed on 2026-07-16: a complete, reliable working application takes priority over visual polish and extended accessibility work. Figma fine-tuning, exhaustive font/display scaling, TalkBack review, and performance profiling do not block the working test build unless they make a core action unreadable, unreachable, or unusable.
@@ -420,6 +420,37 @@ Required scope:
 - Record APK checksum, version, commit, production backend, checks performed, and every known limitation.
 
 Exit criterion: no critical defect is found in the production smoke path; the APK is ready for release.
+
+### Stage 7 — Standalone App Conversion (`mpoddy`)
+
+Goal: Convert the application from a client for the mpod backend Go server into a standalone, local-first Android podcast player (`mpoddy`).
+
+Completed work (commit `8a25520` and `5f72581`):
+
+- **Local Room Database**: Replaced REST client (`MpodApi`) and remote synchronization with Room database (`MpodDatabase`, `PodcastDao`, `EpisodeDao`, `PlaylistDao`). Room entities: `PodcastEntity`, `EpisodeEntity`, `PlaylistItemEntity`.
+- **Feed & OPML Engines**: Implemented local `RssFeedParser` (XML-based podcast feed parser with enclosure extraction, artwork resolution, and date parsing) and `OpmlParser` (import/export OPML directly).
+- **Network Proxy & Feeds**: Implemented `ProxyHttpClientFactory` supporting direct, HTTP, and SOCKS5 proxies for podcast feed fetching and media streaming. Enabled cleartext traffic for HTTP podcast feeds (e.g. Radio-T).
+- **Smart Listening**: Implemented `SmartListeningManager` for automated background downloading of latest unlistened episodes with configurable limits (1–10 episodes per subscription) and automatic cleanup upon completion or marking listened.
+- **DataStore Migration**: Implemented `AppSettingsDataStore` for app theme mode (System/Light/Dark), Smart Listening configuration, and Proxy settings.
+- **UI & Navigation Modernization**: Removed all authentication screens (Login, Setup, BackendUnavailable). Main navigation streamlined to Player, Subscriptions, Settings, and Add podcast modal. Renamed application branding to `mpoddy` with updated Figma icon.
+
+### Stage 8 — Post-Migration Hardening & Bugfixes
+
+Goal: Fix regressions, enhance feed parsing robustness, ensure atomic DB operations, and update UI touch targets.
+
+Completed work (commits `f54cd4e` through `31521d6`):
+
+- **Atomic Playlist Reordering**: Made playlist reordering atomic using Room `@Transaction` to prevent broken queue states during concurrent operations (`4130c7e`).
+- **Date Parsing Robustness**: Made RSS date parsing thread-safe (`2825efd`), fallback unparseable dates to epoch 0 instead of current timestamp (`4e8bc56`, `f54cd4e`).
+- **OkHttp Client Caching**: Cached OkHttp instances across repository calls to prevent socket/connection leaks (`f54cd4e`).
+- **Subscription Deduplication**: Normalized feed URLs before subscription duplicate checks (`dd7aa5a`).
+- **Smart Listening Lifecycle**: Consolidated `SmartListeningManager` observation to a single lifecycle trigger (`955f755`).
+- **Dynamic App Version**: Derived displayed app version from `BuildConfig.VERSION_NAME` (`881e71e`).
+- **DataStore Theme Integration**: Migrated theme observation completely to DataStore Flow with system default fallback (`ac5a9fd`, `0de5260`).
+- **Unsubscribe Cleanup**: Cleared `activeEpisodeId` and invalidates playback queue when unsubscribing a podcast (`3db4d2c`).
+- **Touch Target Accessibility**: Enforced 48dp minimum touch target for `MpodSwitch` (`345f347`).
+- **Audio File Extension**: Derived downloaded audio file extensions directly from feed enclosure URLs (`b1624c4`).
+- **Unit Tests**: Added JVM unit test suite covering `RssFeedParser`, `OpmlParser`, XML parsing with kxml2, `ProxyHttpClientFactory`, and local model reconciliation (`bdf4d06`, `2a936b0`).
 
 ## Priorities
 
