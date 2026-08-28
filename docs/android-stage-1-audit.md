@@ -1,5 +1,7 @@
 # mpod Android — Stage 1 audit and defect backlog
 
+> **Archived backend-client audit.** This document describes the retired mpod server client and is preserved only as historical evidence. It is not a source of current `mpoddy` scope, architecture, backlog, or release requirements. Use `docs/android-delivery-plan.md` and `docs/android-user-scenarios.md` for the standalone Room/RSS/Smart Listening product.
+
 Audit date: 2026-07-15
 
 Audited baseline: `1.0.4 (5)`, commit `d5fb07c`

@@ -1,6 +1,6 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-08-28 (Converted to standalone podcast player mpoddy with Room database, RSS/OPML parsing, Smart Listening, and DataStore)
+Last updated: 2026-08-28 (Standalone `mpoddy` baseline made authoritative; retired backend-client requirements archived)
 
 Current Android source baseline: `1.0.17 (18)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
 
@@ -67,52 +67,33 @@ Icon-source decision confirmed on 2026-07-29: every Android UI icon must come fr
 |---|---|
 | Not started | No production implementation exists |
 | Implemented | Production code exists, but required verification is incomplete |
-| Verified | Required automated and manual checks passed on the test backend |
+| Verified | Required automated and manual checks passed against the local database, real feeds, and applicable Android devices |
 | Accepted | Product owner checked the build and accepted the behavior |
 | Deferred | The product owner explicitly removed the work from the current release scope pending redesign |
 | Blocked | A named external dependency or unanswered product decision prevents progress |
 
 Statuses are evidence-based. `Implemented` must never be used as a synonym for `Verified` or `Accepted`.
 
-## Historical implementation baseline
+## Current standalone implementation baseline
 
-The table below records the implementation baseline accepted on 2026-07-15 and the gaps that drove the later scenario waves. It is retained as history, not as the current backlog. Current release status is authoritative in `docs/android-user-scenarios.md`: 119 release-scope scenarios are Verified, nine Download scenarios are Deferred by product-owner decision, and no scenario is Specified, Open, or Failed.
+The backend-client product was retired when the application became the standalone `mpoddy` player. The current baseline is local-first and is summarized below; detailed expected behavior and evidence status live in `docs/android-user-scenarios.md`.
 
-| Area | Current status | Existing evidence | Remaining work before release |
-|---|---|---|---|
-| Startup/session restoration | Verified | Unit coverage for 2xx/401/5xx/transport outcomes; Compose Retry test; valid-session offline cold-start and recovery; minified production release resolved a real `5050` session response to Login on Pixel 9; authenticated-action `401` clears the persisted session, stops playback, and replaces the authenticated shell with Login | Remaining slow-network/process-recreation reliability rows in the scenario map |
-| Session backup/transfer | Verified | CookiePrefs and pending playback mutations excluded from legacy backup, cloud backup, and device transfer; two connected resource-contract tests; cleared-data launch has no CookiePrefs or restored session | No additional release-process requirement |
-| Initial setup and login | Verified | Real backend login/session/error/restart matrix plus setup API-contract and Compose coverage | Final release-candidate smoke check |
-| Bottom navigation | Verified | Manual emulator/phone checks | Back-stack and process-recreation tests |
-| Home queue | Verified | Real backend row play, active removal, empty/error recovery, exact compact menu, authoritative queue reconciliation, and focused unit/Compose coverage | No-subscriptions E2E and external-client lifecycle conflict remain in the scenario map |
-| Playback service | Verified | Queue/retry automation plus real local audio play, pause, progress, tap/drag scrubbing, button seeks, natural completion, auto-next, and paused completion-window reconciliation on Pixel 9 | Audio focus/route/network and service/process reliability matrix in Stage 5 |
-| Active episode restore | Verified | Backend integration, queue reconciliation tests, and real force-stop restore at saved position without autoplay | Covered by the final playback/background smoke path |
-| Queue reorder | Verified | Pure reorder tests plus real long-press drag with authoritative backend order and offline rollback on Pixel 9 | Background/process lifecycle behavior in Stage 5 |
-| Playback speed | Verified | All supported labels unit-tested; real 0.5x/1x/2x backend restore plus earlier offline/process-stop/reconnect restoration | Cross-device conflict behavior in Stage 5 |
-| Subscriptions carousel/filter | Verified | Compose UI tests and real backend checks | Rotation/process-recreation behavior |
-| Refresh one/all | Verified | Refresh-all completion plus per-podcast success, feed failure, visible error, and Try again recovery checked on the real test backend; transient polling and a real slow-job background/restore path preserve the truthful non-repeatable running state | Final failed Refresh-all E2E after the backend retry schedule is isolated from shared subscriptions |
-| Podcast artwork/fallback | Verified | Exact web/Figma fallback checksum, real missing-image fallback, and successful Android decode/render from a fixture image URL | Cache and lifecycle behavior in Stage 5 |
-| Episode playlist actions | Verified | API/Compose automation plus real add/remove, listened/unlistened, backend cleanup, and failed-add rollback on a temporary podcast | Background/process lifecycle behavior in Stage 5 |
-| Show notes | Verified | Backend contract tests, missing-notes state, scrolling, and real external-browser link dispatch | Accessibility review |
-| Mark all listened | Verified | Single backend-owned atomic endpoint; unit/UI contract coverage; real Pixel 9 one-episode fixture verified listened/playlist/active effects and idempotent repeat | Release-candidate smoke check |
-| Episode download | Implemented | Backend action and UI states exist | Real download success, failure, cancellation, file lifecycle, and playback-from-download matrix |
-| Podcast unsubscribe/undo | Verified | Countdown/unit coverage plus real Undo, final 15-second deletion, connectivity failure rollback, and immediate DELETE retry without a second countdown | Process-death behavior in Stage 5 |
-| Add RSS feed | Verified | API/Compose automation plus real valid, duplicate, invalid-scheme, unreachable-feed, double-submit, and slow-request lifecycle checks | Final physical-device smoke check |
-| OPML import/export | Verified | Multipart contract, stream-limit/read-failure, modal, and ViewModel automation; real picker cancel, partial success, duplicate/skipped counts, oversize rejection, parse failure/retry, library reload, and process-loss checks | Export remains covered separately under Settings; final physical-device picker smoke check |
-| Daily refresh time | Verified | Material TimePicker unit/UI/manual checks; confirmed save survives failed status reload | Full API fixture integration and 12/24-hour device matrix |
-| SOCKS5 switch/status | Implemented | Real backend status displayed; confirmed switch value survives failed status reload | Full failure/running/off API fixture matrix and acceptance |
-| Theme | Verified | Unit/UI tests and physical-phone checks | Screen-by-screen contrast/accessibility audit |
-| Logout | Verified | Backend response controls launch state; real logout cleared persisted cookies and a server-invalidated stored cookie resolved to Login | Final release-candidate smoke check |
-| Empty/loading/error states | Implemented | States exist across main screens | Complete screenshot and interaction matrix |
+| Area | Current architecture | Release focus |
+|---|---|---|
+| Startup | Opens directly into Subscriptions; no account, setup, session, or backend-availability gate | Empty/existing database startup and process recreation |
+| Persistence | Room stores podcasts, episodes, playlist order, active episode, and playback position | Transaction integrity, migrations, backup/restore policy, and corruption recovery |
+| Feed ingestion | Android fetches and parses RSS 2.0/Atom directly | Real-feed compatibility, malformed XML, redirects, dates, enclosures, and duplicates |
+| OPML | Android imports and exports OPML locally through the system document provider | Size/read/write failures, partial import, duplicates, and lifecycle recovery |
+| Subscriptions | Room Flow drives the library; refresh fetches feeds directly | Partial refresh failure, offline retention, large libraries, and artwork fallback |
+| Playlist and player | Room owns queue order and active state; Media3 owns playback | Atomic reorder, lifecycle restoration, audio focus, noisy route, and error recovery |
+| Smart Listening | Android downloads recent unlistened episodes under DataStore policy | Wi-Fi constraint, per-podcast limit, local playback, cleanup, and storage failures |
+| Preferences | DataStore stores theme, playback speed, Smart Listening, and proxy configuration | Immediate application, persistence, validation, and migration |
+| Networking | OkHttp uses Direct, HTTP, or SOCKS5 mode for feeds, artwork, and media | HTTP/HTTPS feeds, proxy validation, timeouts, and recoverable network errors |
+| UI | Compose/Material 3 using the approved Figma components and Hugeicons | Core usability first; visual and accessibility polish remain risk-based |
 
 ## Test baseline
 
-Current automated suite:
-
-- 122 local unit tests.
-- 109 connected Android/Compose UI/configuration tests.
-- Debug and release Android lint.
-- Debug app, Android-test APK, and minified release APK assembly.
+The standalone baseline is protected by local unit tests, connected Android/Compose tests, Debug and Release lint, Android-test APK compilation, and minified Release assembly. Exact test counts are recorded in the verification report for the revision being handed off; historical backend-era counts are not used as the current baseline.
 
 Current verified command set:
 
@@ -131,16 +112,13 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - A version bump is committed with the changes included in that APK, so an installed version can be traced to one source revision.
 - Current build: `1.0.17 (18)`.
 
-Production release regression evidence from 2026-07-19: R8 had removed Gson-reflected API model fields, so `GET /api/auth/session` returned HTTP 200 but conversion failed and Android falsely displayed `mpod is not reachable`. The API model package is now retained for reflection. The installed minified APK used package `com.prod.mpod`, requested `http://192.168.0.222:5050/api/auth/session`, received HTTP 200, and resolved the unauthenticated response to Login; the crash buffer was empty.
-
 ### Current active backlog
 
-- `DLD-01`–`DLD-09` remain explicitly Deferred pending the planned download redesign; they are not represented as release-verified.
-- The immutable production acceptance artifact remains the APK from `67ad83f`, documented in wave 24. Current source/test baseline contains later owner-reviewed maintenance and must not be described using the older artifact checksum.
-- Production HTTP request logging is disabled at build time; Debug retains BASIC request logging.
-- Backend follow-up `BE-FU-01` remains recorded in the scenario map. `BE-FU-02` was resolved by backend commit `6c0ce47`, which requires explicit completion.
-
-Local-network operation is the current product scope. The Android backlog tracks only concrete functional defects, accepted redesigns, and verification needed for that scope.
+- Produce a fresh standalone release baseline; the historical backend-client acceptance APK and checksum are not valid evidence for `mpoddy`.
+- Re-run the complete standalone regression gate and record exact unit/connected counts for the current revision.
+- Perform emulator and physical-device acceptance for local persistence, real RSS/Atom feeds, Smart Listening downloads, proxy modes, Media3 lifecycle, and process recreation.
+- Record any Room migration/backup, device-storage, or feed-compatibility limitations discovered during acceptance.
+- Keep production HTTP request logging disabled; Debug may retain scoped request logging.
 
 ## Risk-based regression policy
 
@@ -148,8 +126,8 @@ Quality checks should be proportional to regression risk so accepted work is not
 
 - Always run the complete unit, lint, and build suite for code changes.
 - Run connected UI tests affected by the change; run the complete connected suite before an APK handoff, stage acceptance, or release candidate.
-- Deeply re-test every changed flow and its direct dependencies, including backend state transitions.
-- Always re-test P0/P1 paths affected by shared navigation, authentication, networking, persistence, playback, theme, or reusable UI components.
+- Deeply re-test every changed flow and its direct dependencies, including Room, filesystem, feed, and playback state transitions.
+- Always re-test P0/P1 paths affected by shared navigation, networking, persistence, downloads, playback, theme, or reusable UI components.
 - Keep already accepted, unchanged, low-risk flows on a short smoke checklist instead of repeating their full manual matrix.
 - Re-open a previously accepted flow only when a dependency changed, an automated test failed, a regression was reported, or release-candidate validation requires it.
 - Use the emulator for repeatable UI and lifecycle checks. Use the physical phone for device-sensitive behavior and the final production smoke pass.
@@ -160,19 +138,24 @@ Quality checks should be proportional to regression risk so accepted work is not
 A feature may move to `Verified` only when all applicable items pass:
 
 1. Expected behavior is documented or explicitly confirmed.
-2. The complete user action reaches the expected authoritative backend/playback state, not merely a callback or mocked UI state.
+2. The complete user action reaches the expected Room, filesystem, DataStore, and/or Media3 state, not merely a callback or mocked UI state.
 3. Success, loading, empty, disabled, retry, and failure states required by the flow are usable and truthful.
 4. Unit tests cover business/state transformations and Compose/UI tests cover user-visible dispatch and reconciliation.
-5. Real test-backend integration is checked when the feature uses the API.
+5. Real RSS/Atom feeds, local files, and configured proxy modes are checked when the feature depends on them.
 6. The complete local unit, lint, assemble, and connected-test suite passes.
 7. The changed flow is checked end-to-end on the Pixel 9 emulator.
 8. Device-sensitive behavior is checked on the physical Android phone before release acceptance.
 9. Version is bumped for an installable handoff build; only scoped files are committed and pushed.
 10. The product owner receives the version, commit, checks actually performed, and known limitations, then accepts or rejects the stage.
 
-Visual similarity alone, a Retrofit contract test alone, or a button callback test alone is not sufficient evidence that a feature works.
+Visual similarity alone, a parser contract test alone, or a button callback test alone is not sufficient evidence that a feature works.
 
-## Delivery stages
+## Historical backend-client delivery stages (retired)
+
+The following Stage 0–6 record is retained only as product history. It describes the former Go-backend client and must not be used as the current `mpoddy` implementation plan, backlog, verification baseline, or release procedure.
+
+<details>
+<summary>Show retired Stage 0–6 history</summary>
 
 Each stage ends with: verification, documentation update, version bump when an APK is handed off, one scoped commit, push, report, and a stop for product-owner approval.
 
@@ -421,6 +404,10 @@ Required scope:
 
 Exit criterion: no critical defect is found in the production smoke path; the APK is ready for release.
 
+</details>
+
+## Current standalone delivery stages
+
 ### Stage 7 — Standalone App Conversion (`mpoddy`)
 
 Goal: Convert the application from a client for the mpod backend Go server into a standalone, local-first Android podcast player (`mpoddy`).
@@ -456,14 +443,14 @@ Completed work (commits `f54cd4e` through `31521d6`):
 
 | Priority | Definition |
 |---|---|
-| P0 | Data loss, security/auth bypass, unusable startup, or playback/app-wide crash with no workaround |
+| P0 | Local data loss/corruption, unsafe file or network behavior, unusable startup, or playback/app-wide crash with no workaround |
 | P1 | Core MVP flow is broken or gives an incorrect authoritative state |
 | P2 | Important defect with a reasonable workaround, major visual mismatch, or missing non-critical coverage |
 | P3 | Polish, minor inconsistency, low-risk technical debt, or deferred enhancement |
 
-## Deferred product-owner input
+## Product-owner input
 
-There are no unanswered product questions blocking the functional scenario audit. The five scenario questions covering OPML partial results, show-notes links, media notification controls, interrupted downloads, and Settings error handling were resolved on 2026-07-19 and recorded in `docs/android-user-scenarios.md`.
+There are no known unanswered product questions blocking the standalone functional audit. Current decisions for OPML results, inline episode actions, playback completion, Smart Listening, proxy configuration, and local cleanup are recorded in `docs/android-user-scenarios.md`.
 
 ## Stage report template
 
@@ -473,6 +460,6 @@ Every completed stage report must include:
 - APK version, when installed.
 - Commit and pushed branch.
 - Automated checks and their counts.
-- Emulator/backend/physical-device checks actually performed.
+- Emulator/real-feed/local-storage/physical-device checks actually performed.
 - Known limitations or deferred findings.
 - Exact acceptance request for the product owner.

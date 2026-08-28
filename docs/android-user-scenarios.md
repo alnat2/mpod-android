@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-08-28 (Updated for standalone podcast player mpoddy with Room database, RSS/OPML parsing, Smart Listening, and DataStore)
+Last updated: 2026-08-28 (Standalone `mpoddy` scenarios made authoritative; retired backend evidence separated)
 
 ## Purpose
 
@@ -104,19 +104,6 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SUB-17 | Database error during delete | Error is surfaced and podcast remains visible in Room DB | C,U,E,L | Verified |
 | SUB-18 | Re-enter or recreate Subscriptions after a successful load | Room Flow delivers cached state immediately without empty-library flicker | C,U,E,L | Verified |
 
-## P1 — episode actions and authoritative playlist state
-
-| ID | User scenario | Expected result | Evidence | Status |
-|---|---|---|---|---|
-| EPS-01 | Use an episode action in Subscriptions | Allowed actions are shown inline on the episode card; there is no Play, manual Download, or queue-drag action outside the playlist | U | Verified |
-| EPS-02 | Add an episode to playlist | Backend playlist changes; row/count/menu update to In playlist / Remove | C,U,E | Verified |
-| EPS-03 | Add to playlist fails | Optimistic UI rolls back only the target episode and a retryable error is shown | C,U,E | Verified |
-| EPS-04 | Remove a non-active episode from playlist | Backend and both screens remove only that episode; unrelated playback is uninterrupted | C,U,E | Verified |
-| EPS-05 | Remove the active episode from playlist | Backend active state and Home player reconcile without stale playback or unintended autoplay | C,U,E | Verified |
-| EPS-06 | Mark an episode listened | Backend marks it listened, removes it from playlist, applies download cleanup, and UI reconciles | C,U,E | Verified |
-| EPS-07 | Mark a listened episode unlistened | Backend/UI change to unlistened; it is not silently re-added to playlist and deleted media is not restored | C,U,E | Verified |
-| EPS-08 | Mark listened/unlistened fails | Target optimistic state rolls back and the backend remains authoritative | C,U,E | Verified |
-| EPS-09 | Mark all listened for selected podcast | One backend operation marks only that podcast, removes its playlist rows, clears its active episode, and returns `markedEpisodes` | C,U,E | Verified |
 ## P1 — episode actions and local playlist state
 
 | ID | User scenario | Expected result | Evidence | Status |
@@ -217,34 +204,34 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 
 ## Resolved scenario decisions
 
-The product owner confirmed on 2026-07-19:
+The following decisions define the standalone `mpoddy` product:
 
-1. OPML partial success is shown inside the existing import modal as `Import completed`, exact imported/skipped counts, and `Done`; do not stack another dialog over the modal.
-2. Links in Show notes are tappable and open through the Android system browser.
-3. Android media notification and lock-screen controls expose Play/Pause only, together with episode/podcast metadata.
-4. Downloads have no user-facing Cancel action in the MVP. An interrupted request either completes or returns to a retryable Download state without false success.
-5. Settings has no Retry buttons. The header shows last refresh and current IP/geo when available; Feed daily refresh and SOCKS5 expose independent backend errors; local sections stay usable. Re-entering the screen or restarting the application reloads the backend-dependent data.
-6. Web/Android synchronization is event-driven for the MVP: launch, foreground, entry to Home or Subscriptions, and manual Refresh reconcile shared state. There is no continuous polling and no immediate interruption of current audio before reconciliation.
-7. Downloads are explicitly deferred from the current release acceptance pending redesign. Until that redesign, the existing Android behavior permits one download at a time and disables other Download actions while it is running; `DLD-01`–`DLD-09` must not be represented as Verified.
-8. Release acceptance uses one release APK. A separate test application, a second application ID, Test/Production coexistence, and upgrade/co-installation checks are not mpod requirements. After all PRD scenarios and regression tests pass, release is switched to production server `5050`, assembled, and smoke-tested for login, subscriptions, playback, speed, episode completion, Settings, MediaSession, and background playback. With no critical defects, the APK is ready for release.
-9. Settings displays only the user-facing application version (`Current app build: <versionName>`). Android `versionCode` remains an internal monotonically increasing update number and is not shown together with environment, package, server, or backend metadata. Every new production APK installed for product-owner testing or handed off increments the patch `versionName` and increases `versionCode` by one; neither value is reused.
-10. The first bottom-navigation item is labeled `Player`, uses the updated Figma icon, and continues opening the existing Home/Now playing destination; it is not a new route or screen.
-11. Playback completion is explicit. Ordinary progress, including a pause or seek inside the final 15 seconds or at the reported duration, never marks an episode listened and never removes it from the playlist. Android sends `completed: true` only from Media3 natural-completion events.
-12. When completion of the last playlist item returns `nextEpisodeId`, Android starts that backend-selected episode. Existing playback state is resumed; if no playback state exists, playback starts at `0:00`.
-13. Player time labels are explicit: the left label is elapsed playback position; the right label is remaining time calculated as `max(durationSeconds - positionSeconds, 0)`. The right label is not the episode's fixed total duration.
-14. Episode actions are inline on the mobile Player playlist item and Subscriptions episode card. The episode action bottom sheet is not part of the current mobile UX. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
+1. The app has no backend account, setup, session, or logout flow. It opens directly into the local Subscriptions library.
+2. Room is authoritative for podcasts, episodes, playlist order, active episode, listened state, and saved position. Multi-table mutations that must stay consistent use Room transactions.
+3. Android fetches and parses RSS 2.0/Atom directly. A refresh failure never erases the previously stored local library.
+4. OPML import/export is local. Partial import is shown inside the existing modal as `Import completed` with exact imported/skipped counts and `Done`; files over 5,000,000 bytes are rejected before parsing.
+5. Smart Listening owns automatic downloads. Its enabled state, per-podcast limit from 1–10, Wi-Fi-only constraint, and cleanup policy are stored in DataStore. There is no manual Download action on subscription episode cards.
+6. Direct, HTTP, and SOCKS5 proxy modes apply to feed fetching, artwork, and media streaming. Invalid proxy host/port values are rejected locally.
+7. The first bottom-navigation destination is `Player`; it opens the single Player/Now playing screen. The default launch destination is Subscriptions.
+8. Episode actions are inline on Player and Subscriptions cards. Bottom sheets remain for playback speed; Add podcast remains a modal overlay/card flow.
+9. Subscription episodes cannot be played before they are added to the local playlist. Podcast artwork has no separate detail-screen navigation in the current MVP.
+10. Links in Show notes open through the Android system browser.
+11. Media notification and lock-screen controls expose Play/Pause only, together with episode and podcast metadata.
+12. Playback completion is explicit. Ordinary progress, including pause or seek inside the final 15 seconds, never marks an episode listened. Only a Media3 natural-completion event performs completion cleanup and next-item behavior.
+13. Player time labels show elapsed time on the left and `max(duration - position, 0)` remaining time on the right.
+14. Settings displays only `Current app build: <versionName>` for build identity. New handoff APKs increment both patch `versionName` and monotonically increasing `versionCode`.
+15. Release acceptance uses the minified `com.prod.mpod` APK and validates local persistence, real feeds, Smart Listening, proxy modes, Media3 lifecycle, and process recreation without any production-server switch.
 
 There are no known unanswered product questions blocking the functional scenario audit.
-
-## Backend follow-ups
-
-1. `BE-FU-01`: during EV-W8, `DELETE /api/podcasts/23` returned success and removed the podcast, but `/api/playlist` retained episode `11764`; `/api/playback/queue` already filtered that orphan. The orphan made the next full reorder fail with `INVALID_PLAYLIST_ORDER` until the row was explicitly deleted. Backend podcast deletion must remove every affected playlist row in the committed database state.
-
-`BE-FU-02` is resolved by backend commit `6c0ce47`: completion side effects now require explicit `completed: true`.
 
 ## Verification ledger
 
 This ledger records why scenario statuses changed. Git remains the change history for the document itself.
+
+Backend-client evidence below is retained only to explain the repository history. It does not verify the standalone Room/RSS/Smart Listening architecture.
+
+<details>
+<summary>Show retired backend-client evidence</summary>
 
 | Evidence ID | Date | Scope | Result/source |
 |---|---|---|---|
@@ -285,6 +272,13 @@ This ledger records why scenario statuses changed. Git remains the change histor
 | EV-M2 | 2026-07-28 | Build/release maintenance evidence for `REL-12` | GitHub automation was consolidated into one Release workflow using JetBrains Runtime 21. It preserves unit tests, Android-test APK compilation, Debug/Release lint, reports, and minified Release assembly while taking `versionName` and `versionCode` from Gradle. The separate quality/emulator workflow was removed by product-owner decision; connected device tests remain a local/manual gate. Production no longer constructs OkHttp BASIC request logging, and focused tests retain that logging only for Debug. The exact workflow commands passed locally under Android Studio JBR 21: 119/119 unit tests, Android-test APK compilation, Debug/Release lint, and Release assembly. Static artifact inspection confirmed package `com.prod.mpod`, version `1.0.12 (13)`, no debuggable manifest flag, and no `HttpLoggingInterceptor` symbol after R8. This maintenance evidence does not replace the wave-24 acceptance APK revision or checksum. |
 | EV-M3 | 2026-07-28 | Playback completion contract maintenance for `PLY-10`, `PLY-11` | Test backend `5051` was updated from stale build `e831ed9` to backend commit `6c0ce47`. A direct `completed:false` probe at 20/30 seconds retained the episode and position. Pixel 9 then paused a real fixture at 21/30; backend stored ordinary progress and kept it unlistened/in playlist. Natural completion of the last item consumed backend `nextEpisodeId`: a fallback without playback state started from zero, while a fallback with authoritative 120/600-second state initially exposed an Android bug by starting at zero. Queue target resolution now restores the backend saved position and the repeated E2E opened exactly at `2:00`. The same pass exposed Play/Pause using `isPlaying` during buffering; the UI and action now follow `playWhenReady`, so Pause remains truthful while buffering. Old client-side 15-second reconciliation was removed. Full gate: 121/121 unit tests, 107/107 connected Pixel 9 tests, Debug/Release lint, and minified Release assembly. Temporary fixture state was removed and the original test playlist/active state was restored. |
 | EV-M4 | 2026-07-29 | Subscriptions continuity evidence for `SUB-18` | A session-scoped in-memory cache now distinguishes first load from confirmed empty state, renders cached subscriptions immediately during silent reconciliation, retains cached content on refresh failure, and clears on logout/login/register/session expiry. Focused recreation, failure, and session tests passed, followed by the full 122/122 unit and 109/109 connected gates, Debug/Release lint, and minified Release assembly. On Pixel 9, a two-second emulator network delay showed `Loading subscriptions` on cold process launch without `No podcasts`, then retained the one-podcast library during a delayed Settings → Subscriptions return. No production backend mutation was performed. |
+
+</details>
+
+### Current standalone evidence
+
+| Evidence ID | Date | Scope | Result/source |
+|---|---|---|---|
 | EV-STANDALONE | 2026-08-25 | `APP-01`–`APP-04`, `NAV-01`–`NAV-05`, `ADD-01`–`ADD-12`, `SUB-01`–`SUB-18`, `EPS-01`–`EPS-13`, `HOM-01`–`HOM-11`, `PLY-01`–`PLY-19`, `DLD-01`–`DLD-07`, `SET-01`–`SET-11`, `REL-01`–`REL-07` | Converted app into standalone player `mpoddy`. Replaced backend client with Room local DB (`MpodDatabase`), XML-based RSS/Atom feed parser (`RssFeedParser`), OPML import/export engine (`OpmlParser`), `SmartListeningManager`, and Jetpack DataStore preferences (`AppSettingsDataStore`). Removed all remote auth/session dependencies (commits `8a25520`, `5f72581`). |
 | EV-HARDENING | 2026-08-27 to 2026-08-28 | `HOM-08`, `SET-03`, `SET-10`, `SET-11`, `ADD-04`, `REL-02`, `REL-03` | Hardening and bugfixes: atomic Room `@Transaction` for playlist reordering (`4130c7e`), RFC-822/ISO-8601 thread-safe date parsing with epoch fallback (`2825efd`, `4e8bc56`, `f54cd4e`), OkHttp client caching (`f54cd4e`), feed URL normalization for duplicate checks (`dd7aa5a`), DataStore theme migration (`ac5a9fd`, `0de5260`), 48dp `MpodSwitch` touch target (`345f347`), and JVM unit test suite (`bdf4d06`, `2a936b0`). |
 
@@ -296,6 +290,6 @@ After the product owner reviews this map, work proceeds in functional waves:
 2. Execute unknown and high-risk scenarios end-to-end, recording `Verified`, `Failed`, and the exact evidence.
 3. Fix failed scenarios in small scenario-scoped commits, then rerun that scenario and affected regression paths.
 4. Run the cross-cutting reliability matrix.
-5. Switch release configuration to production server `5050`, build one release APK, and perform the approved production smoke pass on the physical phone.
+5. Build the minified `com.prod.mpod` release APK and perform the approved standalone smoke pass on a physical phone using real feeds, local downloads, and the supported proxy modes.
 
 Each implementation batch ends with a scoped commit and report. The next batch does not start until approval, unless the product owner explicitly authorizes completing a whole named wave without intermediate confirmation.
