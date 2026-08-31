@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -67,7 +68,8 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(PlayPauseOnlyMediaNotificationProvider(this))
 
-        val okHttpClient = proxyHttpClientFactory.createClient()
+        val settings = runBlocking { appSettingsDataStore.settingsFlow.first() }
+        val okHttpClient = proxyHttpClientFactory.createClient(settings)
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
         val defaultDataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)

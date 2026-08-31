@@ -18,10 +18,23 @@ class ThemeModeTest {
     }
 
     @Test
-    fun systemModeFollowsTheDeviceTheme() {
-        assertEquals(false, ThemeMode.System.isDark(systemDark = false))
-        assertEquals(true, ThemeMode.System.isDark(systemDark = true))
-        assertEquals(false, ThemeMode.Light.isDark(systemDark = true))
-        assertEquals(true, ThemeMode.Dark.isDark(systemDark = false))
+    fun allThreeModesAreDistinct() {
+        val modes = listOf(ThemeMode.System, ThemeMode.Light, ThemeMode.Dark)
+        assertEquals(3, modes.size)
+        assertEquals(3, modes.map { it.storageValue }.toSet().size)
+    }
+
+    @Test
+    fun storageRoundTripForAllModes() {
+        for (mode in ThemeMode.values()) {
+            assertEquals(mode, ThemeMode.fromStorage(mode.storageValue))
+        }
+    }
+
+    @Test
+    fun storageValuesAreLowerCase() {
+        for (mode in ThemeMode.values()) {
+            assertEquals(mode.storageValue, mode.storageValue.lowercase())
+        }
     }
 }

@@ -29,7 +29,10 @@ data class AppSettings(
     val themeMode: String = "System",
     val activeEpisodeId: Long? = null,
     val playbackSpeed: Float = 1.0f,
-    val lastRefreshTimeFormatted: String = ""
+    val lastRefreshTimeFormatted: String = "",
+    val smartListeningEnabled: Boolean = true,
+    val maxDownloadsPerPodcast: Int = 3,
+    val wifiOnlyDownloads: Boolean = false
 )
 
 @Singleton
@@ -47,6 +50,9 @@ class AppSettingsDataStore @Inject constructor(
         val ACTIVE_EPISODE_ID = longPreferencesKey("active_episode_id")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
+        val SMART_LISTENING_ENABLED = booleanPreferencesKey("smart_listening_enabled")
+        val MAX_DOWNLOADS_PER_PODCAST = intPreferencesKey("max_downloads_per_podcast")
+        val WIFI_ONLY_DOWNLOADS = booleanPreferencesKey("wifi_only_downloads")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -60,7 +66,10 @@ class AppSettingsDataStore @Inject constructor(
             themeMode = prefs[Keys.THEME_MODE] ?: "System",
             activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
-            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
+            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: "",
+            smartListeningEnabled = prefs[Keys.SMART_LISTENING_ENABLED] ?: true,
+            maxDownloadsPerPodcast = prefs[Keys.MAX_DOWNLOADS_PER_PODCAST] ?: 3,
+            wifiOnlyDownloads = prefs[Keys.WIFI_ONLY_DOWNLOADS] ?: false
         )
     }
 
@@ -109,5 +118,17 @@ class AppSettingsDataStore @Inject constructor(
 
     suspend fun setLastRefreshTime(formatted: String) {
         context.dataStore.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
+    }
+
+    suspend fun setSmartListeningEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SMART_LISTENING_ENABLED] = enabled }
+    }
+
+    suspend fun setMaxDownloadsPerPodcast(max: Int) {
+        context.dataStore.edit { it[Keys.MAX_DOWNLOADS_PER_PODCAST] = max.coerceIn(1, 10) }
+    }
+
+    suspend fun setWifiOnlyDownloads(wifiOnly: Boolean) {
+        context.dataStore.edit { it[Keys.WIFI_ONLY_DOWNLOADS] = wifiOnly }
     }
 }

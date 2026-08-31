@@ -83,6 +83,8 @@ fun SettingsRoute(
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyToggle = viewModel::setProxyEnabled,
         onSaveProxySettings = viewModel::saveProxySettings,
+        onSmartListeningToggle = viewModel::setSmartListeningEnabled,
+        onWifiOnlyToggle = viewModel::setWifiOnlyDownloads,
         onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
@@ -97,6 +99,8 @@ fun SettingsScreen(
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyToggle: (Boolean) -> Unit = {},
     onSaveProxySettings: (String, Int, String) -> Unit = { _, _, _ -> },
+    onSmartListeningToggle: (Boolean) -> Unit = {},
+    onWifiOnlyToggle: (Boolean) -> Unit = {},
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
@@ -104,6 +108,7 @@ fun SettingsScreen(
 
     var proxyHostInput by rememberSaveable { mutableStateOf(state.proxyHost) }
     var proxyPortInput by rememberSaveable { mutableStateOf(state.proxyPort.toString()) }
+    var proxyTypeInput by rememberSaveable { mutableStateOf(state.proxyType) }
     val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {
@@ -112,6 +117,9 @@ fun SettingsScreen(
     LaunchedEffect(state.proxyHost, state.proxyPort) {
         proxyHostInput = state.proxyHost
         proxyPortInput = state.proxyPort.toString()
+    }
+    LaunchedEffect(state.proxyType) {
+        proxyTypeInput = state.proxyType
     }
 
     Column(
@@ -238,6 +246,48 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf("SOCKS5" to "SOCKS5", "HTTP" to "HTTP").forEach { (type, label) ->
+                                val isSelected = proxyTypeInput == type
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.background
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outline,
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable(
+                                            role = Role.Button,
+                                            onClick = { proxyTypeInput = type }
+                                        )
+                                        .semantics {
+                                            contentDescription = "$label proxy"
+                                            role = Role.Button
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
                         OutlinedTextField(
                             value = proxyHostInput,
                             onValueChange = { proxyHostInput = it },
@@ -283,7 +333,7 @@ fun SettingsScreen(
                             enabled = isSaveEnabled,
                             onClick = {
                                 if (portNumber != null) {
-                                    onSaveProxySettings(proxyHostInput, portNumber, "SOCKS5")
+                                    onSaveProxySettings(proxyHostInput, portNumber, proxyTypeInput)
                                 }
                             }
                         )
@@ -292,22 +342,64 @@ fun SettingsScreen(
             }
         )
 
-        // Card 3: Dark theme toggle
+        // Card 3: Smart Listening
         SettingCard(
-            title = "Use dark theme",
-            description = "Use this option if it feels more comfortable for you.",
+            title = "Smart Listening",
+            description = "Auto-download episodes added to your playlist.",
             action = {
                 MpodSwitch(
-                    checked = themeMode.isDark(isSystemInDarkTheme()),
-                    onCheckedChange = { useDarkTheme ->
-                        onThemeModeChange(if (useDarkTheme) ThemeMode.Dark else ThemeMode.Light)
-                    },
-                    contentDescription = "Use dark theme"
+                    checked = state.smartListeningEnabled,
+                    onCheckedChange = onSmartListeningToggle,
+                    contentDescription = "Smart Listening"
+                )
+            },
+            content = {
+                AnimatedVisibility(
+                    visible = state.smartListeningEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Wi-Fi only",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Download only on Wi-Fi to save mobile data.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        MpodSwitch(
+                            checked = state.wifiOnlyDownloads,
+                            onCheckedChange = onWifiOnlyToggle,
+                            contentDescription = "Wi-Fi only downloads"
+                        )
+                    }
+                }
+            }
+        )
+
+        // Card 4: Theme mode selector
+        SettingCard(
+            title = "Appearance",
+            description = "Choose theme: System follows device setting.",
+            content = {
+                ThemeModeSelector(
+                    currentMode = themeMode,
+                    onModeSelected = onThemeModeChange,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         )
 
-        // Card 4: Export OPML
+        // Card 5: Export OPML
         SettingCard(
             title = "Export OPML",
             description = "Download the current subscription list as an OPML file.",
@@ -518,6 +610,60 @@ private fun SettingCard(
             }
             if (content != null) {
                 content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeSelector(
+    currentMode: ThemeMode,
+    onModeSelected: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = listOf(
+        ThemeMode.System to "System",
+        ThemeMode.Light to "Light",
+        ThemeMode.Dark to "Dark"
+    )
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        for ((mode, label) in modes) {
+            val isSelected = currentMode == mode
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.background
+                    )
+                    .border(
+                        1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable(
+                        role = Role.Button,
+                        onClick = { onModeSelected(mode) }
+                    )
+                    .semantics {
+                        contentDescription = "$label theme"
+                        role = Role.Button
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 14.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }

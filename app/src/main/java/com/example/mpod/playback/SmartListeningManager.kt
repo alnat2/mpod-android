@@ -1,6 +1,8 @@
 package com.example.mpod.playback
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
@@ -39,6 +41,7 @@ class SmartListeningManager @Inject constructor(
         if (observationJob != null) return
         observationJob = scope.launch {
             playlistDao.getPlaylistItemsWithEpisodesFlow().collectLatest { items ->
+                val settings = appSettingsDataStore.settingsFlow.first()
                 val currentPlaylistEpisodeIds = items.map { it.episode.id }.toSet()
 
                 // Cancel pending downloads for episodes no longer in playlist
@@ -47,11 +50,32 @@ class SmartListeningManager @Inject constructor(
                     pendingDownloadJobs.remove(id)?.cancel()
                 }
 
+                if (!settings.smartListeningEnabled) {
+                    return@collectLatest
+                }
+
+                if (settings.wifiOnlyDownloads && !isWifiConnected()) {
+                    return@collectLatest
+                }
+
+                // Enforce per-podcast limit: count existing downloads per podcast
+                val downloadCounts = mutableMapOf<Long, Int>()
+                for (item in items) {
+                    val ep = item.episode
+                    if (ep.isDownloaded) {
+                        downloadCounts[ep.podcastId] = (downloadCounts[ep.podcastId] ?: 0) + 1
+                    }
+                }
+
                 // Schedule 15s debounce download for new playlist items not yet downloaded
                 for (item in items) {
                     val ep = item.episode
                     if (!ep.isDownloaded && ep.localFilePath.isNullOrBlank() && !pendingDownloadJobs.containsKey(ep.id)) {
-                        scheduleDebouncedDownload(ep.id, ep.audioUrl)
+                        val podcastDownloads = downloadCounts[ep.podcastId] ?: 0
+                        if (podcastDownloads < settings.maxDownloadsPerPodcast) {
+                            downloadCounts[ep.podcastId] = podcastDownloads + 1
+                            scheduleDebouncedDownload(ep.id, ep.audioUrl)
+                        }
                     }
                 }
             }
@@ -91,6 +115,7 @@ class SmartListeningManager @Inject constructor(
                 .takeIf { it.length in 2..4 && it.all { c -> c.isLetterOrDigit() } } ?: "mp3"
             val fileName = "ep_${episodeId}_${System.currentTimeMillis()}.$ext"
             val targetFile = File(podcastsDir, fileName)
+            val tempFile = File(podcastsDir, "${fileName}.tmp")
 
             val settings = appSettingsDataStore.settingsFlow.first()
             val client = proxyHttpClientFactory.createClient(settings)
@@ -102,18 +127,23 @@ class SmartListeningManager @Inject constructor(
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     android.util.Log.w("SmartListening", "Download HTTP failed with code ${response.code} for $audioUrl")
+                    tempFile.delete()
                     return@withContext false
                 }
-                val body = response.body ?: return@withContext false
+                val body = response.body ?: run {
+                    tempFile.delete()
+                    return@withContext false
+                }
 
                 body.byteStream().use { input ->
-                    FileOutputStream(targetFile).use { output ->
+                    FileOutputStream(tempFile).use { output ->
                         input.copyTo(output)
                     }
                 }
             }
 
-            if (targetFile.exists() && targetFile.length() > 0) {
+            if (tempFile.exists() && tempFile.length() > 0) {
+                tempFile.renameTo(targetFile)
                 episodeDao.updateDownloadState(
                     episodeId = episodeId,
                     isDownloaded = true,
@@ -122,7 +152,7 @@ class SmartListeningManager @Inject constructor(
                 android.util.Log.i("SmartListening", "Saved episode $episodeId to ${targetFile.absolutePath} (${targetFile.length()} bytes)")
                 true
             } else {
-                targetFile.delete()
+                tempFile.delete()
                 false
             }
         } catch (e: Exception) {
@@ -141,5 +171,12 @@ class SmartListeningManager @Inject constructor(
             }
             episodeDao.updateDownloadState(episodeId, isDownloaded = false, localFilePath = null)
         }
+    }
+
+    private fun isWifiConnected(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 }

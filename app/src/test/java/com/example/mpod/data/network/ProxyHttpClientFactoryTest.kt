@@ -36,4 +36,40 @@ class ProxyHttpClientFactoryTest {
         )
         assertNull(client.proxy)
     }
+
+    @Test
+    fun httpProxyClientConfiguresHttpProxy() {
+        val client = ProxyHttpClientFactory.createOkHttpClient(
+            proxyEnabled = true,
+            proxyHost = "127.0.0.1",
+            proxyPort = 8080,
+            proxyType = "HTTP"
+        )
+        assertNotNull(client.proxy)
+        assertEquals(Proxy.Type.HTTP, client.proxy?.type())
+    }
+
+    @Test
+    fun emptyHostReturnsDirectClient() {
+        val client = ProxyHttpClientFactory.createOkHttpClient(
+            proxyEnabled = true,
+            proxyHost = "",
+            proxyPort = 1080,
+            proxyType = "SOCKS5"
+        )
+        assertNull(client.proxy)
+    }
+
+    @Test
+    fun caseInsensitiveProxyType() {
+        val socks = ProxyHttpClientFactory.createOkHttpClient(
+            proxyEnabled = true, proxyHost = "127.0.0.1", proxyPort = 1080, proxyType = "socks5"
+        )
+        assertEquals(Proxy.Type.SOCKS, socks.proxy?.type())
+
+        val http = ProxyHttpClientFactory.createOkHttpClient(
+            proxyEnabled = true, proxyHost = "127.0.0.1", proxyPort = 8080, proxyType = "http"
+        )
+        assertEquals(Proxy.Type.HTTP, http.proxy?.type())
+    }
 }

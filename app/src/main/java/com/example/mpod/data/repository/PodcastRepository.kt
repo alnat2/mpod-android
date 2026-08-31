@@ -51,7 +51,9 @@ class PodcastRepository @Inject constructor(
             val normalizedUrl = normalizeFeedUrl(feedUrl)
             val existing = podcastDao.getPodcastByFeedUrl(normalizedUrl)
             if (existing != null) {
-                return@withContext Result.success(existing)
+                return@withContext Result.failure(
+                    IllegalArgumentException("This podcast is already in your library.")
+                )
             }
 
             val parsedFeed = fetchAndParseFeed(normalizedUrl)
@@ -187,7 +189,13 @@ class PodcastRepository @Inject constructor(
 
     suspend fun importOpml(inputStream: InputStream): Result<OpmlImportSummary> = withContext(Dispatchers.IO) {
         try {
-            val items = OpmlParser.parse(inputStream)
+            val bytes = inputStream.readBytes()
+            if (bytes.size > 5_000_000) {
+                return@withContext Result.failure(
+                    IllegalStateException("OPML file too large (max 5 MB).")
+                )
+            }
+            val items = OpmlParser.parse(bytes.inputStream())
             var imported = 0
             val errors = mutableListOf<String>()
             for (item in items) {

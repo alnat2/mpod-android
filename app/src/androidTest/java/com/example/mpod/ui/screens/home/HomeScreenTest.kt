@@ -107,10 +107,10 @@ class HomeScreenTest {
         }
 
         composeRule.onNodeWithContentDescription("Play").performClick()
-        composeRule.onNodeWithContentDescription("Rewind 15 seconds").performClick()
-        composeRule.onNodeWithContentDescription("Forward 30 seconds").performClick()
-        composeRule.onNodeWithText("-15").assertIsDisplayed()
-        composeRule.onNodeWithText("+30").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Rewind 10 seconds").performClick()
+        composeRule.onNodeWithContentDescription("Forward 15 seconds").performClick()
+        composeRule.onNodeWithText("-10").assertIsDisplayed()
+        composeRule.onNodeWithText("+15").assertIsDisplayed()
         composeRule.onNodeWithText("14:03").assertIsDisplayed()
         composeRule.onNodeWithText("1.5").performClick()
         composeRule.onNodeWithText("2.0x").performClick()
@@ -122,7 +122,7 @@ class HomeScreenTest {
         composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals(1, playCount)
-            assertEquals(15, seekTotal)
+            assertEquals(5, seekTotal)
             assertEquals(0.75f, absoluteSeek, 0.02f)
             assertEquals(1, absoluteSeekCount)
             assertEquals("2.0", speed)

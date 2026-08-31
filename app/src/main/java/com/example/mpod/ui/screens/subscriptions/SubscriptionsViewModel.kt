@@ -8,6 +8,7 @@ import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
+import com.example.mpod.playback.SmartListeningManager
 import com.example.mpod.ui.util.cleanFeedText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,8 @@ class SubscriptionsViewModel @Inject constructor(
     private val playlistDao: PlaylistDao,
     private val podcastRepository: PodcastRepository,
     private val playlistRepository: PlaylistRepository,
-    private val queueInvalidator: PlaybackQueueInvalidator
+    private val queueInvalidator: PlaybackQueueInvalidator,
+    private val smartListeningManager: SmartListeningManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
@@ -191,6 +193,7 @@ class SubscriptionsViewModel @Inject constructor(
             podcastRepository.markAllEpisodesListened(podcastId, true)
             for (ep in episodes) {
                 playlistRepository.removeFromPlaylist(ep.id)
+                smartListeningManager.cleanupEpisodeFile(ep.id)
             }
             queueInvalidator.invalidate()
         }
@@ -216,6 +219,7 @@ class SubscriptionsViewModel @Inject constructor(
             podcastRepository.setEpisodeListened(episodeId, isListened)
             if (isListened) {
                 playlistRepository.removeFromPlaylist(episodeId)
+                smartListeningManager.cleanupEpisodeFile(episodeId)
             }
             queueInvalidator.invalidate()
         }

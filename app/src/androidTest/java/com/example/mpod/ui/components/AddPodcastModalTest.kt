@@ -34,6 +34,7 @@ class AddPodcastModalTest {
         composeRule.onNodeWithTag("add_podcast_rss_url")
             .assertTextEquals("ftp://example.com/feed")
         composeRule.onNodeWithText("Add Feed").performClick()
+        composeRule.waitForIdle()
 
         composeRule.onNodeWithText("Enter a valid http or https RSS feed URL.").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(false, submitted) }

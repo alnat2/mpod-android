@@ -36,12 +36,28 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("Auto refresh").assertIsDisplayed()
         composeRule.onNodeWithText("Use SOCKS5 proxy").assertIsDisplayed()
         composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
-        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
-        composeRule.onNodeWithText("Export OPML").assertIsDisplayed()
+        composeRule.onNodeWithText("Appearance").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Export OPML").get(0).assertIsDisplayed()
     }
 
     @Test
-    fun darkThemeSwitchEnablesDarkMode() {
+    fun themeSelectorShowsAllThreeModes() {
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(),
+                    themeMode = ThemeMode.Light
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("System").assertIsDisplayed()
+        composeRule.onNodeWithText("Light").assertIsDisplayed()
+        composeRule.onNodeWithText("Dark").assertIsDisplayed()
+    }
+
+    @Test
+    fun darkThemeSelectorSetsDarkMode() {
         var selectedMode: ThemeMode? = null
         composeRule.setContent {
             MpodTheme {
@@ -53,15 +69,15 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Use dark theme").performClick()
+        composeRule.onNodeWithText("Dark").performClick()
         composeRule.runOnIdle { assertEquals(ThemeMode.Dark, selectedMode) }
     }
 
     @Test
-    fun darkThemeSwitchReturnsToLightMode() {
+    fun systemThemeSelectorSetsSystemMode() {
         var selectedMode: ThemeMode? = null
         composeRule.setContent {
-            MpodTheme(themeMode = ThemeMode.Dark) {
+            MpodTheme {
                 SettingsScreen(
                     state = SettingsUiState(),
                     themeMode = ThemeMode.Dark,
@@ -70,8 +86,8 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Use dark theme").performClick()
-        composeRule.runOnIdle { assertEquals(ThemeMode.Light, selectedMode) }
+        composeRule.onNodeWithText("System").performClick()
+        composeRule.runOnIdle { assertEquals(ThemeMode.System, selectedMode) }
     }
 
     @Test

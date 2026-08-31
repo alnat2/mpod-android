@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.playback.AutoRefreshScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appSettingsDataStore: AppSettingsDataStore,
-    private val podcastRepository: PodcastRepository
+    private val podcastRepository: PodcastRepository,
+    private val autoRefreshScheduler: AutoRefreshScheduler
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -44,8 +46,11 @@ class SettingsViewModel @Inject constructor(
                     } else {
                         "Last refresh never"
                     },
-                    appBuild = "mpoddy v${BuildConfig.VERSION_NAME}"
+                    appBuild = "mpoddy v${BuildConfig.VERSION_NAME}",
+                    smartListeningEnabled = prefs.smartListeningEnabled,
+                    wifiOnlyDownloads = prefs.wifiOnlyDownloads
                 )
+                autoRefreshScheduler.schedule(prefs)
             }
         }
     }
@@ -77,6 +82,18 @@ class SettingsViewModel @Inject constructor(
                 type = type
             )
             _state.value = _state.value.copy(proxyMessage = "Proxy settings saved.")
+        }
+    }
+
+    fun setSmartListeningEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsDataStore.setSmartListeningEnabled(enabled)
+        }
+    }
+
+    fun setWifiOnlyDownloads(wifiOnly: Boolean) {
+        viewModelScope.launch {
+            appSettingsDataStore.setWifiOnlyDownloads(wifiOnly)
         }
     }
 
@@ -118,7 +135,9 @@ data class SettingsUiState(
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,
     val errorMessage: String? = null,
-    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}"
+    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}",
+    val smartListeningEnabled: Boolean = true,
+    val wifiOnlyDownloads: Boolean = false
 )
 
 internal fun formatSchedulerTimestamp(
