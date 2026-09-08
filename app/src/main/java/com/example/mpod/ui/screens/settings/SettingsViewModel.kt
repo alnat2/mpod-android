@@ -5,7 +5,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.BuildConfig
+import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.AutoRefreshScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -24,7 +27,8 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appSettingsDataStore: AppSettingsDataStore,
     private val podcastRepository: PodcastRepository,
-    private val autoRefreshScheduler: AutoRefreshScheduler
+    private val autoRefreshScheduler: AutoRefreshScheduler,
+    private val proxyHttpClientFactory: ProxyHttpClientFactory
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -46,9 +50,7 @@ class SettingsViewModel @Inject constructor(
                     } else {
                         "Last refresh never"
                     },
-                    appBuild = "mpoddy v${BuildConfig.VERSION_NAME}",
-                    smartListeningEnabled = prefs.smartListeningEnabled,
-                    wifiOnlyDownloads = prefs.wifiOnlyDownloads
+                    appBuild = "mpoddy v${BuildConfig.VERSION_NAME}"
                 )
                 autoRefreshScheduler.schedule(prefs)
             }
@@ -70,30 +72,27 @@ class SettingsViewModel @Inject constructor(
     fun setProxyEnabled(enabled: Boolean) {
         viewModelScope.launch {
             appSettingsDataStore.setProxyEnabled(enabled)
+            val current = appSettingsDataStore.settingsFlow.first()
+            proxyHttpClientFactory.updateProxy(current)
         }
     }
 
     fun saveProxySettings(host: String, port: Int, type: String = "SOCKS5") {
         viewModelScope.launch {
+            val updated = AppSettings(
+                isProxyEnabled = true,
+                proxyHost = host.trim(),
+                proxyPort = port,
+                proxyType = type
+            )
             appSettingsDataStore.setProxySettings(
                 enabled = true,
                 host = host.trim(),
                 port = port,
                 type = type
             )
+            proxyHttpClientFactory.updateProxy(updated)
             _state.value = _state.value.copy(proxyMessage = "Proxy settings saved.")
-        }
-    }
-
-    fun setSmartListeningEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            appSettingsDataStore.setSmartListeningEnabled(enabled)
-        }
-    }
-
-    fun setWifiOnlyDownloads(wifiOnly: Boolean) {
-        viewModelScope.launch {
-            appSettingsDataStore.setWifiOnlyDownloads(wifiOnly)
         }
     }
 
@@ -135,9 +134,7 @@ data class SettingsUiState(
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,
     val errorMessage: String? = null,
-    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}",
-    val smartListeningEnabled: Boolean = true,
-    val wifiOnlyDownloads: Boolean = false
+    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}"
 )
 
 internal fun formatSchedulerTimestamp(
@@ -176,4 +173,3 @@ internal fun formatSettingsLastRefreshText(
         "Last refresh $rawTimestamp"
     }
 }
-

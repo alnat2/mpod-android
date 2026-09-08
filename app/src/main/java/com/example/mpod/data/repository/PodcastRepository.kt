@@ -189,8 +189,8 @@ class PodcastRepository @Inject constructor(
 
     suspend fun importOpml(inputStream: InputStream): Result<OpmlImportSummary> = withContext(Dispatchers.IO) {
         try {
-            val bytes = inputStream.readBytes()
-            if (bytes.size > 5_000_000) {
+            val bytes = readLimited(inputStream, MAX_OPML_SIZE_BYTES + 1)
+            if (bytes.size > MAX_OPML_SIZE_BYTES) {
                 return@withContext Result.failure(
                     IllegalStateException("OPML file too large (max 5 MB).")
                 )
@@ -223,8 +223,7 @@ class PodcastRepository @Inject constructor(
     }
 
     private suspend fun fetchAndParseFeed(url: String): ParsedPodcastFeed {
-        val settings = appSettingsDataStore.settingsFlow.first()
-        val client = proxyHttpClientFactory.createClient(settings)
+        val client = proxyHttpClientFactory.createClient()
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", "mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
@@ -259,6 +258,22 @@ class PodcastRepository @Inject constructor(
             "$scheme://$host${if (port != -1) ":$port" else ""}$path$query"
         } catch (_: Exception) {
             trimmed
+        }
+    }
+
+    companion object {
+        const val MAX_OPML_SIZE_BYTES = 5_000_000
+
+        internal fun readLimited(inputStream: InputStream, maxBytes: Int): ByteArray {
+            val buffer = ByteArray(maxBytes)
+            var totalRead = 0
+            while (totalRead < maxBytes) {
+                val remaining = maxBytes - totalRead
+                val bytesRead = inputStream.read(buffer, totalRead, remaining)
+                if (bytesRead == -1) break
+                totalRead += bytesRead
+            }
+            return if (totalRead == buffer.size) buffer else buffer.copyOf(totalRead)
         }
     }
 }

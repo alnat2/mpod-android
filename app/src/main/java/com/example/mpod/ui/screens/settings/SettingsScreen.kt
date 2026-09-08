@@ -11,7 +11,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,7 +59,6 @@ import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.theme.ThemeMode
-import com.example.mpod.ui.theme.isDark
 
 @Composable
 fun SettingsRoute(
@@ -83,8 +81,6 @@ fun SettingsRoute(
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyToggle = viewModel::setProxyEnabled,
         onSaveProxySettings = viewModel::saveProxySettings,
-        onSmartListeningToggle = viewModel::setSmartListeningEnabled,
-        onWifiOnlyToggle = viewModel::setWifiOnlyDownloads,
         onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
@@ -99,8 +95,6 @@ fun SettingsScreen(
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyToggle: (Boolean) -> Unit = {},
     onSaveProxySettings: (String, Int, String) -> Unit = { _, _, _ -> },
-    onSmartListeningToggle: (Boolean) -> Unit = {},
-    onWifiOnlyToggle: (Boolean) -> Unit = {},
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
@@ -342,51 +336,7 @@ fun SettingsScreen(
             }
         )
 
-        // Card 3: Smart Listening
-        SettingCard(
-            title = "Smart Listening",
-            description = "Auto-download episodes added to your playlist.",
-            action = {
-                MpodSwitch(
-                    checked = state.smartListeningEnabled,
-                    onCheckedChange = onSmartListeningToggle,
-                    contentDescription = "Smart Listening"
-                )
-            },
-            content = {
-                AnimatedVisibility(
-                    visible = state.smartListeningEnabled,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Wi-Fi only",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Download only on Wi-Fi to save mobile data.",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        MpodSwitch(
-                            checked = state.wifiOnlyDownloads,
-                            onCheckedChange = onWifiOnlyToggle,
-                            contentDescription = "Wi-Fi only downloads"
-                        )
-                    }
-                }
-            }
-        )
-
-        // Card 4: Theme mode selector
+        // Card 3: Theme mode selector
         SettingCard(
             title = "Appearance",
             description = "Choose theme: System follows device setting.",
@@ -399,7 +349,7 @@ fun SettingsScreen(
             }
         )
 
-        // Card 5: Export OPML
+        // Card 4: Export OPML
         SettingCard(
             title = "Export OPML",
             description = "Download the current subscription list as an OPML file.",

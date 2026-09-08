@@ -1,9 +1,12 @@
 package com.example.mpod.data.network
 
 import com.example.mpod.data.local.preferences.AppSettings
+import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,32 +14,38 @@ import javax.inject.Singleton
 @Singleton
 class ProxyHttpClientFactory @Inject constructor() {
 
-    @Volatile
-    private var directClient: OkHttpClient? = null
-    @Volatile
-    private var cachedProxyKey: String? = null
-    @Volatile
-    private var cachedProxyClient: OkHttpClient? = null
+    private val dynamicProxySelector = DynamicProxySelector()
+
+    private val dynamicClient: OkHttpClient = OkHttpClient.Builder()
+        .proxySelector(dynamicProxySelector)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
+
+    fun configure(dataStore: AppSettingsDataStore, scope: CoroutineScope) {
+        scope.launch {
+            dataStore.settingsFlow
+                .map { Triple(it.isProxyEnabled, it.proxyHost, it.proxyPort to it.proxyType) to it }
+                .distinctUntilChanged { old, new -> old.first == new.first }
+                .collect { (_, settings) ->
+                    dynamicProxySelector.updateProxy(settings)
+                }
+        }
+    }
+
+    fun updateProxy(settings: AppSettings) {
+        dynamicProxySelector.updateProxy(settings)
+    }
+
+    fun getProxySelector(): DynamicProxySelector = dynamicProxySelector
 
     fun createClient(settings: AppSettings? = null): OkHttpClient {
-        val proxyEnabled = settings?.isProxyEnabled == true
-        val host = settings?.proxyHost.orEmpty()
-        val port = settings?.proxyPort ?: 1080
-        val type = settings?.proxyType ?: "SOCKS5"
-        if (!proxyEnabled || host.isBlank()) {
-            return directClient ?: createOkHttpClient(proxyEnabled = false).also { directClient = it }
+        if (settings != null) {
+            dynamicProxySelector.updateProxy(settings)
         }
-        val key = "$host:$port:$type"
-        cachedProxyClient?.let { if (cachedProxyKey == key) return it }
-        val client = createOkHttpClient(
-            proxyEnabled = true,
-            proxyHost = host,
-            proxyPort = port,
-            proxyType = type
-        )
-        cachedProxyKey = key
-        cachedProxyClient = client
-        return client
+        return dynamicClient
     }
 
     companion object {
@@ -56,14 +65,16 @@ class ProxyHttpClientFactory @Inject constructor() {
                 .followRedirects(true)
                 .followSslRedirects(true)
 
-            if (proxyEnabled && proxyHost.isNotBlank()) {
-                val type = if (proxyType.equals("HTTP", ignoreCase = true)) {
-                    Proxy.Type.HTTP
-                } else {
-                    Proxy.Type.SOCKS
-                }
-                val address = InetSocketAddress(proxyHost.trim(), proxyPort)
-                builder.proxy(Proxy(type, address))
+            if (proxyEnabled) {
+                val proxy = DynamicProxySelector.resolveProxy(
+                    AppSettings(
+                        isProxyEnabled = true,
+                        proxyHost = proxyHost,
+                        proxyPort = proxyPort,
+                        proxyType = proxyType
+                    )
+                )
+                builder.proxy(proxy)
             }
 
             return builder.build()

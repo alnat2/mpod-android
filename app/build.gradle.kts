@@ -78,6 +78,11 @@ android {
         buildConfig = true
         compose = true
     }
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

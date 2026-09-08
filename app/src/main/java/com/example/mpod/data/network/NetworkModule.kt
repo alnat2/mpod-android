@@ -1,12 +1,9 @@
 package com.example.mpod.data.network
 
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
@@ -17,10 +14,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        factory: ProxyHttpClientFactory,
-        appSettingsDataStore: AppSettingsDataStore
+        factory: ProxyHttpClientFactory
     ): OkHttpClient {
-        val settings = runBlocking { appSettingsDataStore.settingsFlow.first() }
-        return factory.createClient(settings)
+        return factory.createClient()
     }
 }

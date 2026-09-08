@@ -1,12 +1,12 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-08-28 (Standalone `mpoddy` baseline made authoritative; retired backend-client requirements archived)
+Last updated: 2026-09-06 (product-focused defect pool refreshed after physical-phone review and targeted code analysis)
 
 Current Android source baseline: `1.0.17 (18)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
 
 ## Purpose
 
-This is the living delivery document for the native Android application. It is the only Android-specific source of truth for scope, decisions, implementation status, verification, acceptance, defects, and release readiness.
+This is the living delivery document for the native Android application and the source of truth for product scope, decisions, verification policy, acceptance, and release readiness. The authoritative ordered queue of current open work, its active stage, and next executor live in [`docs/mpoddy-current-tasks.md`](mpoddy-current-tasks.md).
 
 The complete functional scenario inventory and its verification status live in
 [`docs/android-user-scenarios.md`](android-user-scenarios.md). This delivery plan defines sequencing and policy; the scenario map defines the complete user paths and expected results. A stage or feature status must not contradict a failed or open scenario row.
@@ -34,10 +34,10 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | UI language | English |
 | Release package | One release APK with package `com.prod.mpod`; debug package `com.prod.mpod.test` |
 | Local Database | Room database (`MpodDatabase`) storing `podcasts`, `episodes`, and `playlist_items` |
-| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, Smart Listening, and Proxy settings |
+| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, playback speed, Auto refresh, and Proxy settings |
 | Feed & OPML Engines | Direct RSS 2.0 / Atom parser (`RssFeedParser`) and OPML import/export (`OpmlParser`) |
 | Network & Proxy | OkHttp with HTTP/HTTPS cleartext support (e.g. for Radio-T) and configurable Direct/HTTP/SOCKS5 proxy (`ProxyHttpClientFactory`) |
-| Smart Listening | `SmartListeningManager` for automated background downloading of latest unlistened episodes with auto-cleanup |
+| Smart Listening | Fully automatic background downloading and cleanup through `SmartListeningManager`; no user-facing toggle, limit, network, or cleanup settings |
 | Default start route | Subscriptions |
 | Primary navigation | Player (Home/Now playing), Subscriptions, Settings, Add podcast modal |
 | Theme | Follow system by default; Settings exposes Light/Dark/System switch backed by DataStore |
@@ -86,8 +86,8 @@ The backend-client product was retired when the application became the standalon
 | OPML | Android imports and exports OPML locally through the system document provider | Size/read/write failures, partial import, duplicates, and lifecycle recovery |
 | Subscriptions | Room Flow drives the library; refresh fetches feeds directly | Partial refresh failure, offline retention, large libraries, and artwork fallback |
 | Playlist and player | Room owns queue order and active state; Media3 owns playback | Atomic reorder, lifecycle restoration, audio focus, noisy route, and error recovery |
-| Smart Listening | Android downloads recent unlistened episodes under DataStore policy | Wi-Fi constraint, per-podcast limit, local playback, cleanup, and storage failures |
-| Preferences | DataStore stores theme, playback speed, Smart Listening, and proxy configuration | Immediate application, persistence, validation, and migration |
+| Smart Listening | Android automatically downloads eligible playlist episodes and owns their cleanup | Local playback, cleanup, interruption, and storage failures; no user configuration |
+| Preferences | DataStore stores theme, playback speed, Auto refresh, and proxy configuration | Immediate application, persistence, validation, and migration |
 | Networking | OkHttp uses Direct, HTTP, or SOCKS5 mode for feeds, artwork, and media | HTTP/HTTPS feeds, proxy validation, timeouts, and recoverable network errors |
 | UI | Compose/Material 3 using the approved Figma components and Hugeicons | Core usability first; visual and accessibility polish remain risk-based |
 
@@ -113,6 +113,10 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - Current build: `1.0.17 (18)`.
 
 ### Current active backlog
+
+The authoritative prioritized backlog is [`docs/mpoddy-current-tasks.md`](mpoddy-current-tasks.md). Keep task order, active executor, acceptance criteria, and rejected findings there instead of duplicating them in this delivery history.
+
+Standing release-wide work that remains after the ordered task pool:
 
 - Produce a fresh standalone release baseline; the historical backend-client acceptance APK and checksum are not valid evidence for `mpoddy`.
 - Re-run the complete standalone regression gate and record exact unit/connected counts for the current revision.
@@ -417,8 +421,8 @@ Completed work (commit `8a25520` and `5f72581`):
 - **Local Room Database**: Replaced REST client (`MpodApi`) and remote synchronization with Room database (`MpodDatabase`, `PodcastDao`, `EpisodeDao`, `PlaylistDao`). Room entities: `PodcastEntity`, `EpisodeEntity`, `PlaylistItemEntity`.
 - **Feed & OPML Engines**: Implemented local `RssFeedParser` (XML-based podcast feed parser with enclosure extraction, artwork resolution, and date parsing) and `OpmlParser` (import/export OPML directly).
 - **Network Proxy & Feeds**: Implemented `ProxyHttpClientFactory` supporting direct, HTTP, and SOCKS5 proxies for podcast feed fetching and media streaming. Enabled cleartext traffic for HTTP podcast feeds (e.g. Radio-T).
-- **Smart Listening**: Implemented `SmartListeningManager` for automated background downloading of latest unlistened episodes with configurable limits (1–10 episodes per subscription) and automatic cleanup upon completion or marking listened.
-- **DataStore Migration**: Implemented `AppSettingsDataStore` for app theme mode (System/Light/Dark), Smart Listening configuration, and Proxy settings.
+- **Smart Listening**: Implemented `SmartListeningManager` for fully automatic background downloading of eligible playlist episodes and automatic cleanup upon completion or marking listened. Product-owner decision: the feature has no user-facing settings.
+- **DataStore Migration**: Implemented `AppSettingsDataStore` for app theme mode (System/Light/Dark), playback speed, Auto refresh, and Proxy settings.
 - **UI & Navigation Modernization**: Removed all authentication screens (Login, Setup, BackendUnavailable). Main navigation streamlined to Player, Subscriptions, Settings, and Add podcast modal. Renamed application branding to `mpoddy` with updated Figma icon.
 
 ### Stage 8 — Post-Migration Hardening & Bugfixes
@@ -450,7 +454,7 @@ Completed work (commits `f54cd4e` through `31521d6`):
 
 ## Product-owner input
 
-There are no known unanswered product questions blocking the standalone functional audit. Current decisions for OPML results, inline episode actions, playback completion, Smart Listening, proxy configuration, and local cleanup are recorded in `docs/android-user-scenarios.md`.
+There are no known unanswered product questions blocking the standalone functional audit. Current decisions for OPML results, inline episode actions, playback completion, automatic Smart Listening, proxy configuration, and local cleanup are recorded in `docs/android-user-scenarios.md`.
 
 ## Stage report template
 

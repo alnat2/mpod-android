@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -29,16 +30,25 @@ data class AppSettings(
     val themeMode: String = "System",
     val activeEpisodeId: Long? = null,
     val playbackSpeed: Float = 1.0f,
-    val lastRefreshTimeFormatted: String = "",
-    val smartListeningEnabled: Boolean = true,
-    val maxDownloadsPerPodcast: Int = 3,
-    val wifiOnlyDownloads: Boolean = false
+    val lastRefreshTimeFormatted: String = ""
 )
 
 @Singleton
-class AppSettingsDataStore @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
+open class AppSettingsDataStore {
+    private val context: Context?
+
+    @Inject
+    constructor(@ApplicationContext context: Context) {
+        this.context = context
+    }
+
+    /**
+     * Testing constructor allowing unit tests without Android Context.
+     */
+    constructor() {
+        this.context = null
+    }
+
     private object Keys {
         val AUTO_REFRESH_ENABLED = booleanPreferencesKey("auto_refresh_enabled")
         val DAILY_REFRESH_TIME = stringPreferencesKey("daily_refresh_time")
@@ -50,43 +60,40 @@ class AppSettingsDataStore @Inject constructor(
         val ACTIVE_EPISODE_ID = longPreferencesKey("active_episode_id")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
-        val SMART_LISTENING_ENABLED = booleanPreferencesKey("smart_listening_enabled")
-        val MAX_DOWNLOADS_PER_PODCAST = intPreferencesKey("max_downloads_per_podcast")
-        val WIFI_ONLY_DOWNLOADS = booleanPreferencesKey("wifi_only_downloads")
     }
 
-    val settingsFlow: Flow<AppSettings> = context.dataStore.data.map { prefs ->
-        AppSettings(
-            isAutoRefreshEnabled = prefs[Keys.AUTO_REFRESH_ENABLED] ?: false,
-            dailyRefreshTime = prefs[Keys.DAILY_REFRESH_TIME] ?: "03:00",
-            isProxyEnabled = prefs[Keys.PROXY_ENABLED] ?: false,
-            proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
-            proxyHost = prefs[Keys.PROXY_HOST] ?: "",
-            proxyPort = prefs[Keys.PROXY_PORT] ?: 1080,
-            themeMode = prefs[Keys.THEME_MODE] ?: "System",
-            activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
-            playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
-            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: "",
-            smartListeningEnabled = prefs[Keys.SMART_LISTENING_ENABLED] ?: true,
-            maxDownloadsPerPodcast = prefs[Keys.MAX_DOWNLOADS_PER_PODCAST] ?: 3,
-            wifiOnlyDownloads = prefs[Keys.WIFI_ONLY_DOWNLOADS] ?: false
-        )
+    open val settingsFlow: Flow<AppSettings> by lazy {
+        val ctx = context ?: return@lazy emptyFlow()
+        ctx.dataStore.data.map { prefs ->
+            AppSettings(
+                isAutoRefreshEnabled = prefs[Keys.AUTO_REFRESH_ENABLED] ?: false,
+                dailyRefreshTime = prefs[Keys.DAILY_REFRESH_TIME] ?: "03:00",
+                isProxyEnabled = prefs[Keys.PROXY_ENABLED] ?: false,
+                proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
+                proxyHost = prefs[Keys.PROXY_HOST] ?: "",
+                proxyPort = prefs[Keys.PROXY_PORT] ?: 1080,
+                themeMode = prefs[Keys.THEME_MODE] ?: "System",
+                activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
+                playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
+                lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
+            )
+        }
     }
 
-    suspend fun setAutoRefreshEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.AUTO_REFRESH_ENABLED] = enabled }
+    open suspend fun setAutoRefreshEnabled(enabled: Boolean) {
+        context?.dataStore?.edit { it[Keys.AUTO_REFRESH_ENABLED] = enabled }
     }
 
-    suspend fun setDailyRefreshTime(time: String) {
-        context.dataStore.edit { it[Keys.DAILY_REFRESH_TIME] = time }
+    open suspend fun setDailyRefreshTime(time: String) {
+        context?.dataStore?.edit { it[Keys.DAILY_REFRESH_TIME] = time }
     }
 
-    suspend fun setProxyEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.PROXY_ENABLED] = enabled }
+    open suspend fun setProxyEnabled(enabled: Boolean) {
+        context?.dataStore?.edit { it[Keys.PROXY_ENABLED] = enabled }
     }
 
-    suspend fun setProxySettings(enabled: Boolean, host: String, port: Int, type: String = "SOCKS5") {
-        context.dataStore.edit {
+    open suspend fun setProxySettings(enabled: Boolean, host: String, port: Int, type: String = "SOCKS5") {
+        context?.dataStore?.edit {
             it[Keys.PROXY_ENABLED] = enabled
             it[Keys.PROXY_HOST] = host
             it[Keys.PROXY_PORT] = port
@@ -94,12 +101,12 @@ class AppSettingsDataStore @Inject constructor(
         }
     }
 
-    suspend fun setThemeMode(theme: String) {
-        context.dataStore.edit { it[Keys.THEME_MODE] = theme }
+    open suspend fun setThemeMode(theme: String) {
+        context?.dataStore?.edit { it[Keys.THEME_MODE] = theme }
     }
 
-    suspend fun setActiveEpisodeId(episodeId: Long?) {
-        context.dataStore.edit {
+    open suspend fun setActiveEpisodeId(episodeId: Long?) {
+        context?.dataStore?.edit {
             if (episodeId == null) {
                 it.remove(Keys.ACTIVE_EPISODE_ID)
             } else {
@@ -108,27 +115,16 @@ class AppSettingsDataStore @Inject constructor(
         }
     }
 
-    suspend fun getActiveEpisodeId(): Long? {
-        return context.dataStore.data.first()[Keys.ACTIVE_EPISODE_ID]
+    open suspend fun getActiveEpisodeId(): Long? {
+        val ctx = context ?: return null
+        return ctx.dataStore.data.first()[Keys.ACTIVE_EPISODE_ID]
     }
 
-    suspend fun setPlaybackSpeed(speed: Float) {
-        context.dataStore.edit { it[Keys.PLAYBACK_SPEED] = speed }
+    open suspend fun setPlaybackSpeed(speed: Float) {
+        context?.dataStore?.edit { it[Keys.PLAYBACK_SPEED] = speed }
     }
 
-    suspend fun setLastRefreshTime(formatted: String) {
-        context.dataStore.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
-    }
-
-    suspend fun setSmartListeningEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.SMART_LISTENING_ENABLED] = enabled }
-    }
-
-    suspend fun setMaxDownloadsPerPodcast(max: Int) {
-        context.dataStore.edit { it[Keys.MAX_DOWNLOADS_PER_PODCAST] = max.coerceIn(1, 10) }
-    }
-
-    suspend fun setWifiOnlyDownloads(wifiOnly: Boolean) {
-        context.dataStore.edit { it[Keys.WIFI_ONLY_DOWNLOADS] = wifiOnly }
+    open suspend fun setLastRefreshTime(formatted: String) {
+        context?.dataStore?.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
     }
 }

@@ -1,6 +1,6 @@
 # mpod Android — functional user scenarios
 
-Last updated: 2026-08-28 (Standalone `mpoddy` scenarios made authoritative; retired backend evidence separated)
+Last updated: 2026-08-31 (Smart Listening confirmed as fully automatic with no user settings)
 
 ## Purpose
 
@@ -51,7 +51,7 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | APP-01 | Cold launch with existing subscriptions | Room DB loads stored podcasts/episodes into memory on IO dispatcher; UI renders Subscriptions without an authentication step | C,U,E | Verified |
 | APP-02 | Cold launch with empty database | App starts directly on Subscriptions showing the empty library state with Add RSS and Import OPML actions | C,U,E | Verified |
 | APP-03 | Process recreation / rotation on startup | Database state and selected tab are restored without duplicated initialization or database locks | U,L | Verified |
-| APP-04 | Relaunch after cleared app data | App starts cleanly with empty Room DB and default DataStore preferences (System theme, Direct proxy, default Smart Listening) | C,E,L,R | Verified |
+| APP-04 | Relaunch after cleared app data | App starts cleanly with empty Room DB and default DataStore preferences (System theme and Direct proxy); automatic Smart Listening requires no preference initialization | C,E,L,R | Verified |
 | APP-05–APP-11 | Remote backend auth/login/logout/session | Retired with migration to standalone offline-capable player architecture (commit `8a25520`) | — | Retired |
 
 ## P1 — navigation and application shell
@@ -89,14 +89,14 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SUB-02 | Subscriptions load / DB query error | Error banner visible and Try again retries loading from Room DB | U,E | Verified |
 | SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct modal mode | U,E | Verified |
 | SUB-04 | All subscribed episodes are listened in Unlistened mode | Caught-up state is distinct from an empty library and can switch to Show all | C,U,E | Verified |
-| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, and episode list change together; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Verified |
+| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, episode list, and podcast-scoped actions change together and always target the same podcast ID; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Implemented — P1 synchronization defect confirmed on physical phone; see `MPOD-BUG-01` |
 | SUB-06 | Toggle Show all / Show unlistened | Icon and visible podcasts/episodes match the selected filter | C,U,E | Verified |
 | SUB-07 | Podcast artwork loads successfully | Real artwork is loaded and cached via Coil/OkHttp | U,E | Verified |
 | SUB-08 | Artwork is missing, invalid, or fails to load | Approved Figma fallback artwork drawable is rendered | U,E | Verified |
 | SUB-09 | Refresh one podcast successfully | RSS feed is fetched directly; updated episodes and metadata persist to Room DB | C,U,E | Verified |
 | SUB-10 | Refresh one podcast fails | Feed error is displayed on that podcast card; Retry repeats the refresh | C,U,E | Verified |
 | SUB-11 | Refresh all podcasts successfully | Feeds are fetched in parallel; updated episodes persist to Room DB; progress indicator reflects completion | C,U,E | Verified |
-| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library | C,U,E | Verified |
+| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library or recording a normal successful `Last refresh` result | C,U,E | Implemented — truthful refresh timestamp requires fix and re-verification; see `MPOD-BUG-02` |
 | SUB-13 | Network drops during feed refresh | Network failure is caught gracefully; previous Room DB state remains intact | C,E,L | Verified |
 | SUB-14 | Episode list for one podcast fails parsing while others load | Failure stays scoped to that podcast; other podcasts remain usable | U,E | Verified |
 | SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Unsubscribe job is cancelled and podcast remains in Room DB and UI | C,U,E,L | Verified |
@@ -116,7 +116,7 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | EPS-06 | Mark an episode listened | Room DB marks it listened, removes it from playlist, triggers Smart Listening audio file cleanup, UI reconciles | C,U,E | Verified |
 | EPS-07 | Mark a listened episode unlistened | Room DB changes episode to unlistened; not silently re-added to playlist; deleted media is not restored | C,U,E | Verified |
 | EPS-08 | Mark listened/unlistened database error | Target state rolls back and Room DB state remains consistent | C,U,E | Verified |
-| EPS-09 | Mark all listened for selected podcast | Single atomic Room DB transaction marks all episodes of that podcast listened and cleans playlist | C,U,E | Verified |
+| EPS-09 | Mark all listened for selected podcast | One consistent episode set is marked listened, removed from the playlist/queue, and scheduled for observable local-file cleanup without stale downloaded state during a concurrent feed refresh | C,U,E | Implemented — concurrency consistency requires regression and re-verification; see `MPOD-BUG-03` |
 | EPS-10 | Repeat Mark all listened | Repeat succeeds idempotently with zero mutations | C,U,E | Verified |
 | EPS-11 | Open Show notes with episode description | Notes render sanitized HTML/text in a scrollable modal | C,U,E | Verified |
 | EPS-12 | Open Show notes when notes are absent | Truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Verified |
@@ -166,11 +166,11 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| DLD-01 | Smart Listening auto-download unlistened episodes | Downloads latest unlistened episodes up to configured limit per podcast | C,U,E | Verified |
-| DLD-02 | Smart Listening Wi-Fi constraint | Downloads occur only on unmetered/Wi-Fi connection when Wi-Fi only setting is enabled | C,U,E | Verified |
+| DLD-01 | Smart Listening observes an eligible episode added to the playlist | The background subsystem automatically schedules its download without user configuration | C,U,E | Verified |
+| DLD-02 | Open Settings before or during automatic downloading | Settings exposes no Smart Listening toggle, episode limit, Wi-Fi-only option, or other user control; downloading remains automatic | U,E | Specified |
 | DLD-03 | Smart Listening download failure | Transient failure is caught without corrupting database or blocking other downloads | C,U,E | Verified |
 | DLD-04 | Play an episode with local download | Playback uses downloaded local audio file directly | E,D | Verified |
-| DLD-05 | Mark a downloaded episode listened | Downloaded audio file is deleted if auto-delete setting is enabled | C,E | Verified |
+| DLD-05 | Mark a downloaded episode listened | Downloaded audio file is deleted automatically according to the internal lifecycle policy | C,E | Verified |
 | DLD-06 | Unsubscribe podcast with downloaded episodes | Downloaded audio files for that podcast are cleaned up from storage | C,E | Verified |
 | DLD-07 | Audio file extension derivation | Downloaded file extension is derived from feed enclosure URL (e.g. .mp3, .m4a) | C,E | Verified |
 
@@ -178,10 +178,10 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 
 | ID | User scenario | Expected result | Evidence | Status |
 |---|---|---|---|---|
-| SET-01 | Open Settings | Theme, Smart Listening toggles, Proxy configuration, OPML Import/Export, and Build Info are rendered | U,E | Verified |
+| SET-01 | Open Settings | Theme, Auto refresh, Proxy configuration, OPML Export, and Build Info are rendered; Smart Listening controls are absent | U,E | Specified |
 | SET-02 | First install follows system theme | App respects Android system night mode by default | C,U,E,D | Verified |
 | SET-03 | Toggle Theme (System / Light / Dark) | Theme updates immediately across all screens and persists to DataStore | C,U,E,D | Verified |
-| SET-04 | Configure Smart Listening settings | Enable/disable toggle, max episodes per podcast (1–10), and Wi-Fi only persist to DataStore | C,U,E | Verified |
+| SET-04 | Look for Smart Listening configuration | No enable/disable, per-podcast limit, Wi-Fi-only, or cleanup setting exists because the feature is fully automatic | C,U,E | Specified |
 | SET-05 | Configure Proxy (Direct / HTTP / SOCKS5) | Proxy type, host, and port persist to DataStore and configure OkHttp client factory | C,U,E | Verified |
 | SET-06 | Proxy validation | Invalid host or port inputs are validated locally before saving | C,U,E | Verified |
 | SET-07 | Export OPML to file | Opens Android document picker and writes valid OPML XML with all subscriptions | C,U,E | Verified |
@@ -210,7 +210,7 @@ The following decisions define the standalone `mpoddy` product:
 2. Room is authoritative for podcasts, episodes, playlist order, active episode, listened state, and saved position. Multi-table mutations that must stay consistent use Room transactions.
 3. Android fetches and parses RSS 2.0/Atom directly. A refresh failure never erases the previously stored local library.
 4. OPML import/export is local. Partial import is shown inside the existing modal as `Import completed` with exact imported/skipped counts and `Done`; files over 5,000,000 bytes are rejected before parsing.
-5. Smart Listening owns automatic downloads. Its enabled state, per-podcast limit from 1–10, Wi-Fi-only constraint, and cleanup policy are stored in DataStore. There is no manual Download action on subscription episode cards.
+5. Smart Listening is a fully automatic background function. The user cannot enable or disable it, set an episode limit, select Wi-Fi-only behavior, or configure cleanup. There is no manual Download action on subscription episode cards.
 6. Direct, HTTP, and SOCKS5 proxy modes apply to feed fetching, artwork, and media streaming. Invalid proxy host/port values are rejected locally.
 7. The first bottom-navigation destination is `Player`; it opens the single Player/Now playing screen. The default launch destination is Subscriptions.
 8. Episode actions are inline on Player and Subscriptions cards. Bottom sheets remain for playback speed; Add podcast remains a modal overlay/card flow.

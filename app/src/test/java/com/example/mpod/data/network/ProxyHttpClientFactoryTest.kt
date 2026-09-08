@@ -3,6 +3,8 @@ package com.example.mpod.data.network
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import java.net.Proxy
 
@@ -50,14 +52,18 @@ class ProxyHttpClientFactoryTest {
     }
 
     @Test
-    fun emptyHostReturnsDirectClient() {
-        val client = ProxyHttpClientFactory.createOkHttpClient(
-            proxyEnabled = true,
-            proxyHost = "",
-            proxyPort = 1080,
-            proxyType = "SOCKS5"
-        )
-        assertNull(client.proxy)
+    fun emptyHostWithProxyEnabled_throwsIllegalArgumentException() {
+        try {
+            ProxyHttpClientFactory.createOkHttpClient(
+                proxyEnabled = true,
+                proxyHost = "",
+                proxyPort = 1080,
+                proxyType = "SOCKS5"
+            )
+            fail("Expected IllegalArgumentException when proxyEnabled is true with empty host")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message?.contains("Proxy host cannot be blank") == true)
+        }
     }
 
     @Test

@@ -68,8 +68,7 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(PlayPauseOnlyMediaNotificationProvider(this))
 
-        val settings = runBlocking { appSettingsDataStore.settingsFlow.first() }
-        val okHttpClient = proxyHttpClientFactory.createClient(settings)
+        val okHttpClient = proxyHttpClientFactory.createClient()
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
         val defaultDataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)

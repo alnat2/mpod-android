@@ -10,7 +10,7 @@
 
 ## What was done
 
-Full QA sweep of the mpoddy Android podcast player. Found 6 confirmed bugs + 3 improvements, implemented all fixes, wrote regression tests, all green.
+QA sweep of the mpoddy Android podcast player. The delivery remains under Team Lead review. A product-owner clarification made after the initial implementation removes all user-facing Smart Listening settings.
 
 ### Quality Gates
 
@@ -25,9 +25,9 @@ Full QA sweep of the mpoddy Android podcast player. Found 6 confirmed bugs + 3 i
 
 ## Bugs Fixed
 
-### BUG-01 (P1) — SmartListening downloads everything unconditionally
-**Problem:** Every playlisted episode triggered download with no settings, no WiFi check, no per-podcast limit.
-**Fix:** Added `smartListeningEnabled`, `wifiOnlyDownloads`, `maxDownloadsPerPodcast` settings. `SmartListeningManager` now respects all three. Added `ACCESS_NETWORK_STATE` permission.
+### Product clarification — Smart Listening is fully automatic
+**Decision:** The absence of Smart Listening settings is not a defect. The feature is automatic and offers no enable/disable, per-podcast limit, Wi-Fi-only, or cleanup controls.
+**Correction:** Removed the mistakenly added Smart Listening preferences, Settings card, policy checks, and `ACCESS_NETWORK_STATE` permission. Automatic scheduling and lifecycle cleanup remain internal behavior.
 
 ### BUG-02 (P2) — Auto refresh does nothing
 **Problem:** Settings stored toggle/time but no scheduler existed. Feature was completely non-functional.
@@ -84,7 +84,7 @@ Full QA sweep of the mpoddy Android podcast player. Found 6 confirmed bugs + 3 i
 
 | Test | Type | Coverage |
 |------|------|----------|
-| `AppSettingsTest.kt` | Unit (new) | Download settings defaults, setters, getters, duplicate feed |
+| `AppSettingsTest.kt` | Unit (new) | General settings defaults |
 | `AutoRefreshSchedulerTest.kt` | Unit (new) | `computeDelayToNextRun()` edge cases |
 | `ThemeModeTest.kt` | Unit (updated) | 3-way mode selector |
 | `OpmlParserTest.kt` | Unit (updated) | Oversized OPML rejection |
