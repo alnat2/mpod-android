@@ -149,13 +149,13 @@ class PodcastRepository @Inject constructor(
                 failures.add("${pod.title}: ${e.message ?: "refresh failed"}")
             }
         }
-        val formatter = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
-        appSettingsDataStore.setLastRefreshTime("Last refresh today at ${formatter.format(Date())}")
         if (failures.isNotEmpty()) {
             Result.failure(
                 Exception("Failed to refresh ${failures.size} podcast(s):\n" + failures.joinToString("\n"))
             )
         } else {
+            val formatter = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
+            appSettingsDataStore.setLastRefreshTime("Last refresh today at ${formatter.format(Date())}")
             Result.success(Unit)
         }
     }
