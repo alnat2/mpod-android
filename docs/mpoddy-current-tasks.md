@@ -8,76 +8,98 @@
 
 - Одновременно активна только одна задача и назначен один следующий исполнитель.
 - Активная задача находится первой и передаётся исполнителю целиком.
-- Закрытая разработка не возвращается в работу без нового воспроизведения или blocker-замечания.
+- QA `FAIL` имеет приоритет над прежним review `PASS` и возвращает только подтверждённый blocker.
 - Commit включает только явно перечисленные task-файлы; посторонние локальные файлы не добавляются.
 - Version bump, release APK и публикация выполняются только по отдельному решению.
 
 ## Фактическое состояние кандидата
 
-- Ветка: `codex/qa-obvious-bugs`.
-- Базовый checkpoint: `8655106` (`fix(android): checkpoint verified bugfix baseline`).
+- Ветка и удалённый baseline: `codex/qa-obvious-bugs` @ `eda4ece64d0be07ad28f5a69f0957b9afe5737ba`.
 - `MPOD-BUG-02`: `341002d` (`fix(android): preserve last refresh on failures`).
 - `MPOD-BUG-01`: `dda7734` (`fix(android): synchronize subscription carousel selection`).
-- Документация состояния: `aa9926d` (`docs(android): synchronize current candidate status`).
-- Локальный и удалённый HEAD совпадали на `aa9926d` до этой редакции документации.
-- `MPOD-REVIEW-01` завершён 15 сентября с итогом `PASS`: оба bugfix-коммита соответствуют контракту, scope чистый, активация `MPOD-QA-02` разрешена.
-- Посторонние untracked IDE-файлы, отчёты, evidence и APK не входят в task-коммиты и не должны добавляться wildcard-командой.
-- Revert или повторная разработка `MPOD-BUG-01` / `MPOD-BUG-02` не требуются.
+- `MPOD-REVIEW-01` завершён с `PASS`, но последующая `MPOD-QA-02` завершена с `FAIL` на новом воспроизводимом blocker.
+- Fresh release APK `1.0.17 (18)` собран из `eda4ece`; SHA-256: `1ce4c25e67ed3766e964988c841cb99535ebbcd5133eb9f821b01ebe04f04266`.
+- QA-устройство: Pixel 9 AVD, API 37, `emulator-5554`. Установка на физический Xiaomi API 35 выполнена, но ручная приёмка там не засчитана из-за личного PIN.
+- `MPOD-BUG-02` не проверялся после первого blocker BUG-01 и остаётся в статусе «review passed, product retest pending».
+- Production-код и Git-история в ходе QA не изменялись.
 
 ---
 
-## 1. АКТИВНО — 15.09.2026 12:03 MSK — Повторная продуктовая приёмка BUG-01 и BUG-02
+## 1. АКТИВНО — 15.09.2026 12:58 MSK — Исправить post-Unsubscribe рассинхронизацию и некомпилируемый regression test
 
-**ID:** `MPOD-QA-02`
-**Направление:** Android QA / product acceptance.
-**Приоритет:** release gate.
-**Статус:** ready; code review пройден.
-**Единственный следующий исполнитель:** Android-тестировщик.
+**ID:** `MPOD-BUG-01-R1`
+**Направление:** Compose UI / subscriptions.
+**Приоритет:** P1, release blocker.
+**Статус:** подтверждён на fresh release, частота 1/1.
+**Единственный следующий исполнитель:** Android-разработчик.
 
 ### Передать исполнителю целиком
 
-> Провести повторную продуктовую приёмку исправлений `MPOD-BUG-01` и `MPOD-BUG-02` из ветки `codex/qa-obvious-bugs`.
+> Исправить два подтверждённых blocker в текущей ветке `codex/qa-obvious-bugs` @ `eda4ece64d0be07ad28f5a69f0957b9afe5737ba`, не затрагивая `MPOD-BUG-02`.
 >
-> Перед началом:
+> Blocker A — post-Unsubscribe рассинхронизация, Pixel 9 AVD API 37, частота 1/1:
 >
-> 1. Подтвердить ветку и точный HEAD, а также совпадение с `origin/codex/qa-obvious-bugs`.
-> 2. Подтвердить наличие в истории `341002d` и `dda7734`.
-> 3. Собрать свежий APK из проверенного HEAD; старый phone-acceptance APK повторно не использовать. Записать имя файла и SHA-256.
-> 4. Установить APK на выбранное Android-устройство без очистки пользовательских данных, чтобы предыдущий успешный `Last refresh` оставался наблюдаемым.
+> 1. Библиотека содержит два контролируемых подкаста: `Throttled30 Podcast` и `QA02 Beta Podcast`.
+> 2. Для визуально выбранного `Throttled30 Podcast` выполняется Unsubscribe; snackbar подтверждает правильную цель.
+> 3. После окончания 15-секундного countdown header показывает `1 podcast`, episode list показывает `QA02 Beta Episode 1`.
+> 4. Карусель и summary продолжают показывать удалённый `Throttled30 Podcast`, действие остаётся `Pending` даже спустя дополнительные 16 секунд.
+> 5. Состояние исправляется только после force-stop/relaunch.
 >
-> Проверка `MPOD-BUG-01`:
+> Expected: сразу после удаления карточка, summary, счётчики, episodes и podcast-scoped actions относятся к оставшемуся Beta; `Pending` исчезает.
 >
-> 1. Открыть Subscriptions с несколькими подкастами и различающимися выпусками.
-> 2. Во время свайпа и после settle проверить, что выбранная карточка, artwork, summary, счётчики и список выпусков относятся к одному подкасту.
-> 3. Проверить переходы через обе границы карусели.
-> 4. Переключить Show all / Show unlistened и подтвердить отсутствие рассинхронизации.
-> 5. Проверить, что Refresh, Mark all listened и Unsubscribe применяются к визуально выбранному подкасту. Не подтверждать необратимое удаление, если для проверки достаточно состояния до финального подтверждения или доступен Undo.
+> Evidence:
 >
-> Проверка `MPOD-BUG-02`:
+> - `/private/tmp/mpod-qa02-bug01-unsubscribe-desync.png`;
+> - `/private/tmp/mpod-qa02-after-old-alpha-removal.xml`;
+> - `/private/tmp/mpod-qa02-bug01-after-relaunch.xml`.
 >
-> 1. Зафиксировать отображаемое значение предыдущего успешного `Last refresh`.
-> 2. На контролируемых feeds выполнить partial-failure Refresh All: один feed успешен, второй возвращает ошибку.
-> 3. Подтвердить, что успешный feed обновился, ошибка показана, Retry доступен, библиотека остаётся пригодной к работе, а `Last refresh` не изменился.
-> 4. Выполнить all-failed вариант и подтвердить тот же контракт сохранения timestamp и библиотеки.
-> 5. Вернуть feeds в успешное состояние, выполнить полный Refresh All и подтвердить, что только теперь `Last refresh` обновился.
+> Blocker B — committed unit-тест не компилируется:
 >
-> После целевых сценариев выполнить короткий smoke Home, Subscriptions, player и Settings.
+> - `SubscriptionsCarouselMappingTest.kt:60,62-64,66` вызывает отсутствующий `selectedPodcastForCarouselPage`;
+> - исправить тест так, чтобы он проверял реальный production mapping и не ссылался на несуществующий test-only/production helper;
+> - не добавлять лишний production API только ради теста, если достаточно проверить `podcasts[podcastIndexForCarouselPage(...)]`.
 >
-> Не изменять production-код или тесты, не делать commit/push/revert/reset/rebase, не менять versionName/versionCode и не добавлять локальные evidence-файлы в Git. При отклонении не исправлять его на месте: сохранить шаги, Expected/Actual и минимальное evidence.
+> Разрешённый scope:
 >
-> Формат результата: `PASS` или `FAIL`; точный commit; APK и SHA-256; устройство и API; результат каждого пункта BUG-01/BUG-02; smoke; известные ограничения. При `FAIL` указать первый воспроизводимый blocker и частоту.
+> - `app/src/main/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsScreen.kt`;
+> - `app/src/main/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsViewModel.kt` только если доказана причина в переходе pending/deletion state;
+> - `app/src/androidTest/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsScreenTest.kt`;
+> - `app/src/test/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsCarouselMappingTest.kt`;
+> - узкий ViewModel regression test только при изменении ViewModel.
+>
+> Требования:
+>
+> 1. Сначала добавить regression, который переводит UI из двух podcasts в один после завершения pending unsubscribe и воспроизводит stale carousel card/summary.
+> 2. Найти причину сохранения старого pager item/state после изменения списка ID; исправить identity/reset минимально, сохранив mid-drag синхронизацию и обе wrap-around границы.
+> 3. После удаления выбранного подкаста authoritative selection должен немедленно указывать на существующий элемент; stale title/summary/action запрещены.
+> 4. Исправить compile failure `SubscriptionsCarouselMappingTest` и подтвердить, что targeted unit class выполняется полностью.
+> 5. Выполнить targeted unit и Compose regression, затем `testDebugUnitTest`, `connectedDebugAndroidTest` и `git diff --check`. Вернуть точные counts и команды.
+>
+> Не менять дизайн, `MPOD-BUG-02`, Room schema, versionName/versionCode, release APK или документацию. Не делать commit/push/revert/reset/rebase и не добавлять QA evidence в Git. Посторонние untracked-файлы не трогать.
+>
+> Формат результата: причина каждого blocker; точный scoped diff; FAIL-before/PASS-after нового regression; результаты targeted/full gate; `git status --short`. Если причина требует выхода за разрешённый scope — остановиться и вернуть доказательство.
 
-**Критерий завершения:** оба исправленных пользовательских сценария подтверждены на свежем APK, короткий smoke пройден, результат привязан к точному commit и SHA-256.
+**Критерий завершения:** новый regression защищает переход 2→1 после unsubscribe; card/summary/episodes/actions синхронны без relaunch; mapping unit class компилируется и проходит; полный gate зелёный; diff ограничен разрешённым scope.
 
-**Следующий переход:** при `PASS` отметить SUB-05 и SUB-12 как `Verified`, закрыть `MPOD-QA-02` и активировать `MPOD-BUG-03`; при `FAIL` создать одну узкую rework-задачу по первому подтверждённому blocker.
+**Следующий переход:** Team Lead code review; при `PASS` активировать `MPOD-QA-02-R1` на том же fresh candidate.
 
 ---
 
-## 2. НЕАКТИВНО — Устранить дублирующие initial/resume загрузки
+## 2. НЕАКТИВНО — Повторить продуктовую приёмку после BUG-01-R1
+
+**ID:** `MPOD-QA-02-R1`
+**Статус:** ожидает разработку и review `MPOD-BUG-01-R1`.
+**Следующий исполнитель после активации:** Android-тестировщик.
+
+Сначала повторить post-Unsubscribe сценарий и полный BUG-01 scope; затем выполнить ранее не начатые partial/all-failed/full-success проверки BUG-02 и короткий smoke.
+
+---
+
+## 3. НЕАКТИВНО — Устранить дублирующие initial/resume загрузки
 
 **ID:** `MPOD-BUG-03`
 **Приоритет:** P2.
-**Статус:** выполнять только после закрытия `MPOD-QA-02` и отдельного воспроизведения на актуальном кандидате.
+**Статус:** выполнять только после закрытия `MPOD-QA-02-R1` и отдельного воспроизведения на актуальном кандидате.
 
 Сначала подтвердить дублирование запросов наблюдаемым тестом. Без воспроизведения production-код не менять.
 
@@ -85,7 +107,7 @@
 
 ## Не возвращать в работу без новых фактов
 
-- `MPOD-BUG-01` реализован в `dda7734` и прошёл code review.
-- `MPOD-BUG-02` реализован в `341002d` и прошёл code review.
-- `MPOD-REVIEW-01` закрыт с итогом `PASS`; повторный review без новых изменений не требуется.
+- Не откатывать `341002d` или `dda7734`: rework должен быть минимальным дополнением к текущей ветке.
+- Не считать прежний review `PASS` достаточным после фактического QA `FAIL`.
+- Не отмечать SUB-05 или SUB-12 как `Verified` до успешного `MPOD-QA-02-R1`.
 - Старый `MPOD-OPS-02` завершён checkpoint-коммитом `8655106` и больше не является текущей задачей.
