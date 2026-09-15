@@ -5,7 +5,10 @@ import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -123,6 +126,212 @@ class SubscriptionsScreenTest {
 
         composeRule.onNodeWithText("First episode").assertIsDisplayed()
         composeRule.onAllNodesWithText("Second episode").assertCountEquals(0)
+    }
+
+    @Test
+    fun selectedPodcastAndEpisodesRemainSynchronizedAcrossGesturesAndFilters() {
+        var refreshedPodcastId: Long? = null
+        var unsubscribedPodcastId: Long? = null
+        var markedAllListenedPodcastId: Long? = null
+        var addedEpisodeId: Long? = null
+
+        val alphaPodcast = SubscriptionPodcastUi(
+            id = 101L,
+            title = "Alpha Podcast",
+            description = "Alpha Description",
+            imageUrl = null,
+            totalEpisodeCount = 2,
+            unlistenedEpisodeCount = 1,
+            episodes = listOf(
+                SubscriptionEpisodeUi(
+                    id = 1001L,
+                    title = "Alpha Unlistened Episode",
+                    durationSeconds = 120,
+                    publishedAt = "2026-09-01T10:00:00Z",
+                    isListened = false,
+                    downloaded = false,
+                    summary = "Alpha unlistened notes",
+                    inPlaylist = false
+                ),
+                SubscriptionEpisodeUi(
+                    id = 1002L,
+                    title = "Alpha Listened Episode",
+                    durationSeconds = 180,
+                    publishedAt = "2026-08-25T10:00:00Z",
+                    isListened = true,
+                    downloaded = false,
+                    summary = "Alpha listened notes",
+                    inPlaylist = false
+                )
+            )
+        )
+        val betaPodcast = SubscriptionPodcastUi(
+            id = 202L,
+            title = "Beta Podcast",
+            description = "Beta Description",
+            imageUrl = null,
+            totalEpisodeCount = 3,
+            unlistenedEpisodeCount = 2,
+            episodes = listOf(
+                SubscriptionEpisodeUi(
+                    id = 2001L,
+                    title = "Beta Episode",
+                    durationSeconds = 240,
+                    publishedAt = "2026-09-02T10:00:00Z",
+                    isListened = false,
+                    downloaded = false,
+                    summary = "Beta notes",
+                    inPlaylist = false
+                )
+            )
+        )
+        val gammaPodcast = SubscriptionPodcastUi(
+            id = 303L,
+            title = "Gamma Podcast",
+            description = "Gamma Description",
+            imageUrl = null,
+            totalEpisodeCount = 4,
+            unlistenedEpisodeCount = 3,
+            episodes = listOf(
+                SubscriptionEpisodeUi(
+                    id = 3001L,
+                    title = "Gamma Episode",
+                    durationSeconds = 300,
+                    publishedAt = "2026-09-03T10:00:00Z",
+                    isListened = false,
+                    downloaded = false,
+                    summary = "Gamma notes",
+                    inPlaylist = false
+                )
+            )
+        )
+
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(
+                        podcasts = listOf(alphaPodcast, betaPodcast, gammaPodcast)
+                    ),
+                    onRefreshPodcast = { refreshedPodcastId = it },
+                    onUnsubscribePodcast = { unsubscribedPodcastId = it },
+                    onMarkAllListened = { markedAllListenedPodcastId = it },
+                    onAddEpisodeToPlaylist = { addedEpisodeId = it }
+                )
+            }
+        }
+
+        // 1. Initial settled state: Alpha Podcast is selected (page 1)
+        composeRule.onNodeWithTag("subscription_podcast_card_selected").assertIsDisplayed()
+        assertSelectedPodcast("Alpha Podcast")
+        composeRule.onNodeWithText("2 / 1 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha Unlistened Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Beta Episode").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Gamma Episode").assertCountEquals(0)
+
+        // 2. Swipe towards next podcast (Beta):
+        // Control Compose clock explicitly without automatic advance
+        try {
+            composeRule.mainClock.autoAdvance = false
+            // Single gesture scope with complete swipe
+            composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+                swipe(
+                    start = Offset(width * 0.8f, height / 2f),
+                    end = Offset(width * 0.2f, height / 2f),
+                    durationMillis = 200L
+                )
+            }
+            // Advance one frame so composition renders the post-touch state while settle animation is stopped
+            composeRule.mainClock.advanceTimeByFrame()
+
+            // Intermediate state: settle animation is stopped (clock autoAdvance is false).
+            // Visually selected card is Beta Podcast.
+            // Contract: visible selected card, summary, and episode list MUST be consistent.
+            assertSelectedPodcast("Beta Podcast")
+            composeRule.onNodeWithText("3 / 2 episodes").assertIsDisplayed()
+            composeRule.onNodeWithText("Beta Episode").assertIsDisplayed()
+            composeRule.onAllNodesWithText("Alpha Unlistened Episode").assertCountEquals(0)
+
+            // Drive the virtual Compose clock long enough for the pager settle animation.
+            // Advancing one frame at a time keeps the test deterministic without real-time waits.
+            repeat(120) {
+                composeRule.mainClock.advanceTimeByFrame()
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+
+        // 3. Settle on Beta Podcast: callbacks receive Beta's ID (202L) and episode ID (2001L)
+        assertSelectedPodcast("Beta Podcast")
+        composeRule.onNodeWithText("3 / 2 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Beta Episode").assertIsDisplayed()
+        composeRule.onNodeWithText("Refresh").performClick()
+        composeRule.runOnIdle { assertEquals(202L, refreshedPodcastId) }
+
+        composeRule.onNodeWithText("Mark all listened").performClick()
+        composeRule.runOnIdle { assertEquals(202L, markedAllListenedPodcastId) }
+
+        composeRule.onNodeWithContentDescription("Add Beta Episode to playlist").performClick()
+        composeRule.runOnIdle { assertEquals(2001L, addedEpisodeId) }
+
+        composeRule.onNodeWithText("Unsubscribe").performClick()
+        composeRule.runOnIdle { assertEquals(202L, unsubscribedPodcastId) }
+
+        // 4. Swipe next to Gamma Podcast
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
+        composeRule.waitForIdle()
+        assertSelectedPodcast("Gamma Podcast")
+        composeRule.onNodeWithText("4 / 3 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Gamma Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Beta Episode").assertCountEquals(0)
+
+        // 5. Right wrap-around: from Gamma (last), swipe next wraps around to Alpha (first)
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
+        composeRule.waitForIdle()
+        assertSelectedPodcast("Alpha Podcast")
+        composeRule.onNodeWithText("2 / 1 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha Unlistened Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Gamma Episode").assertCountEquals(0)
+
+        // 6. Left wrap-around: from Alpha (first), swipe previous wraps around to Gamma (last)
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToPreviousPodcast()
+        }
+        composeRule.waitForIdle()
+        assertSelectedPodcast("Gamma Podcast")
+        composeRule.onNodeWithText("4 / 3 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Gamma Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Alpha Unlistened Episode").assertCountEquals(0)
+
+        // 7. Filter switching (Show all / Show unlistened)
+        // Return to Alpha
+        composeRule.onNodeWithTag("subscriptions_podcast_pager").performTouchInput {
+            swipeToNextPodcast()
+        }
+        composeRule.waitForIdle()
+        assertSelectedPodcast("Alpha Podcast")
+        composeRule.onNodeWithText("2 / 1 episodes").assertIsDisplayed()
+        // Switch to Show all
+        composeRule.onNodeWithContentDescription("Show all").performClick()
+        composeRule.waitForIdle()
+        // Selected podcast is still Alpha Podcast; both unlistened and listened episodes are visible
+        assertSelectedPodcast("Alpha Podcast")
+        composeRule.onNodeWithText("2 / 1 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha Unlistened Episode").assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha Listened Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Gamma Episode").assertCountEquals(0)
+
+        // Switch back to Show unlistened
+        composeRule.onNodeWithContentDescription("Show unlistened").performClick()
+        composeRule.waitForIdle()
+        assertSelectedPodcast("Alpha Podcast")
+        composeRule.onNodeWithText("2 / 1 episodes").assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha Unlistened Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Alpha Listened Episode").assertCountEquals(0)
     }
 
     @Test
@@ -472,6 +681,12 @@ class SubscriptionsScreenTest {
             end = Offset(width * 0.2f, height / 2f),
             durationMillis = 600L
         )
+    }
+
+    private fun assertSelectedPodcast(title: String) {
+        composeRule.onNode(
+            hasText(title) and hasAnyAncestor(hasTestTag("subscription_podcast_card_selected"))
+        ).assertIsDisplayed()
     }
 
     private fun TouchInjectionScope.swipeToPreviousPodcast() {

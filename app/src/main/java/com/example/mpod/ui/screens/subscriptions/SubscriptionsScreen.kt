@@ -228,7 +228,7 @@ fun SubscriptionsScreen(
                         }
                     }
                     val selectedPodcast = podcasts[
-                        podcastIndexForCarouselPage(pagerState.settledPage, podcasts.size)
+                        podcastIndexForCarouselPage(pagerState.currentPage, podcasts.size)
                     ]
                     BoxWithConstraints(
                         modifier = Modifier
