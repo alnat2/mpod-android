@@ -89,14 +89,14 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SUB-02 | Subscriptions load / DB query error | Error banner visible and Try again retries loading from Room DB | U,E | Verified |
 | SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct modal mode | U,E | Verified |
 | SUB-04 | All subscribed episodes are listened in Unlistened mode | Caught-up state is distinct from an empty library and can switch to Show all | C,U,E | Verified |
-| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, episode list, and podcast-scoped actions change together and always target the same podcast ID; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Implemented — synchronization fix committed as `dda7734`; awaiting combined review and product re-verification in `MPOD-REVIEW-01` / `MPOD-QA-02` |
+| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, episode list, and podcast-scoped actions change together and always target the same podcast ID; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Implemented — `dda7734` passed code review; awaiting product re-verification in `MPOD-QA-02` |
 | SUB-06 | Toggle Show all / Show unlistened | Icon and visible podcasts/episodes match the selected filter | C,U,E | Verified |
 | SUB-07 | Podcast artwork loads successfully | Real artwork is loaded and cached via Coil/OkHttp | U,E | Verified |
 | SUB-08 | Artwork is missing, invalid, or fails to load | Approved Figma fallback artwork drawable is rendered | U,E | Verified |
 | SUB-09 | Refresh one podcast successfully | RSS feed is fetched directly; updated episodes and metadata persist to Room DB | C,U,E | Verified |
 | SUB-10 | Refresh one podcast fails | Feed error is displayed on that podcast card; Retry repeats the refresh | C,U,E | Verified |
 | SUB-11 | Refresh all podcasts successfully | Feeds are fetched in parallel; updated episodes persist to Room DB; progress indicator reflects completion | C,U,E | Verified |
-| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library or recording a normal successful `Last refresh` result | C,U,E | Implemented — truthful refresh result committed as `341002d`; awaiting combined review and product re-verification in `MPOD-REVIEW-01` / `MPOD-QA-02` |
+| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library or recording a normal successful `Last refresh` result | C,U,E | Implemented — `341002d` passed code review; awaiting product re-verification in `MPOD-QA-02` |
 | SUB-13 | Network drops during feed refresh | Network failure is caught gracefully; previous Room DB state remains intact | C,E,L | Verified |
 | SUB-14 | Episode list for one podcast fails parsing while others load | Failure stays scoped to that podcast; other podcasts remain usable | U,E | Verified |
 | SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Unsubscribe job is cancelled and podcast remains in Room DB and UI | C,U,E,L | Verified |

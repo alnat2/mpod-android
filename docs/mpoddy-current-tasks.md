@@ -8,87 +8,72 @@
 
 - Одновременно активна только одна задача и назначен один следующий исполнитель.
 - Активная задача находится первой и передаётся исполнителю целиком.
-- Закрытая разработка не возвращается в работу без нового воспроизведения или замечания review.
+- Закрытая разработка не возвращается в работу без нового воспроизведения или blocker-замечания.
 - Commit включает только явно перечисленные task-файлы; посторонние локальные файлы не добавляются.
-- После разработки следуют code review и продуктовый retest. Version bump, release APK и публикация выполняются только по отдельному решению.
+- Version bump, release APK и публикация выполняются только по отдельному решению.
 
 ## Фактическое состояние кандидата
 
 - Ветка: `codex/qa-obvious-bugs`.
 - Базовый checkpoint: `8655106` (`fix(android): checkpoint verified bugfix baseline`).
-- `MPOD-BUG-02` закоммичен как `341002d` (`fix(android): preserve last refresh on failures`).
-- `MPOD-BUG-01` восстановлен после ошибочного локального `reset` и закоммичен как `dda7734` (`fix(android): synchronize subscription carousel selection`).
-- Локальная ветка опережает `origin/codex/qa-obvious-bugs`; push ожидает явного подтверждения отправки именно в этот remote/branch.
-- Посторонние untracked IDE-файлы, отчёты, evidence и APK не входят в эти коммиты и не должны добавляться wildcard-командой.
-- Откатывать `341002d` или заново выполнять разработку `MPOD-BUG-02` не требуется.
+- `MPOD-BUG-02`: `341002d` (`fix(android): preserve last refresh on failures`).
+- `MPOD-BUG-01`: `dda7734` (`fix(android): synchronize subscription carousel selection`).
+- Документация состояния: `aa9926d` (`docs(android): synchronize current candidate status`).
+- Локальный и удалённый HEAD совпадали на `aa9926d` до этой редакции документации.
+- `MPOD-REVIEW-01` завершён 15 сентября с итогом `PASS`: оба bugfix-коммита соответствуют контракту, scope чистый, активация `MPOD-QA-02` разрешена.
+- Посторонние untracked IDE-файлы, отчёты, evidence и APK не входят в task-коммиты и не должны добавляться wildcard-командой.
+- Revert или повторная разработка `MPOD-BUG-01` / `MPOD-BUG-02` не требуются.
 
 ---
 
-## 1. АКТИВНО — 15.09.2026 11:40 MSK — Проверить объединённый кандидат BUG-01 и BUG-02
+## 1. АКТИВНО — 15.09.2026 12:03 MSK — Повторная продуктовая приёмка BUG-01 и BUG-02
 
-**ID:** `MPOD-REVIEW-01`
-**Направление:** Team Lead / code review.
+**ID:** `MPOD-QA-02`
+**Направление:** Android QA / product acceptance.
 **Приоритет:** release gate.
-**Статус:** ожидает push локального `dda7734`, затем review.
-**Единственный следующий исполнитель:** Team Lead / code reviewer.
+**Статус:** ready; code review пройден.
+**Единственный следующий исполнитель:** Android-тестировщик.
 
 ### Передать исполнителю целиком
 
-> Провести read-only code review двух исправлений в ветке `codex/qa-obvious-bugs` после подтверждения, что локальный и удалённый HEAD совпадают.
+> Провести повторную продуктовую приёмку исправлений `MPOD-BUG-01` и `MPOD-BUG-02` из ветки `codex/qa-obvious-bugs`.
 >
-> Проверяемые коммиты:
+> Перед началом:
 >
-> - `341002d` — `MPOD-BUG-02`, правдивый результат Refresh All;
-> - `dda7734` — `MPOD-BUG-01`, синхронизация выбранной карточки подписки, summary, списка выпусков и podcast-scoped действий.
+> 1. Подтвердить ветку и точный HEAD, а также совпадение с `origin/codex/qa-obvious-bugs`.
+> 2. Подтвердить наличие в истории `341002d` и `dda7734`.
+> 3. Собрать свежий APK из проверенного HEAD; старый phone-acceptance APK повторно не использовать. Записать имя файла и SHA-256.
+> 4. Установить APK на выбранное Android-устройство без очистки пользовательских данных, чтобы предыдущий успешный `Last refresh` оставался наблюдаемым.
 >
-> Для `MPOD-BUG-01` допустимый scope состоит ровно из трёх файлов:
+> Проверка `MPOD-BUG-01`:
 >
-> - `app/src/main/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsScreen.kt`;
-> - `app/src/androidTest/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsScreenTest.kt`;
-> - `app/src/test/java/com/example/mpod/ui/screens/subscriptions/SubscriptionsCarouselMappingTest.kt`.
+> 1. Открыть Subscriptions с несколькими подкастами и различающимися выпусками.
+> 2. Во время свайпа и после settle проверить, что выбранная карточка, artwork, summary, счётчики и список выпусков относятся к одному подкасту.
+> 3. Проверить переходы через обе границы карусели.
+> 4. Переключить Show all / Show unlistened и подтвердить отсутствие рассинхронизации.
+> 5. Проверить, что Refresh, Mark all listened и Unsubscribe применяются к визуально выбранному подкасту. Не подтверждать необратимое удаление, если для проверки достаточно состояния до финального подтверждения или доступен Undo.
 >
-> Для `MPOD-BUG-02` допустимый scope состоит ровно из трёх файлов:
+> Проверка `MPOD-BUG-02`:
 >
-> - `app/src/main/java/com/example/mpod/data/repository/PodcastRepository.kt`;
-> - `app/src/test/java/com/example/mpod/data/repository/PodcastRepositoryRefreshAllTest.kt`;
-> - `app/src/androidTest/java/com/example/mpod/ui/screens/RefreshAllStatusUiTest.kt`.
+> 1. Зафиксировать отображаемое значение предыдущего успешного `Last refresh`.
+> 2. На контролируемых feeds выполнить partial-failure Refresh All: один feed успешен, второй возвращает ошибку.
+> 3. Подтвердить, что успешный feed обновился, ошибка показана, Retry доступен, библиотека остаётся пригодной к работе, а `Last refresh` не изменился.
+> 4. Выполнить all-failed вариант и подтвердить тот же контракт сохранения timestamp и библиотеки.
+> 5. Вернуть feeds в успешное состояние, выполнить полный Refresh All и подтвердить, что только теперь `Last refresh` обновился.
 >
-> Проверить:
+> После целевых сценариев выполнить короткий smoke Home, Subscriptions, player и Settings.
 >
-> 1. В `SubscriptionsScreen` карточка и связанные данные используют один authoritative page (`pagerState.currentPage`), а wrap-around нормализуется существующим helper.
-> 2. Regression покрывает промежуточное состояние свайпа, settle, оба wrap-around перехода, visibility filter и podcast-scoped callbacks.
-> 3. `refreshAllPodcasts()` записывает `lastRefreshTime` только при полном успехе; partial/all-failed возвращают failure и не записывают успешное время.
-> 4. В task-коммитах нет посторонних файлов, version bump, release APK или изменения дизайна.
-> 5. Замечание о NUL-байтах из прежнего review не воспроизводится в текущем workspace: проверить фактические байты текущего `PodcastRepository.kt`, а не старый путь из другого checkout.
+> Не изменять production-код или тесты, не делать commit/push/revert/reset/rebase, не менять versionName/versionCode и не добавлять локальные evidence-файлы в Git. При отклонении не исправлять его на месте: сохранить шаги, Expected/Actual и минимальное evidence.
 >
-> Не изменять код, не делать revert/reset/rebase и не добавлять локальные untracked-файлы. Если review проходит, вернуть `PASS` и разрешить активацию `MPOD-QA-02`. Если нет — вернуть только конкретные blocker-замечания с файлом, строкой и ожидаемым контрактом.
+> Формат результата: `PASS` или `FAIL`; точный commit; APK и SHA-256; устройство и API; результат каждого пункта BUG-01/BUG-02; smoke; известные ограничения. При `FAIL` указать первый воспроизводимый blocker и частоту.
 
-**Критерий завершения:** оба commit diff проверены; посторонних изменений нет; получен однозначный `PASS` либо узкий список blocker-замечаний.
+**Критерий завершения:** оба исправленных пользовательских сценария подтверждены на свежем APK, короткий smoke пройден, результат привязан к точному commit и SHA-256.
 
-**Следующий переход:** при `PASS` активировать `MPOD-QA-02`; при `FAIL` создать отдельную узкую rework-задачу без отката уже принятого исправления.
+**Следующий переход:** при `PASS` отметить SUB-05 и SUB-12 как `Verified`, закрыть `MPOD-QA-02` и активировать `MPOD-BUG-03`; при `FAIL` создать одну узкую rework-задачу по первому подтверждённому blocker.
 
 ---
 
-## 2. НЕАКТИВНО — Повторная продуктовая приёмка BUG-01 и BUG-02
-
-**ID:** `MPOD-QA-02`
-**Направление:** Android QA.
-**Статус:** ожидает `PASS` задачи `MPOD-REVIEW-01`.
-**Следующий исполнитель после активации:** Android-тестировщик.
-
-Проверить на одном свежем APK из точного reviewed HEAD:
-
-1. Во время и после свайпа карточка подписки, summary, artwork, выпуски и действия относятся к одному подкасту.
-2. Переходы через обе границы карусели и Show all / Show unlistened не создают рассинхронизацию.
-3. При полном Refresh All время `Last refresh` обновляется.
-4. При partial/all-failed Refresh All показывается ошибка, библиотека остаётся доступной, а `Last refresh` не записывается как успешный.
-5. Выполнить короткий smoke Home, Subscriptions, player и Settings.
-
-Вернуть commit, APK SHA-256, устройство/API, Expected/Actual и evidence только для фактических отклонений.
-
----
-
-## 3. НЕАКТИВНО — Устранить дублирующие initial/resume загрузки
+## 2. НЕАКТИВНО — Устранить дублирующие initial/resume загрузки
 
 **ID:** `MPOD-BUG-03`
 **Приоритет:** P2.
@@ -100,6 +85,7 @@
 
 ## Не возвращать в работу без новых фактов
 
-- `MPOD-BUG-01` уже реализован в `dda7734`; старый текст про ожидание разработки устарел.
-- `MPOD-BUG-02` уже реализован в `341002d`; revert ради искусственного FAIL-before запрещён.
-- Старый активный `MPOD-OPS-02` завершён checkpoint-коммитом `8655106` и больше не является текущей задачей.
+- `MPOD-BUG-01` реализован в `dda7734` и прошёл code review.
+- `MPOD-BUG-02` реализован в `341002d` и прошёл code review.
+- `MPOD-REVIEW-01` закрыт с итогом `PASS`; повторный review без новых изменений не требуется.
+- Старый `MPOD-OPS-02` завершён checkpoint-коммитом `8655106` и больше не является текущей задачей.
