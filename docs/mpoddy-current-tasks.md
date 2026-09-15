@@ -14,7 +14,8 @@
 
 ## Фактическое состояние кандидата
 
-- Ветка и удалённый HEAD: `codex/qa-obvious-bugs` @ `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`.
+- Ветка: `codex/qa-obvious-bugs`; использовать её текущий опубликованный HEAD.
+- Production-code baseline кандидата: `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`; последующие изменения до активации этой задачи затрагивают только task-документы.
 - `MPOD-BUG-01` и rework закрыты: `dda7734` + `da4c6a7`.
 - `MPOD-BUG-02` закрыт: `341002d`.
 - `MPOD-QA-02-R1`: `PASS` на Pixel 9 AVD API 37.
@@ -36,7 +37,7 @@
 
 ### Передать исполнителю целиком
 
-> Исследовать и при подтверждении минимально исправить consistency race между `Mark all listened` выбранного подкаста и concurrent feed refresh в ветке `codex/qa-obvious-bugs` @ `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`.
+> Исследовать и при подтверждении минимально исправить consistency race между `Mark all listened` выбранного подкаста и concurrent feed refresh из текущего опубликованного HEAD ветки `codex/qa-obvious-bugs` (production-code baseline `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`).
 >
 > Наблюдаемый риск: `SubscriptionsViewModel.markAllListened()` сначала читает набор episodes через DAO, затем отдельно вызывает bulk update в repository и после этого очищает playlist/files по ранее прочитанному набору. Concurrent refresh может изменить набор между этими этапами, из-за чего Room listened-state, playlist/queue cleanup и локальные файлы могут относиться к разным episode IDs.
 >
