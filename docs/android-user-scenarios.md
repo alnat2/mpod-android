@@ -89,14 +89,14 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SUB-02 | Subscriptions load / DB query error | Error banner visible and Try again retries loading from Room DB | U,E | Verified |
 | SUB-03 | No podcasts are subscribed | Empty state offers Add RSS feed and Import OPML; both open the correct modal mode | U,E | Verified |
 | SUB-04 | All subscribed episodes are listened in Unlistened mode | Caught-up state is distinct from an empty library and can switch to Show all | C,U,E | Verified |
-| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, episode list, and podcast-scoped actions change together and always target the same podcast ID; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Implemented — post-Unsubscribe rework `da4c6a7` passed code review; awaiting product re-verification in `MPOD-QA-02-R1` |
+| SUB-05 | Swipe between podcast cards | Selected podcast, counts, artwork, episode list, and podcast-scoped actions change together and always target the same podcast ID; header summarizes counts (e.g. `12 podcasts · 2 unlistened`) | U,E | Verified — `dda7734` + `da4c6a7`; product acceptance passed on Pixel 9 API 37 at `43b36ea` |
 | SUB-06 | Toggle Show all / Show unlistened | Icon and visible podcasts/episodes match the selected filter | C,U,E | Verified |
 | SUB-07 | Podcast artwork loads successfully | Real artwork is loaded and cached via Coil/OkHttp | U,E | Verified |
 | SUB-08 | Artwork is missing, invalid, or fails to load | Approved Figma fallback artwork drawable is rendered | U,E | Verified |
 | SUB-09 | Refresh one podcast successfully | RSS feed is fetched directly; updated episodes and metadata persist to Room DB | C,U,E | Verified |
 | SUB-10 | Refresh one podcast fails | Feed error is displayed on that podcast card; Retry repeats the refresh | C,U,E | Verified |
 | SUB-11 | Refresh all podcasts successfully | Feeds are fetched in parallel; updated episodes persist to Room DB; progress indicator reflects completion | C,U,E | Verified |
-| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library or recording a normal successful `Last refresh` result | C,U,E | Implemented — `341002d` passed code review; product retest remains pending in `MPOD-QA-02-R1` |
+| SUB-12 | One feed fails during Refresh all | Other feeds finish successfully; partial failure is surfaced without breaking the library or recording a normal successful `Last refresh` result | C,U,E | Verified — `341002d`; partial/all-failed/full-success product acceptance passed on Pixel 9 API 37 at `43b36ea` |
 | SUB-13 | Network drops during feed refresh | Network failure is caught gracefully; previous Room DB state remains intact | C,E,L | Verified |
 | SUB-14 | Episode list for one podcast fails parsing while others load | Failure stays scoped to that podcast; other podcasts remain usable | U,E | Verified |
 | SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Unsubscribe job is cancelled and podcast remains in Room DB and UI | C,U,E,L | Verified |
@@ -116,7 +116,7 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | EPS-06 | Mark an episode listened | Room DB marks it listened, removes it from playlist, triggers Smart Listening audio file cleanup, UI reconciles | C,U,E | Verified |
 | EPS-07 | Mark a listened episode unlistened | Room DB changes episode to unlistened; not silently re-added to playlist; deleted media is not restored | C,U,E | Verified |
 | EPS-08 | Mark listened/unlistened database error | Target state rolls back and Room DB state remains consistent | C,U,E | Verified |
-| EPS-09 | Mark all listened for selected podcast | One consistent episode set is marked listened, removed from the playlist/queue, and scheduled for observable local-file cleanup without stale downloaded state during a concurrent feed refresh | C,U,E | Implemented — concurrency consistency requires regression and re-verification; see `MPOD-BUG-03` |
+| EPS-09 | Mark all listened for selected podcast | One consistent episode set is marked listened, removed from the playlist/queue, and scheduled for observable local-file cleanup without stale downloaded state during a concurrent feed refresh | C,U,E | Implemented — active diagnostic concurrency regression in `MPOD-BUG-03`; not yet re-verified |
 | EPS-10 | Repeat Mark all listened | Repeat succeeds idempotently with zero mutations | C,U,E | Verified |
 | EPS-11 | Open Show notes with episode description | Notes render sanitized HTML/text in a scrollable modal | C,U,E | Verified |
 | EPS-12 | Open Show notes when notes are absent | Truthful empty-notes state opens instead of a broken or blank modal | C,U,E | Verified |
