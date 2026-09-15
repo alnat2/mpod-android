@@ -57,13 +57,13 @@ class SubscriptionsCarouselMappingTest {
             mockPodcast(id = 303L, title = "Podcast Three")
         )
         // Artificial left wrap-around page 0 -> last podcast (Three)
-        assertEquals(303L, selectedPodcastForCarouselPage(podcasts, page = 0).id)
+        assertEquals(303L, podcasts[podcastIndexForCarouselPage(0, podcasts.size)].id)
         // Interior pages
-        assertEquals(101L, selectedPodcastForCarouselPage(podcasts, page = 1).id)
-        assertEquals(202L, selectedPodcastForCarouselPage(podcasts, page = 2).id)
-        assertEquals(303L, selectedPodcastForCarouselPage(podcasts, page = 3).id)
+        assertEquals(101L, podcasts[podcastIndexForCarouselPage(1, podcasts.size)].id)
+        assertEquals(202L, podcasts[podcastIndexForCarouselPage(2, podcasts.size)].id)
+        assertEquals(303L, podcasts[podcastIndexForCarouselPage(3, podcasts.size)].id)
         // Artificial right wrap-around page 4 -> first podcast (One)
-        assertEquals(101L, selectedPodcastForCarouselPage(podcasts, page = 4).id)
+        assertEquals(101L, podcasts[podcastIndexForCarouselPage(4, podcasts.size)].id)
     }
 
     private fun mockPodcast(id: Long, title: String): SubscriptionPodcastUi {

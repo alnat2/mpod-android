@@ -19,6 +19,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -664,6 +667,59 @@ class SubscriptionsScreenTest {
             assertEquals(1, rssAdds)
             assertEquals(1, opmlImports)
         }
+    }
+
+    @Test
+    fun deletePodcastUpdatesCarouselAndSummaryImmediately() {
+        var currentState by androidx.compose.runtime.mutableStateOf(
+            SubscriptionsUiState(
+                podcasts = listOf(
+                    podcast(1L, "Throttled30", "T30 Episode"),
+                    podcast(2L, "QA02 Beta", "QA02 Episode")
+                )
+            )
+        )
+
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = currentState,
+                    onUnsubscribePodcast = { id ->
+                        currentState = currentState.copy(
+                            pendingUnsubscribe = PendingUnsubscribeUi(id, "Throttled30", 15)
+                        )
+                    },
+                    onUndoPodcastUnsubscribe = {}
+                )
+            }
+        }
+
+        // Visually selected is Throttled30 (page 1)
+        composeRule.onNode(hasText("Throttled30") and hasAnyAncestor(hasTestTag("subscription_podcast_card_selected"))).assertIsDisplayed()
+        composeRule.onNodeWithText("T30 Episode").assertIsDisplayed()
+
+        // Perform Unsubscribe
+        composeRule.onNodeWithText("Unsubscribe").performClick()
+        composeRule.waitForIdle()
+
+        // Snackbar should show Undo
+        composeRule.onNodeWithText("Undo").assertIsDisplayed()
+
+        // Simulate countdown end and deletion
+        currentState = currentState.copy(
+            pendingUnsubscribe = null,
+            podcasts = listOf(podcast(2L, "QA02 Beta", "QA02 Episode"))
+        )
+        composeRule.waitForIdle()
+
+        // After deletion, Beta should be visually selected, and Throttled30 should NOT be shown
+        composeRule.onNode(hasText("QA02 Beta") and hasAnyAncestor(hasTestTag("subscription_podcast_card_selected"))).assertIsDisplayed()
+        composeRule.onNodeWithText("QA02 Episode").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Throttled30").assertCountEquals(0)
+        composeRule.onAllNodesWithText("T30 Episode").assertCountEquals(0)
+
+        // Verify disappearance of Pending state
+        composeRule.onAllNodesWithText("Pending").assertCountEquals(0)
     }
 
     private fun populatedState(): SubscriptionsUiState {

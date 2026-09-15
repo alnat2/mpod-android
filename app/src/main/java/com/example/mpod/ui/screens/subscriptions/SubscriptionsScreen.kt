@@ -209,14 +209,11 @@ fun SubscriptionsScreen(
                     )
 
                     val loopsContinuously = podcasts.size > 1
-                    val carouselPodcastIds = remember(podcasts) { podcasts.map { it.id } }
-                    val pagerState = key(loopsContinuously, carouselPodcastIds) {
-                        rememberPagerState(
-                            initialPage = if (loopsContinuously) 1 else 0,
-                            pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
-                        )
-                    }
-                    LaunchedEffect(pagerState, carouselPodcastIds) {
+                    val pagerState = rememberPagerState(
+                        initialPage = if (loopsContinuously) 1 else 0,
+                        pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
+                    )
+                    LaunchedEffect(pagerState, podcasts.size) {
                         if (loopsContinuously) {
                             snapshotFlow { pagerState.settledPage }
                                 .collect { settledPage ->
@@ -238,7 +235,18 @@ fun SubscriptionsScreen(
                         val carouselWidth = maxWidth + 40.dp
                         HorizontalPager(
                             state = pagerState,
-                            key = { page -> page },
+                            key = { page ->
+                                val podcast = podcasts[podcastIndexForCarouselPage(page, podcasts.size)]
+                                if (loopsContinuously) {
+                                    when (page) {
+                                        0 -> "wrap_left_${podcast.id}"
+                                        podcasts.size + 1 -> "wrap_right_${podcast.id}"
+                                        else -> podcast.id
+                                    }
+                                } else {
+                                    podcast.id
+                                }
+                            },
                             contentPadding = PaddingValues(horizontal = 20.dp),
                             pageSize = PageSize.Fixed(maxWidth),
                             pageSpacing = 12.dp,
