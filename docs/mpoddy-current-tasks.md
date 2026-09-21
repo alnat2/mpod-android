@@ -2,90 +2,67 @@
 
 Единый оперативный источник текущего состояния Android-кандидата `mpoddy`.
 
-Последняя редакция: 15 сентября 2026 года.
+Последняя редакция: 21 сентября 2026 года.
 
 ## Правила
 
 - Одновременно активна только одна задача и назначен один следующий исполнитель.
 - Активная задача находится первой и передаётся исполнителю целиком.
-- Диагностическая фаза не меняет production-код; исправление разрешается только после детерминированного воспроизведения.
+- Закрытая разработка не возвращается в работу без нового воспроизведения или blocker-замечания.
 - Commit включает только явно перечисленные task-файлы; посторонние локальные файлы не добавляются.
-- Version bump, release APK и публикация выполняются только по отдельному решению.
+- Version bump, release APK, push и публикация выполняются только по отдельному решению.
 
 ## Фактическое состояние кандидата
 
-- Ветка: `codex/qa-obvious-bugs`; использовать её текущий опубликованный HEAD.
-- Production-code baseline кандидата: `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`; последующие изменения до активации этой задачи затрагивают только task-документы.
+- Ветка: `codex/qa-obvious-bugs`.
+- Текущий локальный HEAD: `3fb7f45` (`fix: make mark-all-listened cleanup race-safe`). Push не выполнялся; совпадение с remote HEAD после этого коммита не заявляется.
 - `MPOD-BUG-01` и rework закрыты: `dda7734` + `da4c6a7`.
 - `MPOD-BUG-02` закрыт: `341002d`.
 - `MPOD-QA-02-R1`: `PASS` на Pixel 9 AVD API 37.
-- Fresh release: `mpoddy 1.0.17 (18)`, package `com.prod.mpod`.
-- APK SHA-256: `d000c306e94b49ecec2778d7824457b307d1ae1e1b13434d272f08c344ce4372`.
-- Post-Unsubscribe 2→1, mid-drag/settle, обе wrap-around границы, filters и scoped actions прошли.
-- Refresh All partial/all-failed сохранили прежний timestamp; full success обновил timestamp. Home, Subscriptions, Player и Settings smoke прошли.
-- Ограничение QA: Player проверялся как короткий UI/control smoke, не как длительная real-audio приёмка.
+- `MPOD-BUG-03` закрыт: исходная concurrent-refresh гонка и follow-up cleanup/re-add гонка воспроизведены детерминированно и исправлены в `3fb7f45`.
+- Финальные проверки `MPOD-BUG-03`: 173/173 JVM tests PASS; 64/64 connected tests PASS на Pixel 9 AVD API 37; debug/release lint PASS; `git diff --check` PASS.
+- Room schema, `versionName`/`versionCode` и release APK в `MPOD-BUG-03` не менялись. Физический телефон не проверялся.
+- Последний release-кандидат до `MPOD-BUG-03`: `mpoddy 1.0.17 (18)`, package `com.prod.mpod`, SHA-256 `d000c306e94b49ecec2778d7824457b307d1ae1e1b13434d272f08c344ce4372`. Он не содержит коммит `3fb7f45`.
+- В рабочем дереве есть отдельные staged/unstaged изменения UI и task-документов; они не относятся к коммиту `3fb7f45` и не должны добавляться wildcard-командой.
 
 ---
 
-## 1. АКТИВНО — 15.09.2026 20:21 MSK — Согласованное Mark all listened при concurrent refresh
+## 1. АКТИВНО — 21.09.2026 — Единый lifecycle-владелец Smart Listening
 
-**ID:** `MPOD-BUG-03`
-**Направление:** Room / playlist / Smart Listening consistency.
-**Приоритет:** P2.
-**Статус:** риск подтверждён чтением кода, но пользовательский дефект ещё не воспроизведён.
-**Единственный следующий исполнитель:** Android-разработчик, начиная только с диагностического regression test.
+**ID:** `MPOD-MAINT-01`
+**Направление:** Android lifecycle / Smart Listening.
+**Приоритет:** P3.
+**Статус:** подтверждённое дублирование вызова без подтверждённого пользовательского сбоя.
+**Единственный следующий исполнитель:** Codex как Android-разработчик в локальном репозитории на рабочем компьютере. Телефон и эмулятор для первого этапа не нужны.
 
 ### Передать исполнителю целиком
 
-> Исследовать и при подтверждении минимально исправить consistency race между `Mark all listened` выбранного подкаста и concurrent feed refresh из текущего опубликованного HEAD ветки `codex/qa-obvious-bugs` (production-code baseline `43b36ea412d3b1539d3e81a33a4ae3ea17c6d465`).
+> Устранить дублирующий запуск Smart Listening observer. Сейчас `SmartListeningManager.startObserving()` вызывается и из `MpodApplication.onCreate()`, и из `MainActivity.onCreate()`. Сам manager защищён `if (observationJob != null) return`, поэтому подтверждённого пользовательского дефекта нет, но ownership размазан между process- и activity-lifecycle.
 >
-> Наблюдаемый риск: `SubscriptionsViewModel.markAllListened()` сначала читает набор episodes через DAO, затем отдельно вызывает bulk update в repository и после этого очищает playlist/files по ранее прочитанному набору. Concurrent refresh может изменить набор между этими этапами, из-за чего Room listened-state, playlist/queue cleanup и локальные файлы могут относиться к разным episode IDs.
+> Целевой контракт:
 >
-> Фаза A — обязательная диагностика без production-изменений:
+> 1. Единственный production-владелец запуска — `MpodApplication` на время жизни процесса.
+> 2. Удалить injection `SmartListeningManager` и вызов `startObserving()` из `MainActivity`.
+> 3. Не добавлять activity-level `stopObserving()`: recreation Activity не должна останавливать process-level observer или активные Smart Listening jobs.
+> 4. Не менять автоматическую политику загрузки, debounce, cleanup, Room schema, UI и тексты.
 >
-> 1. Добавить детерминированный regression test с управляемыми barriers/fakes, где feed refresh меняет набор episodes между исходным чтением и bulk update.
-> 2. Проверить согласованность точного набора ID для Room listened-state, playlist removal, queue reconciliation и Smart Listening file cleanup.
-> 3. Покрыть минимум два порядка событий: новый episode появляется конкурентно и существующий episode исчезает/заменяется.
-> 4. Проверить повторный Mark all listened: ноль лишних мутаций, отсутствие duplicate cleanup и стабильный результат.
-> 5. Если тест не воспроизводит расхождение, production-код не менять; вернуть доказательство и предложить закрытие риска.
+> Реализация и проверки:
 >
-> Фаза B — только после детерминированного FAIL:
->
-> 1. Перенести orchestration за repository-level consistency boundary и использовать один согласованный набор episode IDs для Room mutation и playlist cleanup.
-> 2. Не изображать filesystem и Room как одну ACID-транзакцию: ошибка удаления файла должна оставаться наблюдаемой и повторяемой.
-> 3. После операции не должно быть stale queue/downloaded-state или файла, потерявшего связь с Room.
-> 4. Сохранить обычное поведение Mark all listened и существующий UI; дизайн и тексты не менять.
->
-> Разрешённый scope после подтверждённого FAIL:
->
-> - `SubscriptionsViewModel.kt` и его tests;
-> - `PodcastRepository.kt` и узкие repository tests;
-> - связанные DAO transaction/query методы и tests только при доказанной необходимости;
-> - playlist/Smart Listening cleanup orchestration tests.
->
-> Запрещено менять `MPOD-BUG-01/02`, Room schema, unrelated lifecycle, versionName/versionCode, release APK или документацию. Не делать commit/push/revert/reset/rebase до code review. Посторонние файлы не добавлять.
->
-> Проверки при production-изменении: targeted regression FAIL-before/PASS-after, обычное и повторное выполнение, `testDebugUnitTest`, `connectedDebugAndroidTest`, debug/release lint и `git diff --check`.
->
-> Формат результата: воспроизведён риск или нет; точная interleaving-схема; причина; scoped diff; тесты и counts; остаточные ограничения; `git status --short`.
+> 1. Сначала добавить или уточнить focused test, подтверждающий идемпотентность повторного `startObserving()` и отсутствие второго observer/job owner.
+> 2. Выполнить минимальное production-изменение только в lifecycle wiring.
+> 3. Проверить, что существующие cancellation/download/cleanup tests Smart Listening не регрессировали.
+> 4. Прогнать targeted test, полный `testDebugUnitTest`, `connectedDebugAndroidTest` на Pixel 9 AVD API 37, debug/release lint и `git diff --check`.
+> 5. Code review, затем локальный task-коммит только с явно перечисленными файлами. Не делать push, release APK или публикацию без отдельного решения.
 
-**Критерий завершения:** либо детерминированно доказано отсутствие расхождения без production-правок, либо regression воспроизводит прежний race и проходит после минимального исправления с одним согласованным набором IDs.
+**Разрешённый scope:** `MainActivity.kt`, узкий lifecycle/Smart Listening regression test; `SmartListeningManager.kt` только если тест докажет необходимость изменения его idempotency-контракта.
 
-**Следующий переход:** Team Lead code review; затем узкая QA concurrency-проверка. При отсутствии воспроизведения закрыть гипотезу и активировать `MPOD-MAINT-01`.
+**Критерий завершения:** в production остаётся один process-level вызов `startObserving()`, повторный запуск остаётся безопасным и тестируемым, Activity recreation не владеет остановкой observer, все проверки проходят.
+
+**Следующий переход:** code review; затем решить, активировать ли `MPOD-COMPAT-01` или перейти к release gate `MPOD-REL-02`.
 
 ---
 
-## 2. НЕАКТИВНО — Единый lifecycle-владелец Smart Listening
-
-**ID:** `MPOD-MAINT-01`
-**Приоритет:** P3.
-**Статус:** подтверждённое дублирование без текущего пользовательского сбоя.
-
-После активации оставить запуск автоматического наблюдения в `MpodApplication`, удалить лишний запуск из `MainActivity`, сохранить idempotent start/stop tests и проверить process recreation. Политику Smart Listening не перерабатывать.
-
----
-
-## 3. НЕАКТИВНО — Безопасные Room-миграции до изменения схемы
+## 2. НЕАКТИВНО — Безопасные Room-миграции до изменения схемы
 
 **ID:** `MPOD-REL-01`
 **Статус:** активировать только перед фактическим изменением Room schema.
@@ -94,22 +71,25 @@
 
 ---
 
-## 4. НЕАКТИВНО — RSS namespace compatibility
+## 3. НЕАКТИВНО — RSS namespace compatibility
 
 **ID:** `MPOD-COMPAT-01`
 **Статус:** гипотеза; production-изменение не разрешено без fixture, который воспроизводит несовместимость.
 
 ---
 
-## 5. НЕАКТИВНО — Финальный regression gate и новый APK
+## 4. НЕАКТИВНО — Финальный regression gate и новый APK
 
 **ID:** `MPOD-REL-02`
 **Статус:** выполнять после закрытия активных defect/maintenance задач по отдельному release-решению.
 
+Нужны полный regression gate, решение о version bump, сборка нового `com.prod.mpod` release APK, SHA-256 и отдельная приёмка. Старый APK 1.0.17 (18) не содержит `MPOD-BUG-03`.
+
 ---
 
-## Не возвращать в работу без новых фактов
+## Закрыто — не возвращать без новых фактов
 
-- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02` и `MPOD-QA-02-R1` закрыты.
-- Не откатывать `341002d`, `dda7734` или `da4c6a7` ради искусственного FAIL-before.
+- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02`, `MPOD-QA-02-R1` и `MPOD-BUG-03` закрыты.
+- `MPOD-BUG-03`: commit `3fb7f45`; regression FAIL-before/PASS-after подтверждён; дополнительный review — `APPROVED`.
+- Не откатывать `341002d`, `dda7734`, `da4c6a7` или `3fb7f45` ради искусственного FAIL-before.
 - Старый `MPOD-OPS-02` завершён checkpoint-коммитом `8655106`.
