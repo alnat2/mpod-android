@@ -72,4 +72,51 @@ class RssFeedParserTest {
         assertEquals("https://example.com/audio.mp3", feed.episodes[0].audioUrl)
         assertEquals("https://example.com/audio.mp3", feed.episodes[0].guid)
     }
+
+    @Test
+    fun parseRssWithCustomNamespacePrefixes() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"
+                 xmlns:apple="http://www.itunes.com/dtds/podcast-1.0.dtd"
+                 xmlns:c="http://purl.org/rss/1.0/modules/content/"
+                 xmlns:dublin="http://purl.org/dc/elements/1.1/"
+                 xmlns:fake="http://fake.com"
+                 xmlns:itunes="http://wrong-itunes.com">
+              <channel>
+                <title>Namespace Ring</title>
+                <dublin:creator>Alias Author</dublin:creator>
+                <apple:image href="https://example.com/alias.jpg" />
+                <!-- itunes prefix but wrong namespace, should be ignored or treated as unknown -->
+                <itunes:summary>Wrong Summary</itunes:summary>
+                <apple:summary>Correct Summary</apple:summary>
+                <item>
+                  <title>Episode with aliases</title>
+                  <guid>guid-ep-alias</guid>
+                  <pubDate>Mon, 31 Mar 2026 12:00:00 GMT</pubDate>
+                  <c:encoded>Correct encoded description</c:encoded>
+                  <apple:duration>1000</apple:duration>
+                  <!-- Should not use duration from wrong namespace -->
+                  <itunes:duration>9999</itunes:duration>
+                  <enclosure url="https://example.com/alias.mp3" length="45000000" type="audio/mpeg" />
+                </item>
+              </channel>
+            </rss>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml.byteInputStream())
+
+        assertEquals("Namespace Ring", feed.title)
+        assertEquals("Correct Summary", feed.description)
+        assertEquals("Alias Author", feed.author)
+        assertEquals("https://example.com/alias.jpg", feed.artworkUrl)
+        assertEquals(1, feed.episodes.size)
+
+        val ep1 = feed.episodes[0]
+        assertEquals("Episode with aliases", ep1.title)
+        assertEquals("guid-ep-alias", ep1.guid)
+        assertEquals("Correct encoded description", ep1.description)
+        assertEquals(1000L, ep1.durationSeconds)
+        assertEquals("https://example.com/alias.mp3", ep1.audioUrl)
+    }
 }

@@ -30,9 +30,13 @@ data class ParsedEpisodeItem(
 
 object RssFeedParser {
 
+    private const val NS_ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
+    private const val NS_CONTENT = "http://purl.org/rss/1.0/modules/content/"
+    private const val NS_DC = "http://purl.org/dc/elements/1.1/"
+
     private val parserFactory: XmlPullParserFactory by lazy {
         XmlPullParserFactory.newInstance().apply {
-            isNamespaceAware = false
+            isNamespaceAware = true
         }
     }
 
@@ -89,23 +93,24 @@ object RssFeedParser {
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
             val name = parser.name.lowercase(Locale.US)
+            val ns = parser.namespace ?: ""
             when {
-                name == "title" && title.isEmpty() -> title = readText(parser)
-                (name == "description" || name == "itunes:summary") && description.isEmpty() -> description = readText(parser)
-                (name == "itunes:author" || name == "author" || name == "dc:creator") && author.isEmpty() -> author = readText(parser)
-                name == "link" && link.isEmpty() -> link = readText(parser)
-                name == "lastbuilddate" || name == "pubdate" -> lastBuildDate = readText(parser)
-                name == "itunes:image" -> {
+                name == "title" && ns.isEmpty() && title.isEmpty() -> title = readText(parser)
+                (name == "description" && ns.isEmpty() || name == "summary" && ns == NS_ITUNES) && description.isEmpty() -> description = readText(parser)
+                (name == "author" && (ns.isEmpty() || ns == NS_ITUNES) || name == "creator" && ns == NS_DC) && author.isEmpty() -> author = readText(parser)
+                name == "link" && ns.isEmpty() && link.isEmpty() -> link = readText(parser)
+                (name == "lastbuilddate" || name == "pubdate") && ns.isEmpty() -> lastBuildDate = readText(parser)
+                name == "image" && ns == NS_ITUNES -> {
                     val href = parser.getAttributeValue(null, "href")
                     if (!href.isNullOrBlank() && artworkUrl.isEmpty()) {
                         artworkUrl = href
                     }
                     skip(parser)
                 }
-                name == "image" && artworkUrl.isEmpty() -> {
+                name == "image" && ns.isEmpty() && artworkUrl.isEmpty() -> {
                     artworkUrl = readImageUrl(parser)
                 }
-                name == "item" -> {
+                name == "item" && ns.isEmpty() -> {
                     episodes.add(readItem(parser))
                 }
                 else -> skip(parser)
@@ -126,7 +131,7 @@ object RssFeedParser {
         var url = ""
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
-            if (parser.name.equals("url", ignoreCase = true)) {
+            if (parser.name.equals("url", ignoreCase = true) && (parser.namespace ?: "").isEmpty()) {
                 url = readText(parser)
             } else {
                 skip(parser)
@@ -147,24 +152,25 @@ object RssFeedParser {
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
             val name = parser.name.lowercase(Locale.US)
+            val ns = parser.namespace ?: ""
             when {
-                name == "guid" -> guid = readText(parser)
-                name == "title" -> title = readText(parser)
-                (name == "description" || name == "content:encoded" || name == "itunes:summary") && description.isEmpty() -> {
+                name == "guid" && ns.isEmpty() -> guid = readText(parser)
+                name == "title" && ns.isEmpty() -> title = readText(parser)
+                (name == "description" && ns.isEmpty() || name == "encoded" && ns == NS_CONTENT || name == "summary" && ns == NS_ITUNES) && description.isEmpty() -> {
                     description = readText(parser)
                 }
-                name == "enclosure" -> {
+                name == "enclosure" && ns.isEmpty() -> {
                     val url = parser.getAttributeValue(null, "url")
                     if (!url.isNullOrBlank()) {
                         audioUrl = url
                     }
                     skip(parser)
                 }
-                name == "itunes:duration" -> {
+                name == "duration" && ns == NS_ITUNES -> {
                     val durStr = readText(parser)
                     durationSeconds = parseDuration(durStr)
                 }
-                name == "pubdate" -> {
+                name == "pubdate" && ns.isEmpty() -> {
                     publishedAtString = readText(parser)
                     publishedAt = parseDate(publishedAtString)
                 }
