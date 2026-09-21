@@ -9,7 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.lifecycleScope
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
-import com.example.mpod.playback.SmartListeningManager
+
 import com.example.mpod.ui.navigation.AppNavigation
 import com.example.mpod.ui.theme.MpodTheme
 import com.example.mpod.ui.theme.ThemeMode
@@ -20,12 +20,10 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        smartListeningManager.startObserving()
         enableEdgeToEdge()
 
         setContent {

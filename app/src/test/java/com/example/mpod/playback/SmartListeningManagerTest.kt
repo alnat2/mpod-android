@@ -218,6 +218,17 @@ class SmartListeningManagerTest {
     }
 
     @Test
+    fun startObserving_calledTwice_idempotentAndSingleJob() = runBlocking {
+        manager.startObserving()
+        val firstJob = manager.activeObservationJobForTest
+        assertNotNull("Job must be created on first start", firstJob)
+
+        manager.startObserving()
+        val secondJob = manager.activeObservationJobForTest
+        assertTrue("Subsequent start must not create a new job instance", firstJob === secondJob)
+    }
+
+    @Test
     fun removedFromPlaylistBeforeDebounce_cancelsPendingJob() = runBlocking {
         manager.startObserving()
         val item = createPlaylistItemWithEpisode(episodeId = 501L, podcastId = 1L, isDownloaded = false)

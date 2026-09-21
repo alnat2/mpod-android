@@ -52,6 +52,9 @@ class SmartListeningManager @Inject constructor(
     private val pendingDownloadJobs = ConcurrentHashMap<Long, Job>()
     private var observationJob: Job? = null
 
+    internal val activeObservationJobForTest: Job?
+        get() = observationJob
+
     internal var fileOps: FileOperations = DefaultFileOperations
     internal var debounceMs: Long = 15_000L
     internal var preDaoHook: (suspend () -> Unit)? = null
