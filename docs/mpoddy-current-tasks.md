@@ -15,10 +15,11 @@
 ## Фактическое состояние кандидата
 
 - Ветка: `codex/qa-obvious-bugs`.
-- Текущий локальный HEAD: `3fb7f45` (`fix: make mark-all-listened cleanup race-safe`). Push не выполнялся; совпадение с remote HEAD после этого коммита не заявляется.
+- Текущий локальный HEAD: `686423a` (`fix: require explicit Room migrations`). Push этого коммита не выполнялся.
 - `MPOD-BUG-01` и rework закрыты: `dda7734` + `da4c6a7`.
 - `MPOD-BUG-02` закрыт: `341002d`.
 - `MPOD-QA-02-R1`: `PASS` на Pixel 9 AVD API 37.
+- `MPOD-MAINT-01` закрыт другой командой: `67c0da0` (`Fix duplicate Smart Listening start on Activity recreation`), опубликован в `origin/codex/qa-obvious-bugs`.
 - `MPOD-BUG-03` закрыт: исходная concurrent-refresh гонка и follow-up cleanup/re-add гонка воспроизведены детерминированно и исправлены в `3fb7f45`.
 - Финальные проверки `MPOD-BUG-03`: 173/173 JVM tests PASS; 64/64 connected tests PASS на Pixel 9 AVD API 37; debug/release lint PASS; `git diff --check` PASS.
 - Room schema, `versionName`/`versionCode` и release APK в `MPOD-BUG-03` не менялись. Физический телефон не проверялся.
@@ -27,58 +28,38 @@
 
 ---
 
-## 1. АКТИВНО — 21.09.2026 — Единый lifecycle-владелец Smart Listening
-
-**ID:** `MPOD-MAINT-01`
-**Направление:** Android lifecycle / Smart Listening.
-**Приоритет:** P3.
-**Статус:** подтверждённое дублирование вызова без подтверждённого пользовательского сбоя.
-**Единственный следующий исполнитель:** Codex как Android-разработчик в локальном репозитории на рабочем компьютере. Телефон и эмулятор для первого этапа не нужны.
-
-### Передать исполнителю целиком
-
-> Устранить дублирующий запуск Smart Listening observer. Сейчас `SmartListeningManager.startObserving()` вызывается и из `MpodApplication.onCreate()`, и из `MainActivity.onCreate()`. Сам manager защищён `if (observationJob != null) return`, поэтому подтверждённого пользовательского дефекта нет, но ownership размазан между process- и activity-lifecycle.
->
-> Целевой контракт:
->
-> 1. Единственный production-владелец запуска — `MpodApplication` на время жизни процесса.
-> 2. Удалить injection `SmartListeningManager` и вызов `startObserving()` из `MainActivity`.
-> 3. Не добавлять activity-level `stopObserving()`: recreation Activity не должна останавливать process-level observer или активные Smart Listening jobs.
-> 4. Не менять автоматическую политику загрузки, debounce, cleanup, Room schema, UI и тексты.
->
-> Реализация и проверки:
->
-> 1. Сначала добавить или уточнить focused test, подтверждающий идемпотентность повторного `startObserving()` и отсутствие второго observer/job owner.
-> 2. Выполнить минимальное production-изменение только в lifecycle wiring.
-> 3. Проверить, что существующие cancellation/download/cleanup tests Smart Listening не регрессировали.
-> 4. Прогнать targeted test, полный `testDebugUnitTest`, `connectedDebugAndroidTest` на Pixel 9 AVD API 37, debug/release lint и `git diff --check`.
-> 5. Code review, затем локальный task-коммит только с явно перечисленными файлами. Не делать push, release APK или публикацию без отдельного решения.
-
-**Разрешённый scope:** `MainActivity.kt`, узкий lifecycle/Smart Listening regression test; `SmartListeningManager.kt` только если тест докажет необходимость изменения его idempotency-контракта.
-
-**Критерий завершения:** в production остаётся один process-level вызов `startObserving()`, повторный запуск остаётся безопасным и тестируемым, Activity recreation не владеет остановкой observer, все проверки проходят.
-
-**Следующий переход:** code review; затем решить, активировать ли `MPOD-COMPAT-01` или перейти к release gate `MPOD-REL-02`.
-
----
-
-## 2. НЕАКТИВНО — Безопасные Room-миграции до изменения схемы
+## 1. АКТИВНО — 21.09.2026 — Безопасные Room-миграции
 
 **ID:** `MPOD-REL-01`
-**Статус:** активировать только перед фактическим изменением Room schema.
+**Направление:** Room persistence / release safety.
+**Статус:** реализация завершена в `686423a`; ожидается code review.
+**Единственный следующий исполнитель:** reviewer Android/Room. Проверять локальный commit `686423a`; production APK и физическое устройство для review не требуются.
 
-Запретить destructive fallback для production migration path и добавить migration tests до увеличения версии схемы.
+### Передать ревьюеру целиком
+
+> Проверить `MPOD-REL-01` в commit `686423a`.
+>
+> - Production database builder больше не вызывает `fallbackToDestructiveMigration()`: при будущей несовместимой версии без явной migration приложение должно отказать в открытии, а не удалять пользовательские данные.
+> - `MpodDatabase` остаётся version 1; вымышленная migration 1→2 не добавлялась.
+> - Включён `exportSchema`, schema v1 зафиксирована в `app/schemas/com.example.mpod.data.local.MpodDatabase/1.json` и подключена как androidTest asset.
+> - Добавлен Room `MigrationTestHelper` baseline: создаёт базу из архивной schema v1, записывает podcast/episode/playlist и повторно открывает её текущим `MpodDatabase` без потери данных.
+> - Проверки: 175/175 JVM tests PASS; targeted migration baseline PASS; 65/65 connected tests PASS на Pixel 9 AVD API 37; debug/release lint PASS; `git diff --check` PASS.
+> - Проверить scope из шести файлов, отсутствие schema/version bump, release APK и push.
+
+**Критерий завершения:** review подтверждает отсутствие destructive fallback, корректность schema archive/test wiring и честную границу: реальная migration добавляется только вместе с будущим schema bump.
+
+**Следующий переход:** при `APPROVED` закрыть `MPOD-REL-01` и активировать `MPOD-COMPAT-01`; при blocker исправить его в этой же задаче.
 
 ---
 
-## 3. НЕАКТИВНО — RSS namespace compatibility
+## 2. НЕАКТИВНО — RSS namespace compatibility
 
 **ID:** `MPOD-COMPAT-01`
 **Статус:** гипотеза; production-изменение не разрешено без fixture, который воспроизводит несовместимость.
 
 ---
 
-## 4. НЕАКТИВНО — Финальный regression gate и новый APK
+## 3. НЕАКТИВНО — Финальный regression gate и новый APK
 
 **ID:** `MPOD-REL-02`
 **Статус:** выполнять после закрытия активных defect/maintenance задач по отдельному release-решению.
@@ -89,7 +70,7 @@
 
 ## Закрыто — не возвращать без новых фактов
 
-- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02`, `MPOD-QA-02-R1` и `MPOD-BUG-03` закрыты.
+- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02`, `MPOD-QA-02-R1`, `MPOD-BUG-03` и `MPOD-MAINT-01` закрыты.
 - `MPOD-BUG-03`: commit `3fb7f45`; regression FAIL-before/PASS-after подтверждён; дополнительный review — `APPROVED`.
 - Не откатывать `341002d`, `dda7734`, `da4c6a7` или `3fb7f45` ради искусственного FAIL-before.
 - Старый `MPOD-OPS-02` завершён checkpoint-коммитом `8655106`.
