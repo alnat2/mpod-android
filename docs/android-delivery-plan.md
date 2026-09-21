@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-06 (product-focused defect pool refreshed after physical-phone review and targeted code analysis)
 
-Current Android source baseline: `1.0.17 (18)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
+Current Android source baseline: `1.0.18 (19)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
 
 ## Purpose
 
@@ -110,7 +110,7 @@ GitHub uses one release workflow on pushes to `main`/`master` and manual dispatc
 - Every production APK installed for product-owner testing or handed off as a new build receives a new patch `versionName`.
 - `versionCode` increases by exactly one for every such build and is never reused, even when the preceding APK was not publicly released.
 - A version bump is committed with the changes included in that APK, so an installed version can be traced to one source revision.
-- Current build: `1.0.17 (18)`.
+- Current build: `1.0.18 (19)`.
 
 ### Current active backlog
 
