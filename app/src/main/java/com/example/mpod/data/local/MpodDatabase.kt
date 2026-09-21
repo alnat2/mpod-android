@@ -16,7 +16,7 @@ import com.example.mpod.data.local.entity.PodcastEntity
         PlaylistItemEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class MpodDatabase : RoomDatabase() {
     abstract fun podcastDao(): PodcastDao

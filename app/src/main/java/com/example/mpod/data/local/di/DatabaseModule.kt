@@ -25,7 +25,6 @@ object DatabaseModule {
             MpodDatabase::class.java,
             "mpoddy.db"
         )
-        .fallbackToDestructiveMigration()
         .build()
     }
 
