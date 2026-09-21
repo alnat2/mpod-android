@@ -402,6 +402,15 @@ class SmartListeningManagerTest {
         assertNull("localFilePath must be null after cleanup", resetCalls[0].path)
     }
 
+    @Test
+    fun cleanupEpisodeFile_downloadedFlagWithoutPath_clearsStaleMetadata() = runBlocking {
+        fakeEpisodeDao.insertEpisode(EpisodeEntity(id = 604, podcastId = 1, guid = "guid604",
+            title = "No linked file", audioUrl = "https://example.com/604.mp3", isDownloaded = true))
+        assertEquals(CleanupResult.Success, manager.cleanupEpisodeFile(604))
+        assertFalse(fakeEpisodeDao.getEpisodeById(604)!!.isDownloaded)
+        assertEquals(listOf(DownloadedState(604, false, null)), fakeEpisodeDao.downloadedStates)
+    }
+
     // ── SL-FIX-03: cleanupFailed observable by caller ────────────────────────────────────────
 
     @Test
@@ -712,6 +721,9 @@ class SmartListeningManagerTest {
         }
         override fun setListened(episodeId: Long, listened: Boolean) {}
         override fun setAllListenedForPodcast(podcastId: Long, listened: Boolean) {}
+        override fun getPlaylistEpisodeIdsForPodcast(podcastId: Long): List<Long> = emptyList()
+        override fun setEpisodesListened(episodeIds: List<Long>): Int = error("Manager does not mark listened")
+        override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("Manager does not delete playlist")
         override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {}
         override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
             if (throwOnUpdateDownloadState) {
@@ -723,6 +735,12 @@ class SmartListeningManagerTest {
                 episodes.removeAll { it.id == episodeId }
                 episodes.add(existing.copy(isDownloaded = isDownloaded, localFilePath = localFilePath))
             }
+        }
+        override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int {
+            val existing = episodes.find { it.id == episodeId } ?: return 0
+            if (existing.isDownloaded != expectedIsDownloaded || existing.localFilePath != expectedLocalFilePath) return 0
+            updateDownloadState(episodeId, isDownloaded = false, localFilePath = null)
+            return 1
         }
         override fun getDownloadedEpisodes(): List<EpisodeEntity> = emptyList()
     }

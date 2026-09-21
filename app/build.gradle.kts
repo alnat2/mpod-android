@@ -129,6 +129,8 @@ dependencies {
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
+    // Match resolved core 1.7.3; Main dispatcher control for local ViewModel tests only.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation(libs.mockwebserver)
     testImplementation(libs.kxml2)
     androidTestImplementation(platform(libs.androidx.compose.bom))

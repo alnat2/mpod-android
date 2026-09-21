@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -38,6 +37,7 @@ class SubscriptionsViewModel @Inject constructor(
 
     private var pendingUnsubscribeJob: Job? = null
     private var refreshInFlight = false
+    private val markingPodcastIds = mutableSetOf<Long>()
 
     init {
         observeData()
@@ -188,14 +188,16 @@ class SubscriptionsViewModel @Inject constructor(
     fun markAllListened(podcastId: Long) {
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
         if (podcast.unlistenedEpisodeCount == 0) return
+        if (!markingPodcastIds.add(podcastId)) return
         viewModelScope.launch {
-            val episodes = withContext(Dispatchers.IO) { episodeDao.getEpisodesByPodcastId(podcastId) }
-            podcastRepository.markAllEpisodesListened(podcastId, true)
-            for (ep in episodes) {
-                playlistRepository.removeFromPlaylist(ep.id)
-                smartListeningManager.cleanupEpisodeFile(ep.id)
+            try {
+                val result = podcastRepository.markAllEpisodesListened(podcastId)
+                for (failure in result.cleanupFailures) {
+                    android.util.Log.e("MarkAllListened", "Cleanup failed for episode ${failure.episodeId}: ${failure.path} (${failure.error})")
+                }
+            } finally {
+                markingPodcastIds.remove(podcastId)
             }
-            queueInvalidator.invalidate()
         }
     }
 

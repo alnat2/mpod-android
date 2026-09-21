@@ -8,6 +8,7 @@ import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
+import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -41,7 +42,9 @@ class PodcastRepositoryOpmlTest {
             podcastDao = fakePodcastDao,
             episodeDao = fakeEpisodeDao,
             appSettingsDataStore = fakeAppSettingsDataStore,
-            proxyHttpClientFactory = proxyHttpClientFactory
+            proxyHttpClientFactory = proxyHttpClientFactory,
+            smartListeningManager = repositoryCleanupManager(fakeEpisodeDao, proxyHttpClientFactory),
+            queueInvalidator = PlaybackQueueInvalidator()
         )
     }
 
@@ -160,8 +163,12 @@ class PodcastRepositoryOpmlTest {
         override fun update(episode: EpisodeEntity) {}
         override fun setListened(episodeId: Long, listened: Boolean) {}
         override fun setAllListenedForPodcast(podcastId: Long, listened: Boolean) {}
+        override fun getPlaylistEpisodeIdsForPodcast(podcastId: Long): List<Long> = emptyList()
+        override fun setEpisodesListened(episodeIds: List<Long>): Int = error("OPML does not mark listened")
+        override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("OPML does not delete playlist")
         override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {}
         override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {}
+        override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int = 0
         override fun getDownloadedEpisodes(): List<EpisodeEntity> = episodes.filter { it.isDownloaded }
     }
 }

@@ -11,10 +11,16 @@ import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.rss.OpmlParser
 import com.example.mpod.data.rss.ParsedPodcastFeed
 import com.example.mpod.data.rss.RssFeedParser
+import com.example.mpod.playback.CleanupResult
+import com.example.mpod.playback.PlaybackQueueInvalidator
+import com.example.mpod.playback.SmartListeningManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.Request
 import java.io.File
 import java.io.InputStream
@@ -24,13 +30,32 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class EpisodeCleanupFailure(
+    val episodeId: Long,
+    val path: String?,
+    val error: String? = null
+)
+
+data class MarkAllListenedResult(
+    val targetEpisodeIds: List<Long>,
+    val listenedEpisodeIds: List<Long>,
+    val removedPlaylistEpisodeIds: List<Long>,
+    val cleanupFailures: List<EpisodeCleanupFailure>
+)
+
 @Singleton
 class PodcastRepository @Inject constructor(
     private val podcastDao: PodcastDao,
     private val episodeDao: EpisodeDao,
     private val appSettingsDataStore: AppSettingsDataStore,
-    private val proxyHttpClientFactory: ProxyHttpClientFactory
+    private val proxyHttpClientFactory: ProxyHttpClientFactory,
+    private val smartListeningManager: SmartListeningManager,
+    private val queueInvalidator: PlaybackQueueInvalidator
 ) {
+    // Serialize mark/retry through filesystem completion; unsubscribe cannot destroy its Room
+    // links in the meantime. Additive refresh needs no network lock: Room linearizes its inserts.
+    private val markActionMutex = Mutex()
+
     fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = podcastDao.getAllPodcastsFlow()
 
     fun getEpisodesByPodcastIdFlow(podcastId: Long): Flow<List<EpisodeEntity>> =
@@ -161,17 +186,19 @@ class PodcastRepository @Inject constructor(
     }
 
     suspend fun unsubscribe(podcastId: Long) = withContext(Dispatchers.IO) {
-        val episodes = episodeDao.getEpisodesByPodcastId(podcastId)
-        for (ep in episodes) {
-            if (!ep.localFilePath.isNullOrBlank()) {
-                val f = File(ep.localFilePath)
-                if (f.exists()) f.delete()
+        markActionMutex.withLock {
+            val episodes = episodeDao.getEpisodesByPodcastId(podcastId)
+            for (ep in episodes) {
+                if (!ep.localFilePath.isNullOrBlank()) {
+                    val f = File(ep.localFilePath)
+                    if (f.exists()) f.delete()
+                }
             }
-        }
-        val activeEpisodeId = appSettingsDataStore.getActiveEpisodeId()
-        podcastDao.deleteById(podcastId)
-        if (activeEpisodeId != null && episodeDao.getEpisodeById(activeEpisodeId) == null) {
-            appSettingsDataStore.setActiveEpisodeId(null)
+            val activeEpisodeId = appSettingsDataStore.getActiveEpisodeId()
+            podcastDao.deleteById(podcastId)
+            if (activeEpisodeId != null && episodeDao.getEpisodeById(activeEpisodeId) == null) {
+                appSettingsDataStore.setActiveEpisodeId(null)
+            }
         }
     }
 
@@ -179,8 +206,35 @@ class PodcastRepository @Inject constructor(
         episodeDao.setListened(episodeId, isListened)
     }
 
-    suspend fun markAllEpisodesListened(podcastId: Long, isListened: Boolean) = withContext(Dispatchers.IO) {
-        episodeDao.setAllListenedForPodcast(podcastId, isListened)
+    suspend fun markAllEpisodesListened(podcastId: Long): MarkAllListenedResult = withContext(Dispatchers.IO) {
+        markActionMutex.withLock {
+            val snapshot = episodeDao.markAllListenedAndRemoveFromPlaylist(podcastId)
+            val failures = mutableListOf<EpisodeCleanupFailure>()
+            try {
+                for (episode in snapshot.episodes) {
+                    try {
+                        when (val result = smartListeningManager.cleanupEpisodeFile(episode.id)) {
+                            CleanupResult.Success -> Unit
+                            is CleanupResult.DeleteFailed -> failures.add(EpisodeCleanupFailure(episode.id, result.path))
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        // Keep failed cleanup observable. Room still owns the path for a retry;
+                        // if deletion succeeded but reset failed, missing-file cleanup can retry it.
+                        failures.add(EpisodeCleanupFailure(episode.id, episode.localFilePath, error.message))
+                    }
+                }
+            } finally {
+                if (snapshot.removedPlaylistEpisodeIds.isNotEmpty()) queueInvalidator.invalidate()
+            }
+            MarkAllListenedResult(
+                targetEpisodeIds = snapshot.episodes.map { it.id },
+                listenedEpisodeIds = snapshot.listenedEpisodeIds,
+                removedPlaylistEpisodeIds = snapshot.removedPlaylistEpisodeIds,
+                cleanupFailures = failures
+            )
+        }
     }
 
     suspend fun updatePlaybackPosition(episodeId: Long, positionMs: Long) = withContext(Dispatchers.IO) {

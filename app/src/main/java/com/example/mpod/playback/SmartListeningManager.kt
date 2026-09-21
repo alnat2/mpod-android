@@ -65,12 +65,17 @@ class SmartListeningManager @Inject constructor(
 
                 val cancelledIds = pendingDownloadJobs.keys.filter { it !in currentPlaylistEpisodeIds }
                 for (id in cancelledIds) {
-                    pendingDownloadJobs.remove(id)?.cancel()
+                    // Keep the job discoverable until its finally block removes it. Cleanup
+                    // must still be able to join a download already cancelled by this observer.
+                    pendingDownloadJobs[id]?.cancelAndJoin()
                     android.util.Log.d("SmartListening", "Cancelled download for removed episode $id")
                 }
 
                 for (item in items) {
                     val ep = item.episode
+                    // A removed episode may be re-added while cancellation is finishing.
+                    // Wait for that old owner before allowing a replacement download.
+                    pendingDownloadJobs[ep.id]?.takeIf { it.isCancelled }?.join()
                     if (!ep.isDownloaded && ep.localFilePath.isNullOrBlank()) {
                         if (!ep.audioUrl.isNullOrBlank() && !pendingDownloadJobs.containsKey(ep.id)) {
                             scheduleDebouncedDownload(ep.id, ep.audioUrl)
@@ -232,7 +237,7 @@ class SmartListeningManager @Inject constructor(
         }
 
     suspend fun cleanupEpisodeFile(episodeId: Long): CleanupResult = withContext(Dispatchers.IO) {
-        pendingDownloadJobs.remove(episodeId)?.cancelAndJoin()
+        pendingDownloadJobs[episodeId]?.cancelAndJoin()
 
         val episode = episodeDao.getEpisodeById(episodeId)
             ?: return@withContext CleanupResult.Success
@@ -244,7 +249,20 @@ class SmartListeningManager @Inject constructor(
                 android.util.Log.e("SmartListening", "Failed to delete audio file: ${file.absolutePath} for episode $episodeId. Skipping Room state reset to prevent desync.")
                 return@withContext CleanupResult.DeleteFailed(episode.localFilePath)
             }
-            episodeDao.updateDownloadState(episodeId, isDownloaded = false, localFilePath = null)
+            // Only clear the state that owned the deleted file. A newer download may have
+            // committed a different path while this cleanup was deleting the old one.
+            episodeDao.clearDownloadStateIfMatches(
+                episodeId = episodeId,
+                expectedIsDownloaded = episode.isDownloaded,
+                expectedLocalFilePath = episode.localFilePath
+            )
+        } else if (episode.isDownloaded) {
+            // No file is linked, so there is nothing to delete before clearing stale metadata.
+            episodeDao.clearDownloadStateIfMatches(
+                episodeId = episodeId,
+                expectedIsDownloaded = true,
+                expectedLocalFilePath = null
+            )
         }
         CleanupResult.Success
     }

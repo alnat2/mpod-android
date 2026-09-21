@@ -8,6 +8,7 @@ import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
+import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -147,7 +148,9 @@ class PodcastRepositoryRefreshAllTest {
             podcastDao = podcastDao,
             episodeDao = episodeDao,
             appSettingsDataStore = settings,
-            proxyHttpClientFactory = proxyHttpClientFactory
+            proxyHttpClientFactory = proxyHttpClientFactory,
+            smartListeningManager = repositoryCleanupManager(episodeDao, proxyHttpClientFactory),
+            queueInvalidator = PlaybackQueueInvalidator()
         )
     }
 
@@ -308,8 +311,19 @@ class PodcastRepositoryRefreshAllTest {
             mutate(episodeId) { it.copy(playbackPositionMs = positionMs) }
         }
 
+        override fun getPlaylistEpisodeIdsForPodcast(podcastId: Long): List<Long> = emptyList()
+        override fun setEpisodesListened(episodeIds: List<Long>): Int = error("Refresh does not mark listened")
+        override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("Refresh does not delete playlist")
+
         override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
             mutate(episodeId) { it.copy(isDownloaded = isDownloaded, localFilePath = localFilePath) }
+        }
+
+        override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int {
+            val current = episodes.firstOrNull { it.id == episodeId }
+            if (current?.isDownloaded != expectedIsDownloaded || current.localFilePath != expectedLocalFilePath) return 0
+            mutate(episodeId) { it.copy(isDownloaded = false, localFilePath = null) }
+            return 1
         }
 
         override fun getDownloadedEpisodes(): List<EpisodeEntity> = episodes.filter { it.isDownloaded }
