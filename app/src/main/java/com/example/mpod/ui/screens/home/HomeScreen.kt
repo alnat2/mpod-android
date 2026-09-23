@@ -161,7 +161,7 @@ fun HomeRoute(
         playbackStateProvider = playbackStateProvider,
         onPlayToggle = {
             controller?.let { player ->
-                if (playbackIntentActive(player.playWhenReady)) {
+                if (playbackIntentActive(player.playWhenReady, player.playerError != null)) {
                     player.pause()
                 } else {
                     if (player.playerError != null) player.prepare()
@@ -634,7 +634,7 @@ private fun Player?.toHomePlaybackUiState(
         currentEpisodeId = episodeId,
         positionSeconds = (positionMs / 1_000L).toInt().coerceAtLeast(0),
         durationSeconds = (durationMs / 1_000L).toInt().coerceAtLeast(0),
-        isPlaying = playbackIntentActive(this?.playWhenReady == true),
+        isPlaying = playbackIntentActive(this?.playWhenReady == true, this?.playerError != null),
         speedLabel = this?.playbackParameters?.speed.toSpeedLabel(),
         errorMessage = this?.playerError?.let {
             "Could not play this episode. Check its audio source and try again."
@@ -642,7 +642,8 @@ private fun Player?.toHomePlaybackUiState(
     )
 }
 
-internal fun playbackIntentActive(playWhenReady: Boolean): Boolean = playWhenReady
+internal fun playbackIntentActive(playWhenReady: Boolean, hasError: Boolean = false): Boolean =
+    playWhenReady && !hasError
 
 private fun Float?.toSpeedLabel(): String = when (this) {
     0.5f -> "0.5"

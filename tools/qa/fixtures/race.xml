@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:p="http://www.itunes.com/dtds/podcast-1.0.dtd"
+ xmlns:c="http://purl.org/rss/1.0/modules/content/" xmlns:d="http://purl.org/dc/elements/1.1/"
+ xmlns:x="urn:mpoddy:qa:unknown"><channel>
+<x:title>POISON podcast</x:title><title>QA race</title>
+<x:author>POISON author</x:author><x:creator>POISON creator</x:creator><p:author>QA Alias Author</p:author>
+<x:summary>POISON channel</x:summary><p:summary>QA channel summary</p:summary>
+<x:image href="http://127.0.0.1:8765/missing.png"/><p:image href="http://127.0.0.1:8765/artwork.png"/>
+<link>http://127.0.0.1:8765/</link><lastBuildDate>Mon, 21 Sep 2026 10:00:00 +0000</lastBuildDate>
+<item>
+<x:title>POISON title</x:title><title>QA race episode 1</title>
+<x:guid>POISON guid</x:guid><guid isPermaLink="false">qa-race-1</guid>
+<x:encoded>POISON description</x:encoded><x:summary>POISON summary</x:summary><c:encoded><![CDATA[<p>QA content 1</p>]]></c:encoded>
+<x:enclosure url="http://127.0.0.1:8765/missing.wav"/>
+<enclosure url="http://127.0.0.1:8765/audio/race-1.wav" length="960044" type="audio/wav"/>
+<p:duration>00:00:30</p:duration><x:duration>99:59:59</x:duration>
+<pubDate>Mon, 21 Sep 2026 10:00:01 +0000</pubDate>
+<x:pubDate>Tue, 01 Jan 2030 00:00:00 +0000</x:pubDate>
+</item><item>
+<x:title>POISON title</x:title><title>QA race episode 2</title>
+<x:guid>POISON guid</x:guid><guid isPermaLink="false">qa-race-2</guid>
+<x:encoded>POISON description</x:encoded><x:summary>POISON summary</x:summary><p:summary>QA summary 2</p:summary>
+<x:enclosure url="http://127.0.0.1:8765/missing.wav"/>
+<enclosure url="http://127.0.0.1:8765/audio/race-2.wav" length="960044" type="audio/wav"/>
+<p:duration>00:00:30</p:duration><x:duration>99:59:59</x:duration>
+<pubDate>Mon, 21 Sep 2026 10:00:02 +0000</pubDate>
+<x:pubDate>Tue, 01 Jan 2030 00:00:00 +0000</x:pubDate>
+</item><item>
+<x:title>POISON title</x:title><title>QA race episode 3</title>
+<x:guid>POISON guid</x:guid><guid isPermaLink="false">qa-race-3</guid>
+<x:encoded>POISON description</x:encoded><x:summary>POISON summary</x:summary><c:encoded><![CDATA[<p>QA content 3</p>]]></c:encoded>
+<x:enclosure url="http://127.0.0.1:8765/missing.wav"/>
+<enclosure url="http://127.0.0.1:8765/audio/race-3.wav" length="960044" type="audio/wav"/>
+<p:duration>00:00:30</p:duration><x:duration>99:59:59</x:duration>
+<pubDate>Mon, 21 Sep 2026 10:00:03 +0000</pubDate>
+<x:pubDate>Tue, 01 Jan 2030 00:00:00 +0000</x:pubDate>
+</item></channel></rss>

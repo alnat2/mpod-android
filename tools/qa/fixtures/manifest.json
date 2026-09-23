@@ -1,0 +1,42 @@
+{
+  "race.xml": {
+    "bytes": 2493,
+    "sha256": "1733c9c690c727ffa10aac266ac6ff433e3579452fa178efa4214aea40db6fc6"
+  },
+  "aliases.xml": {
+    "bytes": 2523,
+    "sha256": "08472effafe08554234d00c49ed9fe1e139199b051f42d5d4b0fb2dfa53fa4fe"
+  },
+  "dc.xml": {
+    "bytes": 2481,
+    "sha256": "174a3d297cfa4f6edb403b031cfd94b16bb21c4bc8e672c28a99a478a6a13548"
+  },
+  "import-a.xml": {
+    "bytes": 2533,
+    "sha256": "4d0a97b2b0e7330c313e5ac04e9d6cca6265772367c46480b85bed1ec0ad8adf"
+  },
+  "import-b.xml": {
+    "bytes": 2533,
+    "sha256": "8031ffbd6d339188826ce9202cb4dcede70c430f178269584839219892fe7115"
+  },
+  "race-v2.xml": {
+    "bytes": 3094,
+    "sha256": "a3d85724182e03cdb21d4fb34b63857e52e9bc36c5eb5912f2201a25b74e5b33"
+  },
+  "import.opml": {
+    "bytes": 350,
+    "sha256": "5203da3a7030bff18f29022a255f45af11c5f23d999c7938b3a78251feeecef6"
+  },
+  "invalid.xml": {
+    "bytes": 14,
+    "sha256": "56b4d6168e4b6513ae161d553ba2fc2fc0dec7850faebbe6d5c76545335d7ba0"
+  },
+  "tone.wav": {
+    "bytes": 960044,
+    "sha256": "90e3719f0b12829665591042acc2b7b7f1cb8a1b09a0cfe5556e609d4e361aa2"
+  },
+  "artwork.png": {
+    "bytes": 164,
+    "sha256": "e866b3a090fbd4653613f797505b76be48a24f482c31afb0b2da57dbdbd604a1"
+  }
+}
