@@ -1,0 +1,67 @@
+{
+  "apk": "build/release-handoff/mpoddy-1.0.18-19-eb34273-6880c4432152.apk",
+  "applicationId": "com.prod.mpod",
+  "versionName": "1.0.18",
+  "versionCode": 19,
+  "source_commit": "eb34273be19fd4ce593f282ae458a6ef26129c8b",
+  "remote_branch": "origin/codex/qa-obvious-bugs",
+  "source_commit_pushed": true,
+  "size_bytes": 4915716,
+  "sha256": "6880c44321522708c02fd8092196281830035f16dfd4737d54742ddc74a8935a",
+  "certificate_sha256": "61f0b1bb4485fcf4333e005e1adb43115340eb6b63b8f378cce5319430a4d012",
+  "signing": "existing release debug-key fallback",
+  "assemble_release": "BUILD SUCCESSFUL in 1m 6s; 3 executed, 51 up-to-date",
+  "qa_apk_comparison": {
+    "previous_sha256": "585949d10d2f4e4748f8a7ceacd263b5377c44b42b9188f7af2d7c1c5588c39c",
+    "final_sha256": "6880c44321522708c02fd8092196281830035f16dfd4737d54742ddc74a8935a",
+    "entry_count_before": 218,
+    "entry_count_after": 218,
+    "changed_entry_payloads": [
+      "META-INF/version-control-info.textproto"
+    ],
+    "changed_entry_metadata": [],
+    "archive_bytes_before": 4915716,
+    "archive_bytes_after": 4915716
+  },
+  "qa_results": {
+    "unit": {
+      "tests": 178,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "instrumentation": {
+      "tests": 65,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint_debug": {
+      "Warning": 117,
+      "Information": 1
+    },
+    "lint_release": {
+      "Warning": 96,
+      "Information": 1
+    },
+    "finished_at": "2026-09-23T13:21:39.409657+00:00",
+    "gradle": "BUILD SUCCESSFUL in 12m 1s",
+    "offline_retry": false
+  },
+  "qa_support_tests": {
+    "tests": 9,
+    "failures": 0
+  },
+  "qa_scope": "agreed emulator gate; physical phone and acoustic verification not run",
+  "task": "MPOD-REL-02",
+  "status": "PASS — MPOD-REL-02 CLOSED",
+  "final_update_smoke": {
+    "device": "Pixel_9 API 37, emulator-5554",
+    "installed_sha256_verified": true,
+    "subscriptions": 6,
+    "queue": "QA race episode 4, Downloaded, position 0:23, speed 1.5x, Play action; no autoplay",
+    "settings": "Last refresh 23.09 15:40; System theme",
+    "crash_buffer": "empty",
+    "data_clear": false
+  }
+}

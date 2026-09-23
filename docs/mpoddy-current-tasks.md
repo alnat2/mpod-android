@@ -2,69 +2,38 @@
 
 Единый оперативный источник текущего состояния Android-кандидата `mpoddy`.
 
-Последняя редакция: 21 сентября 2026 года.
+Последняя редакция: 23 сентября 2026 года.
 
-## Правила
+## Активные задачи
 
-- Одновременно активна только одна задача и назначен один следующий исполнитель.
-- Активная задача находится первой и передаётся исполнителю целиком.
-- Закрытая разработка не возвращается в работу без нового воспроизведения или blocker-замечания.
-- Commit включает только явно перечисленные task-файлы; посторонние локальные файлы не добавляются.
-- Version bump, release APK, push и публикация выполняются только по отдельному решению.
+**Нет. Все задачи текущего списка закрыты.**
 
-## Фактическое состояние кандидата
+Новый QA-прогон, сборку или публикацию не запускать без новой задачи либо обнаруженного дефекта. Пользовательский `AGENTS.md` не относится к release-изменениям.
 
-- Ветка: `codex/qa-obvious-bugs`.
-- Текущий локальный HEAD: `e7cc41e` (`fix: resolve XML namespace semantic aliases in RssFeedParser`); remote HEAD остаётся `4392cce`.
-- `MPOD-BUG-01` и rework закрыты: `dda7734` + `da4c6a7`.
-- `MPOD-BUG-02` закрыт: `341002d`.
-- `MPOD-QA-02-R1`: `PASS` на Pixel 9 AVD API 37.
-- `MPOD-MAINT-01` закрыт другой командой: `67c0da0` (`Fix duplicate Smart Listening start on Activity recreation`), опубликован в `origin/codex/qa-obvious-bugs`.
-- `MPOD-REL-01` закрыт после review: `686423a` (`fix: require explicit Room migrations`), release APK собирается, commit опубликован в `origin/codex/qa-obvious-bugs`.
-- `MPOD-COMPAT-01` закрыт после review: `e7cc41e`; alias-prefix fixture подтвердил FAIL-before/PASS-after, независимый итоговый прогон 176/176 JVM tests и debug/release lint прошли. Push не выполнялся.
-- `MPOD-BUG-03` закрыт: исходная concurrent-refresh гонка и follow-up cleanup/re-add гонка воспроизведены детерминированно и исправлены в `3fb7f45`.
-- Финальные проверки `MPOD-BUG-03`: 173/173 JVM tests PASS; 64/64 connected tests PASS на Pixel 9 AVD API 37; debug/release lint PASS; `git diff --check` PASS.
-- Room schema, `versionName`/`versionCode` и release APK в `MPOD-BUG-03` не менялись. Физический телефон не проверялся.
-- Последний release-кандидат до `MPOD-BUG-03`: `mpoddy 1.0.17 (18)`, package `com.prod.mpod`, SHA-256 `d000c306e94b49ecec2778d7824457b307d1ae1e1b13434d272f08c344ce4372`. Он не содержит коммит `3fb7f45`.
-- В рабочем дереве есть отдельные staged/unstaged изменения UI и task-документов; они не относятся к коммиту `3fb7f45` и не должны добавляться wildcard-командой.
+## Последняя закрытая задача — MPOD-REL-02
 
----
+**Название:** Финальный regression gate и новый APK.
+**Статус:** `CLOSED — PASS`, 23.09.2026.
 
-## 1. АКТИВНО — 21.09.2026 — Финальный regression gate и новый APK
+- Исправление плеера, regression tests, QA-отчёты и fixture-пакет закоммичены и отправлены в `origin/codex/qa-obvious-bugs` по прямой команде пользователя.
+- Commit исходников APK: `eb34273be19fd4ce593f282ae458a6ef26129c8b`; наличие на remote подтверждено через `git ls-remote`.
+- Кандидат: `mpoddy 1.0.18 (19)`, production package `com.prod.mpod`. Финализация уже проверенного кандидата выполнена без изменения версии и исполняемого кода.
+- Итоговый APK: `build/release-handoff/mpoddy-1.0.18-19-eb34273-6880c4432152.apk`, 4 915 716 байт.
+- SHA-256: `6880c44321522708c02fd8092196281830035f16dfd4737d54742ddc74a8935a`.
+- Release assembly из опубликованного commit: `BUILD SUCCESSFUL in 1m 6s`. Подпись проверена; используется прежний debug-key fallback release-конфигурации.
+- От проверенного APK отличается только `META-INF/version-control-info.textproto`: теперь внутри записан commit `eb34273` вместо `26112e1`. Все остальные 217 ZIP entries, включая DEX, ресурсы и manifest, побайтово идентичны. Поэтому результаты полного QA сохранены без повторного прогона.
+- Проверки: 178/178 JVM tests, 65/65 instrumentation tests; debug/release lint — 0 errors, прежние предупреждения; QA support — 9/9.
+- Итоговый APK установлен поверх существующего на Pixel 9 API 37 без очистки данных. Сохранились 6 подписок, скачанный выпуск в очереди, позиция 0:23, скорость 1.5x и Settings; crash buffer пуст.
+- Полный Refresh all подтверждён на исходном Pixel 9. Прямая сверка Room/files выполнена на том же исполняемом коде в дополнительном Google APIs Pixel 7 API 37 / 16 KB AVD; ограничения этих проверок сохранены в отчётах.
 
-**ID:** `MPOD-REL-02`
-**Направление:** release regression / Android delivery.
-**Статус:** release-решение принято: `1.0.18 (19)`, push разрешён, публикация запрещена. Готовится точный опубликованный HEAD для приёмки.
-**Единственный следующий исполнитель:** Android QA на Pixel 9 AVD API 37 в отдельной Codex-задаче по `docs/mpoddy-release-1.0.18-acceptance.md`; текущая Codex-задача координирует blocker/rework и закрытие кандидата.
+**Итоговый handoff:** `docs/mpoddy-release-1.0.18-closure.md` и `docs/mpoddy-release-1.0.18-final.json`.
 
-### Передать исполнителю после release-решения
+**Границы:** закрыт согласованный emulator gate и локальная поставка APK. Физический телефон и звук на слух не проверялись; Google Play, GitHub Release и production deploy не выполнялись. Это не основание заново открывать задачи текущего списка: ограничения не входят в согласованный объём.
 
-> Выполнить финальный regression gate из точного опубликованного HEAD ветки `codex/qa-obvious-bugs`, затем собрать новый production/release APK `com.prod.mpod` только после подтверждения versionName/versionCode и разрешения на push/install/publish.
->
-> Обязательные предварительные условия:
->
-> 1. Подтвердить exact local/remote HEAD и наличие `67c0da0`, `686423a`, `e7cc41e`; не собирать release из неполной ветки.
-> 2. Получить точные `versionName` и `versionCode`; не выбирать их самостоятельно.
-> 3. Отдельно подтвердить разрешение на push, установку на устройство и публикацию. Сборка APK сама по себе публикацией не является.
->
-> Regression gate:
->
-> 1. Полные JVM, connected tests на Pixel 9 AVD API 37, debug/release lint и `git diff --check`.
-> 2. Release assembly/minification и launch smoke `com.prod.mpod` без очистки пользовательских данных.
-> 3. Smoke основных сценариев: cold launch, Subscriptions, refresh, Mark all listened, Player/queue, Settings; отдельная проверка persistence после обновления APK.
-> 4. Зафиксировать APK path, размер, SHA-256, commit, version, устройство/API и ограничения. Эмулятор не называть физическим телефоном.
->
-> При любом FAIL не публиковать APK и не исправлять несколько проблем одновременно: сохранить первый blocker, Expected/Actual и evidence, затем открыть узкую rework-задачу.
+## Остальные закрытые задачи
 
-**Критерий завершения:** новый versioned production APK собран из подтверждённого published commit, полный gate зелёный, APK идентифицирован SHA-256 и прошёл согласованную приёмку.
+- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02`, `MPOD-QA-02-R1`, `MPOD-BUG-03`, `MPOD-MAINT-01`, `MPOD-REL-01`, `MPOD-COMPAT-01`.
+- `MPOD-BUG-03`: commit `3fb7f45`, regression FAIL-before/PASS-after, review `APPROVED`.
+- `MPOD-OPS-02`: checkpoint commit `8655106`.
 
-**Следующий переход:** при PASS закрыть Android-кандидат и сохранить release evidence; при FAIL активировать одну rework-задачу по первому blocker.
-
----
-
-## Закрыто — не возвращать без новых фактов
-
-- `MPOD-BUG-01`, `MPOD-BUG-01-R1`, `MPOD-BUG-02`, `MPOD-QA-02-R1`, `MPOD-BUG-03`, `MPOD-MAINT-01`, `MPOD-REL-01` и `MPOD-COMPAT-01` закрыты.
-- `MPOD-BUG-03`: commit `3fb7f45`; regression FAIL-before/PASS-after подтверждён; дополнительный review — `APPROVED`.
-- Не откатывать `341002d`, `dda7734`, `da4c6a7` или `3fb7f45` ради искусственного FAIL-before.
-- Старый `MPOD-OPS-02` завершён checkpoint-коммитом `8655106`.
+Не возвращать закрытые задачи без нового воспроизведения или blocker-замечания. Не откатывать `341002d`, `dda7734`, `da4c6a7` или `3fb7f45` ради искусственного FAIL-before.

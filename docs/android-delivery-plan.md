@@ -1,8 +1,16 @@
 # mpod Android — delivery plan and quality baseline
 
-Last updated: 2026-09-06 (product-focused defect pool refreshed after physical-phone review and targeted code analysis)
+Last updated: 2026-09-23 (MPOD-REL-02 closed after agreed emulator acceptance and committed APK handoff)
 
 Current Android source baseline: `1.0.18 (19)`; standalone architecture (`mpoddy`) with Room local database, direct RSS/OPML engines, Smart Listening, and Jetpack DataStore preferences
+
+## Current release closure — 2026-09-23
+
+`MPOD-REL-02` is closed; the current task queue is empty. Source commit `eb34273be19fd4ce593f282ae458a6ef26129c8b` is pushed to `codex/qa-obvious-bugs`. Final APK identity, checks and limitations are in [`mpoddy-release-1.0.18-closure.md`](mpoddy-release-1.0.18-closure.md).
+
+The agreed gate uses Pixel 9 API 37; private Room/files checks additionally used a Google APIs Pixel 7 API 37 / 16 KB AVD with the same release code. The user's later decision excludes physical-phone acceptance from this candidate's gate and supersedes the older physical-device prerequisites below. 178 JVM and 65 instrumentation tests passed, both lint variants have zero errors, and the committed release APK passed update/persistence smoke.
+
+This closes the existing tested `1.0.18 (19)` candidate without a new version: only packaged Git revision metadata changed during final assembly. It does not change the versioning rule for future builds. Commit/push were explicitly authorized; no public release/deploy was performed. The historical broad release checklist below is not an additional active task list.
 
 ## Purpose
 
