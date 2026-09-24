@@ -55,14 +55,10 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".test"
-            buildConfigField("String", "BACKEND_SCHEME", "\"http\"")
-            buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5051\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("String", "BACKEND_SCHEME", "\"http\"")
-            buildConfigField("String", "BACKEND_ADDRESS", "\"192.168.0.222:5050\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
@@ -106,11 +102,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     
-    // Retrofit & OkHttp
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.gson)
+    // Direct RSS, artwork and audio requests
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
 
     // Room
     implementation(libs.androidx.room.runtime)

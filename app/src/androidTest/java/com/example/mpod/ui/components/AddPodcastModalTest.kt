@@ -108,7 +108,7 @@ class AddPodcastModalTest {
     }
 
     @Test
-    fun submittingStateDisablesImportActionAndShowsBackendError() {
+    fun submittingStateDisablesImportActionAndShowsImportError() {
         composeRule.setContent {
             MpodTheme {
                 AddPodcastModal(

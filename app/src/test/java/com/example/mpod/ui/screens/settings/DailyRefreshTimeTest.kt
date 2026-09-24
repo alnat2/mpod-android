@@ -5,17 +5,17 @@ import org.junit.Test
 
 class DailyRefreshTimeTest {
     @Test
-    fun validBackendTimeIsParsed() {
+    fun validSavedTimeIsParsed() {
         assertEquals(4 to 7, parseDailyRefreshTime("04:07"))
     }
 
     @Test
-    fun invalidBackendTimeFallsBackToThreeAm() {
+    fun invalidSavedTimeFallsBackToThreeAm() {
         assertEquals(3 to 0, parseDailyRefreshTime("25:90"))
     }
 
     @Test
-    fun selectedTimeUsesBackendFormat() {
+    fun selectedTimeUsesStoredHourMinuteFormat() {
         assertEquals("04:07", formatDailyRefreshTime(hour = 4, minute = 7))
     }
 }

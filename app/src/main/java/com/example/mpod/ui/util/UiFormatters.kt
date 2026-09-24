@@ -1,7 +1,5 @@
 package com.example.mpod.ui.util
 
-import kotlin.math.roundToInt
-
 fun formatEpisodeDuration(seconds: Int?): String {
     val safeSeconds = seconds?.coerceAtLeast(0) ?: return ""
     val minutes = (safeSeconds / 60).coerceAtLeast(1)
@@ -61,8 +59,6 @@ fun cleanFeedText(value: String?): String {
         .replace(Regex("\\s+"), " ")
         .trim()
 }
-
-fun Double?.toDurationSeconds(): Int? = this?.roundToInt()?.takeIf { it > 0 }
 
 private fun String.decodeHtmlEntities(): String {
     return replace(Regex("&(#x[0-9a-fA-F]+|#\\d+|[a-zA-Z][a-zA-Z0-9]+);")) { match ->

@@ -14,6 +14,10 @@ This closes the existing tested `1.0.18 (19)` candidate without a new version: o
 
 Repository maintenance on 2026-09-24: EPS-09 now references the completed storage/concurrency checks; generated build caches and the supplemental QA AVD were removed after preserving test reports. The final APK and QA evidence remain available. The owner authorized integration of the verified branch into `main`; this documentation-only change does not require repeating the completed application tests.
 
+## Standalone source cleanup — 2026-09-24
+
+Removed unused backend BuildConfig fields, obsolete API response/error/build-info code, old timestamp helpers, and Retrofit/Gson/logging dependencies. The redundant IP-specific network rules are gone; HTTP podcast support, active OkHttp/proxy wiring and legacy backup exclusions remain. Verification: 168 JVM tests, 12 targeted Android tests, both lint variants and release assembly passed; see [`mpoddy-legacy-cleanup-2026-09-24-report.md`](mpoddy-legacy-cleanup-2026-09-24-report.md). This source maintenance is newer than the accepted APK above; no new production handoff or phone installation was performed.
+
 ## Purpose
 
 This is the living delivery document for the native Android application and the source of truth for product scope, decisions, verification policy, acceptance, and release readiness. The authoritative ordered queue of current open work, its active stage, and next executor live in [`docs/mpoddy-current-tasks.md`](mpoddy-current-tasks.md).

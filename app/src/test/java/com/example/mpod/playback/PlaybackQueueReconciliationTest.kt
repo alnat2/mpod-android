@@ -90,7 +90,7 @@ class PlaybackQueueReconciliationTest {
     }
 
     @Test
-    fun removingActiveEpisodeSelectsBackendTargetWithoutAutoplay() {
+    fun removingActiveEpisodeSelectsSavedTargetWithoutAutoplay() {
         val target = resolveQueuePlaybackTarget(
             queue = queue(2L to 12_000L, 3L to 0L),
             savedActiveEpisodeId = 2L,

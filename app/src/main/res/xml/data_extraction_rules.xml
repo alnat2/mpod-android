@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!-- Legacy credentials/sync files may survive upgrades; never back them up. -->
     <cloud-backup>
         <exclude
             domain="sharedpref"
