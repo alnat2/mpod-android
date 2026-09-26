@@ -36,28 +36,13 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("Auto refresh").assertIsDisplayed()
         composeRule.onNodeWithText("Use SOCKS5 proxy").assertIsDisplayed()
         composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
-        composeRule.onNodeWithText("Appearance").assertIsDisplayed()
+        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
+        composeRule.onNodeWithText("Use this option if it feels more comfortable for you.").assertIsDisplayed()
         composeRule.onAllNodesWithText("Export OPML").get(0).assertIsDisplayed()
     }
 
     @Test
-    fun themeSelectorShowsAllThreeModes() {
-        composeRule.setContent {
-            MpodTheme {
-                SettingsScreen(
-                    state = SettingsUiState(),
-                    themeMode = ThemeMode.Light
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("System").assertIsDisplayed()
-        composeRule.onNodeWithText("Light").assertIsDisplayed()
-        composeRule.onNodeWithText("Dark").assertIsDisplayed()
-    }
-
-    @Test
-    fun darkThemeSelectorSetsDarkMode() {
+    fun darkThemeToggleSwitchesThemeMode() {
         var selectedMode: ThemeMode? = null
         composeRule.setContent {
             MpodTheme {
@@ -69,25 +54,9 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Dark").performClick()
+        composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Use dark theme").performClick()
         composeRule.runOnIdle { assertEquals(ThemeMode.Dark, selectedMode) }
-    }
-
-    @Test
-    fun systemThemeSelectorSetsSystemMode() {
-        var selectedMode: ThemeMode? = null
-        composeRule.setContent {
-            MpodTheme {
-                SettingsScreen(
-                    state = SettingsUiState(),
-                    themeMode = ThemeMode.Dark,
-                    onThemeModeChange = { selectedMode = it }
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("System").performClick()
-        composeRule.runOnIdle { assertEquals(ThemeMode.System, selectedMode) }
     }
 
     @Test

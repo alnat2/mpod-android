@@ -301,15 +301,17 @@ fun SettingsScreen(
             )
         }
 
-        // Card 3: Theme mode selector
+        // Card 3: Use dark theme (matching Figma 1264:7739)
         SettingCard(
-            title = "Appearance",
-            description = "Choose theme: System follows device setting.",
-            content = {
-                ThemeModeSelector(
-                    currentMode = themeMode,
-                    onModeSelected = onThemeModeChange,
-                    modifier = Modifier.padding(top = 8.dp)
+            title = "Use dark theme",
+            description = "Use this option if it feels more comfortable for you.",
+            action = {
+                MpodSwitch(
+                    checked = themeMode == ThemeMode.Dark,
+                    onCheckedChange = { checked ->
+                        onThemeModeChange(if (checked) ThemeMode.Dark else ThemeMode.Light)
+                    },
+                    contentDescription = "Use dark theme"
                 )
             }
         )
@@ -526,60 +528,6 @@ private fun SettingCard(
             }
             if (content != null) {
                 content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeModeSelector(
-    currentMode: ThemeMode,
-    onModeSelected: (ThemeMode) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val modes = listOf(
-        ThemeMode.System to "System",
-        ThemeMode.Light to "Light",
-        ThemeMode.Dark to "Dark"
-    )
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        for ((mode, label) in modes) {
-            val isSelected = currentMode == mode
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.background
-                    )
-                    .border(
-                        1.dp,
-                        if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outline,
-                        RoundedCornerShape(8.dp)
-                    )
-                    .clickable(
-                        role = Role.Button,
-                        onClick = { onModeSelected(mode) }
-                    )
-                    .semantics {
-                        contentDescription = "$label theme"
-                        role = Role.Button
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 14.sp,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurface
-                )
             }
         }
     }
