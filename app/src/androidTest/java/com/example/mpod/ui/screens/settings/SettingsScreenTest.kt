@@ -73,6 +73,7 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithText("Feed daily refresh").assertIsDisplayed()
+        composeRule.onNodeWithText("Save time").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Daily refresh time").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Daily refresh time").performClick()
         composeRule.onNodeWithText("Cancel").assertIsDisplayed()

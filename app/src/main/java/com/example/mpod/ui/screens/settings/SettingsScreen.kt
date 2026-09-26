@@ -160,7 +160,7 @@ fun SettingsScreen(
             )
         }
 
-        // Card 1: Auto refresh + Daily refresh time accordion
+        // Card 1: Auto refresh toggle
         SettingCard(
             title = "Auto refresh",
             description = "Turn on for a scheduled update.",
@@ -170,51 +170,43 @@ fun SettingsScreen(
                     onCheckedChange = onAutoRefreshToggle,
                     contentDescription = "Auto refresh"
                 )
-            },
-            content = {
-                AnimatedVisibility(
-                    visible = state.isAutoRefreshEnabled,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Feed daily refresh",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Feeds are refreshed once per day at a single global time.",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            DailyRefreshTimeField(
-                                value = feedRefreshTime,
-                                enabled = true,
-                                onClick = { showTimePicker = true },
-                                modifier = Modifier.weight(1f)
-                            )
-                            SettingsPrimaryButton(
-                                text = "Save time",
-                                enabled = feedRefreshTime != state.dailyRefreshTime,
-                                onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
-                            )
-                        }
-                    }
-                }
             }
         )
+
+        // Card 1b: Feed daily refresh (separate card, shown when Auto refresh is ON, matching Figma 1264:6472)
+        AnimatedVisibility(
+            visible = state.isAutoRefreshEnabled,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            SettingCard(
+                title = "Feed daily refresh",
+                description = "Feeds are refreshed once per day at a single global time.",
+                content = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DailyRefreshTimeField(
+                            value = feedRefreshTime,
+                            enabled = true,
+                            onClick = { showTimePicker = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SettingsPrimaryButton(
+                            text = "Save time",
+                            width = 116.dp,
+                            radius = 8.dp,
+                            enabled = feedRefreshTime != state.dailyRefreshTime,
+                            onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                        )
+                    }
+                }
+            )
+        }
 
         // Card 2: SOCKS5 Proxy toggle
         SettingCard(
