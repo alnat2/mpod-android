@@ -10,6 +10,7 @@ import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.AutoRefreshScheduler
+import com.example.mpod.data.network.IpGeoService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,8 @@ class SettingsViewModel @Inject constructor(
     private val appSettingsDataStore: AppSettingsDataStore,
     private val podcastRepository: PodcastRepository,
     private val autoRefreshScheduler: AutoRefreshScheduler,
-    private val proxyHttpClientFactory: ProxyHttpClientFactory
+    private val proxyHttpClientFactory: ProxyHttpClientFactory,
+    private val ipGeoService: IpGeoService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -55,6 +57,20 @@ class SettingsViewModel @Inject constructor(
                 autoRefreshScheduler.schedule(prefs)
             }
         }
+        loadCurrentIpGeo()
+    }
+
+    fun loadCurrentIpGeo() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(currentIpGeoText = "Current IP: Checking...")
+            val result = ipGeoService.fetchCurrentIpGeo()
+            _state.value = _state.value.copy(
+                currentIpGeoText = result.fold(
+                    onSuccess = { (ip, geo) -> "Current IP: $ip • Geo: $geo" },
+                    onFailure = { "Current IP: Unavailable" }
+                )
+            )
+        }
     }
 
     fun setAutoRefreshEnabled(enabled: Boolean) {
@@ -74,6 +90,7 @@ class SettingsViewModel @Inject constructor(
             appSettingsDataStore.setProxyEnabled(enabled)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
+            loadCurrentIpGeo()
         }
     }
 
@@ -93,6 +110,7 @@ class SettingsViewModel @Inject constructor(
             )
             proxyHttpClientFactory.updateProxy(updated)
             _state.value = _state.value.copy(proxyMessage = "Proxy settings saved.")
+            loadCurrentIpGeo()
         }
     }
 
@@ -131,6 +149,7 @@ data class SettingsUiState(
     val proxyMessage: String? = null,
     val themeMode: String = "System",
     val lastRefreshHeaderText: String = "Last refresh never",
+    val currentIpGeoText: String? = null,
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,
     val errorMessage: String? = null,

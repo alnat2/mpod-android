@@ -126,9 +126,16 @@ fun SettingsScreen(
             .padding(top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        val headerSubtitle = buildString {
+            append(state.lastRefreshHeaderText)
+            if (!state.currentIpGeoText.isNullOrBlank()) {
+                append("\n")
+                append(state.currentIpGeoText)
+            }
+        }
         PageHeader(
             title = "Settings",
-            subtitle = state.lastRefreshHeaderText
+            subtitle = headerSubtitle
         )
 
         if (state.errorMessage != null) {
