@@ -51,10 +51,12 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.mpod.ui.components.LabeledInput
 import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
@@ -94,26 +96,28 @@ fun SettingsScreen(
     onAutoRefreshToggle: (Boolean) -> Unit = {},
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyToggle: (Boolean) -> Unit = {},
-    onSaveProxySettings: (String, Int, String) -> Unit = { _, _, _ -> },
+    onSaveProxySettings: (String, Int, String, String) -> Unit = { _, _, _, _ -> },
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
-    var proxyHostInput by rememberSaveable { mutableStateOf(state.proxyHost) }
-    var proxyPortInput by rememberSaveable { mutableStateOf(state.proxyPort.toString()) }
-    var proxyTypeInput by rememberSaveable { mutableStateOf(state.proxyType) }
+    var proxyAddressPortInput by rememberSaveable {
+        mutableStateOf(formatProxyAddressPort(state.proxyHost, state.proxyPort))
+    }
+    var proxyUserInput by rememberSaveable { mutableStateOf(state.proxyUsername) }
+    var proxyPasswordInput by rememberSaveable { mutableStateOf(state.proxyPassword) }
     val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
     }
     LaunchedEffect(state.proxyHost, state.proxyPort) {
-        proxyHostInput = state.proxyHost
-        proxyPortInput = state.proxyPort.toString()
+        proxyAddressPortInput = formatProxyAddressPort(state.proxyHost, state.proxyPort)
     }
-    LaunchedEffect(state.proxyType) {
-        proxyTypeInput = state.proxyType
+    LaunchedEffect(state.proxyUsername, state.proxyPassword) {
+        proxyUserInput = state.proxyUsername
+        proxyPasswordInput = state.proxyPassword
     }
 
     Column(
@@ -212,7 +216,7 @@ fun SettingsScreen(
             }
         )
 
-        // Card 2: SOCKS5 Proxy + Proxy settings accordion with Save button
+        // Card 2: SOCKS5 Proxy toggle
         SettingCard(
             title = "Use SOCKS5 proxy",
             description = "Turn on if direct connection update fails.",
@@ -222,98 +226,48 @@ fun SettingsScreen(
                     onCheckedChange = onProxyToggle,
                     contentDescription = "Use SOCKS5 proxy"
                 )
-            },
-            content = {
-                AnimatedVisibility(
-                    visible = state.isProxyEnabled,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
+            }
+        )
+
+        // Card 2b: Proxy settings (separate card matching Figma 1264:7739)
+        AnimatedVisibility(
+            visible = state.isProxyEnabled,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            val parsed = parseProxyAddressPort(proxyAddressPortInput)
+            val isSaveEnabled = parsed != null
+
+            SettingCard(
+                title = "Proxy settings",
+                description = "Fill out to connect to the server",
+                content = {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "Proxy settings",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Fill out to connect to the server",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        LabeledInput(
+                            label = "Proxy address:port",
+                            value = proxyAddressPortInput,
+                            onValueChange = { proxyAddressPortInput = it },
+                            placeholder = "E.g. 192.168.1.1:1080"
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf("SOCKS5" to "SOCKS5", "HTTP" to "HTTP").forEach { (type, label) ->
-                                val isSelected = proxyTypeInput == type
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(36.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.background
-                                        )
-                                        .border(
-                                            1.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.outline,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable(
-                                            role = Role.Button,
-                                            onClick = { proxyTypeInput = type }
-                                        )
-                                        .semantics {
-                                            contentDescription = "$label proxy"
-                                            role = Role.Button
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                        else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-
-                        OutlinedTextField(
-                            value = proxyHostInput,
-                            onValueChange = { proxyHostInput = it },
-                            label = { Text("Host / IP Address") },
-                            placeholder = { Text("127.0.0.1 or proxy.example.com") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                            )
+                        LabeledInput(
+                            label = "User login",
+                            value = proxyUserInput,
+                            onValueChange = { proxyUserInput = it },
+                            placeholder = "Enter username"
                         )
 
-                        OutlinedTextField(
-                            value = proxyPortInput,
-                            onValueChange = { proxyPortInput = it.filter { ch -> ch.isDigit() } },
-                            label = { Text("Port") },
-                            placeholder = { Text("1080") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                            )
+                        LabeledInput(
+                            label = "Password",
+                            value = proxyPasswordInput,
+                            onValueChange = { proxyPasswordInput = it },
+                            placeholder = "Enter password",
+                            visualTransformation = PasswordVisualTransformation()
                         )
 
                         if (state.proxyMessage != null) {
@@ -324,24 +278,28 @@ fun SettingsScreen(
                             )
                         }
 
-                        val portNumber = proxyPortInput.toIntOrNull()
-                        val isSaveEnabled = proxyHostInput.isNotBlank() && portNumber != null && portNumber in 1..65535
-
                         SettingsPrimaryButton(
-                            text = "Save Proxy",
-                            width = 120.dp,
+                            text = "Save settings",
+                            width = null,
+                            modifier = Modifier.fillMaxWidth(),
                             height = 36.dp,
+                            radius = 10.dp,
                             enabled = isSaveEnabled,
                             onClick = {
-                                if (portNumber != null) {
-                                    onSaveProxySettings(proxyHostInput, portNumber, proxyTypeInput)
+                                if (parsed != null) {
+                                    onSaveProxySettings(
+                                        parsed.first,
+                                        parsed.second,
+                                        proxyUserInput,
+                                        proxyPasswordInput
+                                    )
                                 }
                             }
                         )
                     }
                 }
-            }
-        )
+            )
+        }
 
         // Card 3: Theme mode selector
         SettingCard(
@@ -486,15 +444,16 @@ private fun SettingsStatusCard(
 @Composable
 private fun SettingsPrimaryButton(
     text: String,
-    width: Dp = 100.dp,
+    modifier: Modifier = Modifier,
+    width: Dp? = 100.dp,
     height: Dp = 36.dp,
     radius: Dp = 10.dp,
     enabled: Boolean,
     onClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier
-            .width(width)
+        modifier = modifier
+            .then(if (width != null) Modifier.width(width) else Modifier)
             .height(height)
             .clip(RoundedCornerShape(radius))
             .background(
@@ -625,3 +584,23 @@ private fun ThemeModeSelector(
         }
     }
 }
+
+internal fun parseProxyAddressPort(input: String): Pair<String, Int>? {
+    val trimmed = input.trim()
+    if (trimmed.isBlank()) return null
+    val lastColon = trimmed.lastIndexOf(':')
+    return if (lastColon > 0 && lastColon < trimmed.length - 1) {
+        val host = trimmed.substring(0, lastColon).trim()
+        val port = trimmed.substring(lastColon + 1).trim().toIntOrNull()
+        if (host.isNotBlank() && port != null && port in 1..65535) {
+            host to port
+        } else null
+    } else {
+        null
+    }
+}
+
+internal fun formatProxyAddressPort(host: String, port: Int): String {
+    return if (host.isNotBlank()) "$host:$port" else ""
+}
+

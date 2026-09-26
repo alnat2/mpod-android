@@ -46,6 +46,8 @@ class SettingsViewModel @Inject constructor(
                     proxyType = prefs.proxyType,
                     proxyHost = prefs.proxyHost,
                     proxyPort = prefs.proxyPort,
+                    proxyUsername = prefs.proxyUsername,
+                    proxyPassword = prefs.proxyPassword,
                     themeMode = prefs.themeMode,
                     lastRefreshHeaderText = if (prefs.lastRefreshTimeFormatted.isNotBlank()) {
                         prefs.lastRefreshTimeFormatted
@@ -94,19 +96,23 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun saveProxySettings(host: String, port: Int, type: String = "SOCKS5") {
+    fun saveProxySettings(host: String, port: Int, username: String = "", password: String = "") {
         viewModelScope.launch {
             val updated = AppSettings(
                 isProxyEnabled = true,
                 proxyHost = host.trim(),
                 proxyPort = port,
-                proxyType = type
+                proxyType = "SOCKS5",
+                proxyUsername = username.trim(),
+                proxyPassword = password
             )
             appSettingsDataStore.setProxySettings(
                 enabled = true,
                 host = host.trim(),
                 port = port,
-                type = type
+                type = "SOCKS5",
+                username = username.trim(),
+                password = password
             )
             proxyHttpClientFactory.updateProxy(updated)
             _state.value = _state.value.copy(proxyMessage = "Proxy settings saved.")
@@ -146,6 +152,8 @@ data class SettingsUiState(
     val proxyType: String = "SOCKS5",
     val proxyHost: String = "",
     val proxyPort: Int = 1080,
+    val proxyUsername: String = "",
+    val proxyPassword: String = "",
     val proxyMessage: String? = null,
     val themeMode: String = "System",
     val lastRefreshHeaderText: String = "Last refresh never",

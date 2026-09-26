@@ -125,7 +125,7 @@ class SettingsScreenTest {
         }
 
         composeRule.onNodeWithText("Proxy settings").assertIsDisplayed()
-        composeRule.onNodeWithText("Save Proxy").assertIsDisplayed()
+        composeRule.onNodeWithText("Save settings").assertIsDisplayed()
     }
 
     @Test
