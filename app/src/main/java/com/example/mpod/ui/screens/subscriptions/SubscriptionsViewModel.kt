@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.subscriptions
 
+import androidx.annotation.MainThread
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.EpisodeDao
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -36,6 +38,8 @@ class SubscriptionsViewModel @Inject constructor(
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
     val state: StateFlow<SubscriptionsUiState> = _state.asStateFlow()
 
+    // Action guards and the Undo job are confined to Main, including synchronous entry checks.
+    // The IO observer only publishes library fields through atomic state updates.
     private var pendingUnsubscribeJob: Job? = null
     private var refreshInFlight = false
     private var failedUnsubscribePodcastId: Long? = null
@@ -77,87 +81,105 @@ class SubscriptionsViewModel @Inject constructor(
                     )
                 }
 
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    hasLoadedOnce = true,
-                    podcasts = podcastUis
-                )
+                _state.update { current ->
+                    current.copy(
+                        isLoading = false,
+                        hasLoadedOnce = true,
+                        podcasts = podcastUis
+                    )
+                }
             }.collect { }
         }
     }
 
+    @MainThread
     fun refresh() {
         refreshAll()
     }
 
+    @MainThread
     fun refreshAll() {
         if (_state.value.isRefreshingAll || refreshInFlight) return
         refreshInFlight = true
         failedUnsubscribePodcastId = null
-        _state.value = _state.value.copy(isRefreshingAll = true, actionErrorMessage = null)
+        _state.update { current -> current.copy(isRefreshingAll = true, actionErrorMessage = null) }
 
         viewModelScope.launch {
             try {
                 val result = podcastRepository.refreshAllPodcasts()
                 if (result.isFailure) {
-                    _state.value = _state.value.copy(
-                        actionErrorMessage = result.exceptionOrNull()?.message ?: "Failed to refresh some podcasts."
-                    )
+                    _state.update { current ->
+                        current.copy(
+                            actionErrorMessage = result.exceptionOrNull()?.message ?: "Failed to refresh some podcasts."
+                        )
+                    }
                 }
                 queueInvalidator.invalidate()
             } finally {
                 refreshInFlight = false
-                _state.value = _state.value.copy(isRefreshingAll = false)
+                _state.update { current -> current.copy(isRefreshingAll = false) }
             }
         }
     }
 
+    @MainThread
     fun refreshPodcast(podcastId: Long) {
         if (_state.value.isRefreshingAll || podcastId in _state.value.refreshingPodcastIds) return
         failedUnsubscribePodcastId = null
-        _state.value = _state.value.copy(
-            refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
-            actionErrorMessage = null
-        )
+        _state.update { current ->
+            current.copy(
+                refreshingPodcastIds = current.refreshingPodcastIds + podcastId,
+                actionErrorMessage = null
+            )
+        }
         viewModelScope.launch {
             try {
                 val result = podcastRepository.refreshPodcast(podcastId)
                 if (result.isFailure) {
-                    _state.value = _state.value.copy(
-                        actionErrorMessage = result.exceptionOrNull()?.message ?: "Could not refresh podcast."
-                    )
+                    _state.update { current ->
+                        current.copy(
+                            actionErrorMessage = result.exceptionOrNull()?.message ?: "Could not refresh podcast."
+                        )
+                    }
                 }
                 queueInvalidator.invalidate()
             } finally {
-                _state.value = _state.value.copy(
-                    refreshingPodcastIds = _state.value.refreshingPodcastIds - podcastId
-                )
+                _state.update { current ->
+                    current.copy(
+                        refreshingPodcastIds = current.refreshingPodcastIds - podcastId
+                    )
+                }
             }
         }
     }
 
+    @MainThread
     fun schedulePodcastUnsubscribe(podcastId: Long) {
         if (_state.value.pendingUnsubscribe != null) return
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
         val countdown = unsubscribeCountdownSeconds()
-        _state.value = _state.value.copy(
-            pendingUnsubscribe = PendingUnsubscribeUi(
-                podcastId = podcast.id,
-                podcastTitle = podcast.title,
-                secondsRemaining = countdown.first()
+        _state.update { current ->
+            current.copy(
+                pendingUnsubscribe = PendingUnsubscribeUi(
+                    podcastId = podcast.id,
+                    podcastTitle = podcast.title,
+                    secondsRemaining = countdown.first()
+                )
             )
-        )
+        }
 
         pendingUnsubscribeJob = viewModelScope.launch {
             for (secondsRemaining in countdown.drop(1)) {
                 delay(UNSUBSCRIBE_TICK_MS)
-                _state.value = _state.value.copy(
-                    pendingUnsubscribe = PendingUnsubscribeUi(
-                        podcastId = podcast.id,
-                        podcastTitle = podcast.title,
-                        secondsRemaining = secondsRemaining
+                _state.update { current ->
+                    current.copy(
+                        pendingUnsubscribe = PendingUnsubscribeUi(
+                            podcastId = podcast.id,
+                            podcastTitle = podcast.title,
+                            secondsRemaining = secondsRemaining
+                        )
                     )
-                )
+                }
             }
             delay(UNSUBSCRIBE_TICK_MS)
             pendingUnsubscribeJob = null
@@ -165,21 +187,25 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun undoPodcastUnsubscribe(podcastId: Long) {
         if (_state.value.pendingUnsubscribe?.podcastId != podcastId) return
         pendingUnsubscribeJob?.cancel()
         pendingUnsubscribeJob = null
-        _state.value = _state.value.copy(pendingUnsubscribe = null)
+        _state.update { current -> current.copy(pendingUnsubscribe = null) }
     }
 
+    @MainThread
     internal fun unsubscribePodcastNow(podcastId: Long) {
         if (podcastId in _state.value.unsubscribingPodcastIds) return
         failedUnsubscribePodcastId = null
-        _state.value = _state.value.copy(
-            pendingUnsubscribe = null,
-            unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
-            actionErrorMessage = null
-        )
+        _state.update { current ->
+            current.copy(
+                pendingUnsubscribe = null,
+                unsubscribingPodcastIds = current.unsubscribingPodcastIds + podcastId,
+                actionErrorMessage = null
+            )
+        }
         viewModelScope.launch {
             try {
                 podcastRepository.unsubscribe(podcastId)
@@ -187,22 +213,28 @@ class SubscriptionsViewModel @Inject constructor(
                 throw cancelled
             } catch (error: Exception) {
                 failedUnsubscribePodcastId = podcastId
-                _state.value = _state.value.copy(
-                    actionErrorMessage = error.message ?: "Could not unsubscribe. Please try again."
-                )
+                _state.update { current ->
+                    current.copy(
+                        actionErrorMessage = error.message ?: "Could not unsubscribe. Please try again."
+                    )
+                }
             } finally {
-                _state.value = _state.value.copy(
-                    unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId
-                )
+                _state.update { current ->
+                    current.copy(
+                        unsubscribingPodcastIds = current.unsubscribingPodcastIds - podcastId
+                    )
+                }
             }
         }
     }
 
+    @MainThread
     fun retryLastAction() {
         val podcastId = failedUnsubscribePodcastId
         if (podcastId != null) unsubscribePodcastNow(podcastId) else refreshAll()
     }
 
+    @MainThread
     fun markAllListened(podcastId: Long) {
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
         if (podcast.unlistenedEpisodeCount == 0) return
@@ -219,6 +251,7 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun addEpisodeToPlaylist(episodeId: Long) {
         viewModelScope.launch {
             podcastRepository.setEpisodeListened(episodeId, false)
@@ -227,6 +260,7 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun removeEpisodeFromPlaylist(episodeId: Long) {
         viewModelScope.launch {
             playlistRepository.removeFromPlaylist(episodeId)
@@ -234,6 +268,7 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun setEpisodeListened(episodeId: Long, isListened: Boolean) {
         viewModelScope.launch {
             podcastRepository.setEpisodeListened(episodeId, isListened)
@@ -245,8 +280,9 @@ class SubscriptionsViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun clearActionError() {
-        _state.value = _state.value.copy(actionErrorMessage = null)
+        _state.update { current -> current.copy(actionErrorMessage = null) }
     }
 }
 
