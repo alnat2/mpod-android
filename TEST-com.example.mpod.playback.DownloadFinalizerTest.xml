@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.playback.DownloadFinalizerTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="0.063">
+  <properties/>
+  <testcase name="readException_tempAndFinalAbsent_daoNotInvoked" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.006"/>
+  <testcase name="cancellationException_duringWrite_propagatesAndCleansTemp" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.001"/>
+  <testcase name="cancellationException_propagatesAsCancellation" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.002"/>
+  <testcase name="largeGeneratedStream_isCopiedInChunksWithoutMemoryAccumulation" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.027"/>
+  <testcase name="unsuccessfulMove_reportsFailure_tempCleaned_daoNotInvoked" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.002"/>
+  <testcase name="successfulDownload_tempFileRemoved_finalExistsNonEmpty_andDaoInvoked" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.002"/>
+  <testcase name="unsuccessfulTargetCompensationAfterDaoFailure_isObservedAndReportedInResult" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.004"/>
+  <testcase name="emptyStream_tempAndFinalAbsent_daoNotInvoked" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.001"/>
+  <testcase name="moveTempToTarget_cleanupFailure_isPreservedInDownloadAndFinalize" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.001"/>
+  <testcase name="afterFailure_retryCanSucceed" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.002"/>
+  <testcase name="daoExceptionAfterSuccessfulMove_deletesTargetFile" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.001"/>
+  <testcase name="unsuccessfulTempCleanup_isObservedAndReportedInResult" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.002"/>
+  <testcase name="ioException_duringWrite_returnsFailureAndCleansTemp" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.001"/>
+  <testcase name="coroutineCancellation_stopsFileWritingAndCleansUp" classname="com.example.mpod.playback.DownloadFinalizerTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

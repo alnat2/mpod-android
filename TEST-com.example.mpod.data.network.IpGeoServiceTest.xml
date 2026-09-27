@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.data.network.IpGeoServiceTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:32" hostname="runnervmtr4k5" time="0.195">
+  <properties/>
+  <testcase name="parseIpGeoJson_parsesIpApiFormatCorrectly" classname="com.example.mpod.data.network.IpGeoServiceTest" time="0.032"/>
+  <testcase name="fetchCurrentIpGeo_parsesMockServerResponse" classname="com.example.mpod.data.network.IpGeoServiceTest" time="0.158"/>
+  <testcase name="parseIpGeoJson_returnsNullForInvalidJson" classname="com.example.mpod.data.network.IpGeoServiceTest" time="0.001"/>
+  <testcase name="parseIpGeoJson_parsesCountryIsFormatCorrectly" classname="com.example.mpod.data.network.IpGeoServiceTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

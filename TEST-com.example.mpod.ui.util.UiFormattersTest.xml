@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.ui.util.UiFormattersTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:35" hostname="runnervmtr4k5" time="0.007">
+  <properties/>
+  <testcase name="cleanFeedTextDecodesNumericEntitiesAndCollapsesWhitespace" classname="com.example.mpod.ui.util.UiFormattersTest" time="0.003"/>
+  <testcase name="cleanFeedTextRemovesTagsAndDecodesCommonEntities" classname="com.example.mpod.ui.util.UiFormattersTest" time="0.0"/>
+  <testcase name="formatPublishedDateFormatsIsoAndRfcDates" classname="com.example.mpod.ui.util.UiFormattersTest" time="0.003"/>
+  <testcase name="cleanFeedTextRemovesTagsDecodedFromEntities" classname="com.example.mpod.ui.util.UiFormattersTest" time="0.001"/>
+  <testcase name="remainingTimeSubtractsElapsedPositionAndClampsAtZero" classname="com.example.mpod.ui.util.UiFormattersTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

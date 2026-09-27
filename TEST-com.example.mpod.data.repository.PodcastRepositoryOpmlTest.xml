@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.data.repository.PodcastRepositoryOpmlTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="0.12">
+  <properties/>
+  <testcase name="importOpml_oneByteOverLimit_isRejectedBeforeDatabaseOrNetwork" classname="com.example.mpod.data.repository.PodcastRepositoryOpmlTest" time="0.023"/>
+  <testcase name="importOpml_exactLimit_isDeterministicAndReturnsSuccess" classname="com.example.mpod.data.repository.PodcastRepositoryOpmlTest" time="0.078"/>
+  <testcase name="importOpml_oversizedInput_returnsFailure_andDoesNotTouchDatabase" classname="com.example.mpod.data.repository.PodcastRepositoryOpmlTest" time="0.015"/>
+  <testcase name="importOpml_readError_returnsFailure_andDoesNotTouchDatabaseOrParser" classname="com.example.mpod.data.repository.PodcastRepositoryOpmlTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

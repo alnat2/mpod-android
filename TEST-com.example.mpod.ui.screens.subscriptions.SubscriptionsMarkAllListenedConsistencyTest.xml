@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:35" hostname="runnervmtr4k5" time="0.316">
+  <properties/>
+  <testcase name="syntheticQueuedDownloadedInsertion_afterRealRefresh_hasNoStaleQueueOrFile" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.024"/>
+  <testcase name="anotherPodcastAndItsPlaylistRows_areOutsideOperationOwnership" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.004"/>
+  <testcase name="cleanupException_isObservableAndCommittedQueueStillInvalidates" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.005"/>
+  <testcase name="cleanupWithOldMetadata_readdWaitsForReset_thenDownloadsConsistently" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.013"/>
+  <testcase name="repositorySettledAndEmptyPodcastWork_areStrictNoOps" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.004"/>
+  <testcase name="observerRemovesJobBeforeCleanup_noLateDownloadCommitOrFile" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.012"/>
+  <testcase name="syntheticPruneAndReplacement_betweenSnapshotAndBulk_usesOneOwnershipSet" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.008"/>
+  <testcase name="alreadyListenedQueuedAndFlagOnlyDownloaded_workIsCleanedWithoutListenMutations" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.005"/>
+  <testcase name="settledRepeat_isNoOp_dueToExistingViewModelGuard" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.005"/>
+  <testcase name="overlappingRepositoryAndDirectCleanup_readdMustNotLoseNewDownloadMetadata" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.017"/>
+  <testcase name="repositoryCleansActiveQueuedDownload_beforeDownloadedStateWasCommitted" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.01"/>
+  <testcase name="realFeedInsertionAfterCommittedSnapshot_remainsUnlistenedAndOutsideCleanup" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.013"/>
+  <testcase name="largeFeed_usesBoundedSqlBatchesWithoutLosingOwnership" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.136"/>
+  <testcase name="immediateDoubleDispatch_doesNotDuplicateCleanupOrMutation" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.013"/>
+  <testcase name="repositoryDeleteFailure_isTypedAndRetryOnlyCleansRemainingFile" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.006"/>
+  <testcase name="cleanupWithoutMetadata_readdWaitsForCleanup_thenDownloadsConsistently" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.011"/>
+  <testcase name="realFeedInsertionBetweenSnapshotAndBulk_usesOneOwnershipSet" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.01"/>
+  <testcase name="cancelledEpisodeReaddedWhileCommitFinishes_keepsOldOwnerUntilItCanReschedule" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.011"/>
+  <testcase name="deleteFailure_preservesDownloadState_andDirectCleanupRetryWorks" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsMarkAllListenedConsistencyTest" time="0.006"/>
+  <system-out><![CDATA[SYNTHETIC_QUEUE added=103, listened=[101, 102, 103], queue=[], stale=[], remainingFiles=[]
+OBSERVER_COMMIT after cleanup: downloaded=false, path=null, exists=null
+SYNTHETIC_PRUNE snapshot=[101,102], bulk=[101, 103], playlistTargets=[101, 103], cleanupTargets=[101, 103], queue=[], orphan102=true
+OVERLAPPING_CLEANUP downloaded=true, path=/tmp/mpod-mark-all-11171404100973639050/podcasts/ep_101_1790539055207.mp3, newFileExists=true, queued=true
+DOUBLE_DISPATCH records=[[[101, 102]], [101, 102], [101, 102], [101, 102], [101, 102]], invalidations=1
+REAL_INSERT snapshot=[101,102], bulk=[101, 102, 103], playlistTargets=[101, 102, 103], cleanupTargets=[101, 102, 103], queue=[]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

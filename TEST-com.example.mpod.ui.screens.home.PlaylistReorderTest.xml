@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.ui.screens.home.PlaylistReorderTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:35" hostname="runnervmtr4k5" time="0.002">
+  <properties/>
+  <testcase name="movesEpisodeWithinQueueBounds" classname="com.example.mpod.ui.screens.home.PlaylistReorderTest" time="0.001"/>
+  <testcase name="clampsMoveToQueueEdges" classname="com.example.mpod.ui.screens.home.PlaylistReorderTest" time="0.001"/>
+  <testcase name="returnsNullWhenMoveWouldNotChangeQueue" classname="com.example.mpod.ui.screens.home.PlaylistReorderTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

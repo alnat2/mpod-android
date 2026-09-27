@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.playback.PlaybackQueueReconciliationTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="0.002">
+  <properties/>
+  <testcase name="reorderPreservesCurrentEpisodePositionAndPlayingState" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="changedQueueRebuildsPlayer" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="identicalQueueAndCurrentEpisodeDoNotRebuildPlayer" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="explicitEpisodeSelectionRebuildsPlayerEvenWhenQueueMatches" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="initialLoadUsesSavedActivePositionWithoutAutoplay" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="removingActiveEpisodeSelectsSavedTargetWithoutAutoplay" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="removingInactiveEpisodeDoesNotInterruptPlayback" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.0"/>
+  <testcase name="emptyQueueHasNoPlaybackTarget" classname="com.example.mpod.playback.PlaybackQueueReconciliationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

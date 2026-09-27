@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:35" hostname="runnervmtr4k5" time="0.026">
+  <properties/>
+  <testcase name="libraryReadBeforeCountdownTick_keepsLatestCountdown" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" time="0.01"/>
+  <testcase name="libraryReadBeforeRefreshStart_doesNotClearSpinnerOrAllowDuplicateRefresh" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" time="0.003"/>
+  <testcase name="libraryReadDuringRefresh_completionAndErrorSurvivePublication" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" time="0.006"/>
+  <testcase name="libraryReadBeforeUndo_doesNotRestoreCancelledUnsubscribe" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" time="0.003"/>
+  <testcase name="immediateSinglePodcastRefreshRepeat_dispatchesOnceAndRetainsBusyId" classname="com.example.mpod.ui.screens.subscriptions.SubscriptionsStateConcurrencyTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

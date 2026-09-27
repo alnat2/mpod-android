@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.data.rss.OpmlParserTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="0.019">
+  <properties/>
+  <testcase name="parseOpmlWithNoXmlUrl" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.0"/>
+  <testcase name="parseOpmlFallsBackToUrlAsTitle" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.0"/>
+  <testcase name="generateOpmlEscapesXmlSpecialChars" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.013"/>
+  <testcase name="generateOpmlContainsAllPodcasts" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.001"/>
+  <testcase name="parseEmptyOpml" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.001"/>
+  <testcase name="parseOpmlWithUrlAttribute" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.001"/>
+  <testcase name="parseValidOpml" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.001"/>
+  <testcase name="parseOpmlUsesTitleAttributeFallback" classname="com.example.mpod.data.rss.OpmlParserTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

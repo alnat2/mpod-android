@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.playback.SmartListeningManagerTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="1.325">
+  <properties/>
+  <testcase name="coroutineCancellation_abortsActiveOkHttpBodyImmediately_andCleansTempAndFinalFiles" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.058"/>
+  <testcase name="cancellationBeforeDao_noRoomUpdate_noFilesLeft" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.008"/>
+  <testcase name="episodeRemovedDuringActiveDownload_stopsBodyAndCleansFiles" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.247"/>
+  <testcase name="cleanupEpisodeFile_deleteFailure_roomNotReset" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.003"/>
+  <testcase name="cleanupEpisodeFile_cancelsActiveJob_andJoinsBeforeRead" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.055"/>
+  <testcase name="targetCompensationFailure_afterDaoException_observedByCaller" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.01"/>
+  <testcase name="rapidTwoEmissions_singleNetworkRequest_singleDaoCommit" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.064"/>
+  <testcase name="cleanupEpisodeFile_downloadedFlagWithoutPath_clearsStaleMetadata" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.004"/>
+  <testcase name="failedAttempt_clearsJobRegistry_allowsSubsequentNetworkRequest" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.065"/>
+  <testcase name="tempCleanupFailure_afterStreamWriteFailure_observedByCaller" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.005"/>
+  <testcase name="episodeRemovedBeforeDebounce_noNetworkRequest_noDaoCommit" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.353"/>
+  <testcase name="rapidFailedAttempt_doesNotLeaveCompletedJobInMap_andAllowsSubsequentAttempt" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.047"/>
+  <testcase name="cleanupEpisodeFile_success_fileGoneAndRoomReset" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.003"/>
+  <testcase name="stopObserving_cancelsAllPendingJobs" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.053"/>
+  <testcase name="httpError_doesNotUpdateDao_andCleansFiles" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.004"/>
+  <testcase name="removedFromPlaylistBeforeDebounce_cancelsPendingJob" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.103"/>
+  <testcase name="successfulDownload_createsTargetFile_updatesDao_andCleansTemp" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.005"/>
+  <testcase name="startObserving_calledTwice_idempotentAndSingleJob" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.002"/>
+  <testcase name="cancellationAfterRoomCommit_filePreservedAndRoomPathValid" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.007"/>
+  <testcase name="failedFileDeleteInCleanupEpisodeFile_doesNotClearRoomState" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.003"/>
+  <testcase name="stopObservingDuringActiveDownload_stopsBodyAndCleansFiles" classname="com.example.mpod.playback.SmartListeningManagerTest" time="0.225"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

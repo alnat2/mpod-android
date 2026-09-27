@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.data.network.DynamicProxySelectorTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:27" hostname="runnervmtr4k5" time="5.245">
+  <properties/>
+  <testcase name="switchingFromSocksToDirectReturnsNoProxy" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.011"/>
+  <testcase name="directSettingsReturnNoProxy" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.001"/>
+  <testcase name="switchingFromHttpToDirectReturnsNoProxy" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="enabledProxyWithUnsupportedType_throwsException_andDisallowsDirect" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="waitingThreadInterrupted_throwsIllegalStateException_noDirectFallback" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.054"/>
+  <testcase name="socks5SettingsReturnSocksProxy" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.001"/>
+  <testcase name="enabledProxyWithBlankHost_throwsException_andDisallowsDirect" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="changingTypeDoesNotReturnCachedRoute" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="selectBeforeInitialization_waitsForInitialProxy_doesNotFallBackToDirect" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.11"/>
+  <testcase name="httpSettingsReturnHttpProxy" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="initialStateNotArrived_awaitTimesOut_throwsIllegalStateException_noDirectFallback" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="5.051"/>
+  <testcase name="explicitDirectSettings_returnsNoProxyWithoutWaiting" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="changingHostPortDoesNotReturnCachedRoute" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.0"/>
+  <testcase name="enabledProxyWithInvalidPort_throwsException_andDisallowsDirect" classname="com.example.mpod.data.network.DynamicProxySelectorTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.mpod.data.rss.ParsersTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-09-27T19:57:33" hostname="runnervmtr4k5" time="0.019">
+  <properties/>
+  <testcase name="parseDuration_handlesSecondsOnly" classname="com.example.mpod.data.rss.ParsersTest" time="0.0"/>
+  <testcase name="parseDate_returnsZeroForUnparseable" classname="com.example.mpod.data.rss.ParsersTest" time="0.002"/>
+  <testcase name="parse_readsOutlineEntries" classname="com.example.mpod.data.rss.ParsersTest" time="0.003"/>
+  <testcase name="parseDateOrNull_parsesIso8601" classname="com.example.mpod.data.rss.ParsersTest" time="0.003"/>
+  <testcase name="parseDuration_handlesHms" classname="com.example.mpod.data.rss.ParsersTest" time="0.001"/>
+  <testcase name="parseDuration_handlesMinutesSeconds" classname="com.example.mpod.data.rss.ParsersTest" time="0.0"/>
+  <testcase name="parse_readsChannelAndEpisode" classname="com.example.mpod.data.rss.ParsersTest" time="0.003"/>
+  <testcase name="parse_ignoresOutlineWithoutXmlUrl" classname="com.example.mpod.data.rss.ParsersTest" time="0.0"/>
+  <testcase name="parseDuration_returnsZeroForGarbage" classname="com.example.mpod.data.rss.ParsersTest" time="0.001"/>
+  <testcase name="generateOpml_thenParse_preservesEntries" classname="com.example.mpod.data.rss.ParsersTest" time="0.001"/>
+  <testcase name="parseDateOrNull_parsesRfc822" classname="com.example.mpod.data.rss.ParsersTest" time="0.003"/>
+  <testcase name="parseDateOrNull_returnsNullForGarbage" classname="com.example.mpod.data.rss.ParsersTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
