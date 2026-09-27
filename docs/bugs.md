@@ -79,7 +79,7 @@
 
 ## BUG-R03 — N+1 и пересчёт подписок из-за позиции воспроизведения
 
-**Статус:** OPEN. **Приоритет:** средний.
+**Статус:** IMPLEMENTED — developer verification завершена; код-ревью и QA acceptance ожидаются. **Приоритет:** средний.
 
 **Где:** `SubscriptionsViewModel.observeData`, `EpisodeDao`, `PodcastDao`, `PlaylistDao`; при необходимости методы чтения `PodcastRepository`.
 
@@ -101,6 +101,19 @@
 - Короткий пользовательский smoke: воспроизведение продолжается при переходе в Subscriptions, обновление подкаста показывает новый выпуск.
 
 **Готово, когда:** измерения до/после подтверждают устранение N+1, а проверки видимых изменений проходят. Искусственный benchmark с тысячами подкастов не требуется.
+
+**Результат реализации (27.09.2026):** отдельный `PodcastDao.getSubscriptionRowsFlow()` читает одним LEFT JOIN только поля Subscriptions и membership очереди. Пустые подкасты сохранены; порядок — название подкаста, ID при одинаковом названии, дата выпуска DESC. `distinctUntilChanged` сравнивает проекцию до группировки, очистки текста и построения UI-моделей; атомарная публикация `_state.update` из R02 сохранена. Схема Room и Repository не менялись.
+
+**Изменённые файлы:** `PodcastDao.kt`, новый `SubscriptionRow.kt`, `SubscriptionsViewModel.kt`; новые `SubscriptionsQueryTest.kt`, `SubscriptionsProjectionTest.kt`, `SubscriptionRowsFixture.kt`; адаптированы DAO-fakes в `PodcastRepositoryOpmlTest`, `PodcastRepositoryRefreshAllTest`, `PodcastUnsubscribeTest`, `SubscriptionsMarkAllListenedConsistencyTest`, `SubscriptionsStateConcurrencyTest`.
+
+**Developer verification:**
+
+- `SubscriptionsQueryTest`, настоящая in-memory Room/SQLite на Pixel 9 API 37 (`emulator-5554`): 3/3 PASS. Callback измеряет прежний read-path и новый на одной БД: при 1/30 подкастах прежний путь выполняет 1/30 отдельных запросов эпизодов, новый — один общий SELECT независимо от количества. При изменении эпизода допускаются initial SELECT + invalidation SELECT (1–2), без запросов на каждый подкаст.
+- Позиционный UPDATE действительно вызывает Room SELECT, но проекция остаётся равной. Unit regression считает выходы production-пайплайна без фильтра после mapping: позиция и `lastRefreshedAt` не вызывают новый mapping. При временном удалении `distinctUntilChanged` regression даёт FAIL (3 mapping вместо 1), после восстановления — PASS. Названия, описания, даты, duration, listened/downloaded, новые выпуски, очередь и пустой подкаст проверены unit/Room-тестами.
+- Полный набор: 190/190 unit-тестов PASS, включая пять управляемых concurrency-regression R02; Debug lint и `git diff --check` PASS.
+- Пользовательский smoke на эмуляторе с отдельным `com.prod.mpod.test`: добавить локальный RSS → добавить эпизод в очередь → Player/Play → перейти в Subscriptions → добавить выпуск на RSS-сервере → Refresh. MediaSession остаётся PLAYING с растущей позицией (0 → 8966 → 42577 ms); новый выпуск появляется без переоткрытия, порядок/счётчик 2/2 и downloaded/queue отображаются. Playback остановлен; созданный тестовый подкаст удалён штатным Unsubscribe; локальный сервер и port forwarding выключены.
+
+**Ограничения / QA acceptance:** физический телефон и release-вариант не проверялись. Это developer verification на эмуляторе, отдельная QA acceptance не проведена. Room может повторно выполнять общий SELECT при обновлении позиции; устранены N+1 и полная пересборка равных данных UI, а не все SQL-запросы. Задача остаётся на код-ревью; commit исправления определяется по коммиту, содержащему этот раздел.
 
 ## BUG-R04 — неявная debug-подпись release APK
 

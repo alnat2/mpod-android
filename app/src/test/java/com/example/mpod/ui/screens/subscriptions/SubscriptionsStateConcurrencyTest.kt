@@ -7,6 +7,7 @@ import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
+import com.example.mpod.data.local.model.subscriptionRows
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -51,7 +53,7 @@ class SubscriptionsStateConcurrencyTest {
         // Strict fakes: any unexpected repository/DAO work fails the test.
         val podcastDao = fake<PodcastDao> { name, _ ->
             when (name) {
-                "getAllPodcastsFlow" -> podcasts
+                "getSubscriptionRowsFlow" -> podcasts.map { subscriptionRows(it) }
                 "getAllPodcasts" -> podcasts.value
                 "getPodcastById" -> {
                     refreshCalls.incrementAndGet()

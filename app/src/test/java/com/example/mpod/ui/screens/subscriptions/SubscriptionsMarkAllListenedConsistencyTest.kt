@@ -11,6 +11,8 @@ import com.example.mpod.data.local.entity.PlaylistItemEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
+import com.example.mpod.data.local.model.SubscriptionRow
+import com.example.mpod.data.local.model.subscriptionRows
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
@@ -634,6 +636,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
         private var notificationPending = false
         val podcastFlow = MutableStateFlow(listOf(podcast))
         val playlistFlow = MutableStateFlow(emptyList<PlaylistItemWithEpisode>())
+        val subscriptionFlow = MutableStateFlow(emptyList<SubscriptionRow>())
         @Volatile var bulkGate: Gate? = null
         @Volatile var downloadGate: Gate? = null
         @Volatile var afterTransactionGate: Gate? = null
@@ -653,7 +656,10 @@ class SubscriptionsMarkAllListenedConsistencyTest {
         }
         private fun emit() {
             if (transactionDepth > 0) notificationPending = true
-            else playlistFlow.value = joined()
+            else {
+                playlistFlow.value = joined()
+                subscriptionFlow.value = subscriptionRows(listOf(podcast), rows.values.toList(), playlistRows.keys)
+            }
         }
         fun replaceForStress(old: Long, replacement: EpisodeEntity) = synchronized(lock) {
             rows.remove(old)
@@ -662,6 +668,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
             emit()
         }
         val podcasts = object : PodcastDao {
+            override fun getSubscriptionRowsFlow(): Flow<List<SubscriptionRow>> = subscriptionFlow
             override fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = podcastFlow
             override fun getAllPodcasts() = synchronized(lock) { listOf(podcast) }
             override fun getPodcastById(id: Long) = synchronized(lock) { podcast.takeIf { it.id == id } }

@@ -236,6 +236,7 @@ class PodcastRepositoryRefreshAllTest {
         val deletedPodcastIds = mutableListOf<Long>()
         var deleteAllCalls = 0
 
+        override fun getSubscriptionRowsFlow(): Flow<List<com.example.mpod.data.local.model.SubscriptionRow>> = error("Repository does not observe subscriptions")
         override fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = emptyFlow()
         override fun getAllPodcasts(): List<PodcastEntity> = snapshot()
         override fun getPodcastById(id: Long): PodcastEntity? = podcasts.find { it.id == id }

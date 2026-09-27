@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.*
 import com.example.mpod.data.local.entity.*
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
+import com.example.mpod.data.local.model.subscriptionRows
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsDataStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
@@ -72,7 +73,7 @@ class PodcastUnsubscribeTest {
             else -> error("Unexpected playlist DAO call: $name")
         } }
         val podcasts = dao<PodcastDao> { name, args -> when (name) {
-            "getAllPodcastsFlow" -> podcastFlow
+            "getSubscriptionRowsFlow" -> podcastFlow.map { subscriptionRows(it, rows.values.toList(), queue.toSet()) }
             "deleteById" -> {
                 deleteGate?.invoke()
                 val ids = rows.values.filter { it.podcastId == args[0] }.map { it.id }

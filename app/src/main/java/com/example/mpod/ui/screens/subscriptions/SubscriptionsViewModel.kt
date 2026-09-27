@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.dao.PodcastDao
+import com.example.mpod.data.local.model.SubscriptionRow
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
@@ -16,10 +17,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -51,36 +54,9 @@ class SubscriptionsViewModel @Inject constructor(
 
     private fun observeData() {
         viewModelScope.launch(Dispatchers.IO) {
-            combine(
-                podcastDao.getAllPodcastsFlow(),
-                playlistDao.getPlaylistItemsWithEpisodesFlow()
-            ) { podcasts, playlistItems ->
-                val playlistEpisodeIds = playlistItems.map { it.episode.id }.toSet()
-                val podcastUis = podcasts.map { pod ->
-                    val episodes = episodeDao.getEpisodesByPodcastId(pod.id)
-                    val episodeUis = episodes.map { ep ->
-                        SubscriptionEpisodeUi(
-                            id = ep.id,
-                            title = cleanFeedText(ep.title).ifBlank { "Untitled episode" },
-                            durationSeconds = ep.durationSeconds.toInt(),
-                            publishedAt = ep.publishedAtString.ifBlank { null },
-                            isListened = ep.isListened,
-                            downloaded = ep.isDownloaded,
-                            summary = ep.description.ifBlank { null },
-                            inPlaylist = ep.id in playlistEpisodeIds
-                        )
-                    }
-                    SubscriptionPodcastUi(
-                        id = pod.id,
-                        title = cleanFeedText(pod.title).ifBlank { "Untitled podcast" },
-                        description = cleanFeedText(pod.description).ifBlank { pod.feedUrl },
-                        imageUrl = pod.artworkUrl.ifBlank { null },
-                        totalEpisodeCount = episodes.size,
-                        unlistenedEpisodeCount = episodes.count { !it.isListened },
-                        episodes = episodeUis
-                    )
-                }
-
+            // Room may requery after any episodes write, including position updates.
+            // Compare the screen projection before grouping/text cleanup/UI allocation.
+            podcastDao.getSubscriptionRowsFlow().subscriptionUiFlow().collect { podcastUis ->
                 _state.update { current ->
                     current.copy(
                         isLoading = false,
@@ -88,7 +64,7 @@ class SubscriptionsViewModel @Inject constructor(
                         podcasts = podcastUis
                     )
                 }
-            }.collect { }
+            }
         }
     }
 
@@ -334,3 +310,33 @@ private const val UNSUBSCRIBE_TICK_MS = 1_000L
 internal fun unsubscribeCountdownSeconds(windowSeconds: Int = UNSUBSCRIBE_WINDOW_SECONDS): List<Int> {
     return (windowSeconds downTo 1).toList()
 }
+
+internal fun mapSubscriptionRows(rows: List<SubscriptionRow>): List<SubscriptionPodcastUi> =
+    rows.groupBy { it.podcast }.map { (pod, podcastRows) ->
+        val episodes = podcastRows.mapNotNull { row ->
+            row.episode?.let { ep ->
+                SubscriptionEpisodeUi(
+                    id = ep.id,
+                    title = cleanFeedText(ep.title).ifBlank { "Untitled episode" },
+                    durationSeconds = ep.durationSeconds.toInt(),
+                    publishedAt = ep.publishedAtString.ifBlank { null },
+                    isListened = ep.isListened,
+                    downloaded = ep.isDownloaded,
+                    summary = ep.description.ifBlank { null },
+                    inPlaylist = row.inPlaylist
+                )
+            }
+        }
+        SubscriptionPodcastUi(
+            id = pod.id,
+            title = cleanFeedText(pod.title).ifBlank { "Untitled podcast" },
+            description = cleanFeedText(pod.description).ifBlank { pod.feedUrl },
+            imageUrl = pod.artworkUrl.ifBlank { null },
+            totalEpisodeCount = episodes.size,
+            unlistenedEpisodeCount = episodes.count { !it.isListened },
+            episodes = episodes
+        )
+    }
+
+internal fun Flow<List<SubscriptionRow>>.subscriptionUiFlow(): Flow<List<SubscriptionPodcastUi>> =
+    distinctUntilChanged().map(::mapSubscriptionRows)

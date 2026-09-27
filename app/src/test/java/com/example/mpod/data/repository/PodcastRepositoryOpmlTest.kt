@@ -125,6 +125,7 @@ class PodcastRepositoryOpmlTest {
         val insertCount = AtomicInteger(0)
         private val podcasts = mutableListOf<PodcastEntity>()
 
+        override fun getSubscriptionRowsFlow(): Flow<List<com.example.mpod.data.local.model.SubscriptionRow>> = error("Repository does not observe subscriptions")
         override fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = emptyFlow()
         override fun getAllPodcasts(): List<PodcastEntity> = podcasts.toList()
         override fun getPodcastById(id: Long): PodcastEntity? = podcasts.find { it.id == id }
