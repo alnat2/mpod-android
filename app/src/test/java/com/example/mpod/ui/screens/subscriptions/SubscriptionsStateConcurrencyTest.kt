@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicReference
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubscriptionsStateConcurrencyTest {
     private val main = UnconfinedTestDispatcher()
-    private val testThread = Thread.currentThread()
     private val podcasts = MutableStateFlow(listOf(PodcastEntity(id = 1, title = "Original", feedUrl = "https://example.com/feed")))
     private val refreshGate = Gate()
     private val refreshCalls = AtomicInteger()
@@ -47,6 +46,7 @@ class SubscriptionsStateConcurrencyTest {
 
     @Before
     fun setUp() = runBlocking {
+        val testThread = Thread.currentThread()
         Dispatchers.setMain(main)
         // Strict fakes: any unexpected repository/DAO work fails the test.
         val podcastDao = fake<PodcastDao> { name, _ ->
@@ -84,6 +84,7 @@ class SubscriptionsStateConcurrencyTest {
 
         // Intercept the actual VM's read/CAS boundary without adding production test hooks.
         // The public StateFlow still observes the original delegate.
+        // The reflected field name must match SubscriptionsViewModel._state.
         val field = SubscriptionsViewModel::class.java.getDeclaredField("_state").apply { isAccessible = true }
         @Suppress("UNCHECKED_CAST")
         controlledState = ControlledState(field.get(viewModel) as MutableStateFlow<SubscriptionsUiState>, testThread)

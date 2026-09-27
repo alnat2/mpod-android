@@ -289,7 +289,6 @@ class SubscriptionsViewModel @Inject constructor(
 data class SubscriptionsUiState(
     val hasLoadedOnce: Boolean = true,
     val isLoading: Boolean = false,
-    val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val pendingUnsubscribe: PendingUnsubscribeUi? = null,
