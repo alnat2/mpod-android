@@ -7,10 +7,12 @@ import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -51,6 +53,12 @@ class SmartListeningManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingDownloadJobs = ConcurrentHashMap<Long, Job>()
     private var observationJob: Job? = null
+    // Scheduling and suppression share one lock, so even a previously emitted Room snapshot
+    // cannot register an owner after cleanup has captured the jobs it must join.
+    private val ownershipLock = Any()
+    private val pausedPodcasts = mutableMapOf<Long, Int>()
+    private val pausedEpisodes = mutableMapOf<Long, Int>()
+    private val rescheduleAfterCleanup = mutableSetOf<Long>()
 
     internal val activeObservationJobForTest: Job?
         get() = observationJob
@@ -98,7 +106,14 @@ class SmartListeningManager @Inject constructor(
         pendingDownloadJobs.clear()
     }
 
-    private fun scheduleDebouncedDownload(episodeId: Long, audioUrl: String) {
+    private fun scheduleDebouncedDownload(episodeId: Long, audioUrl: String) = synchronized(ownershipLock) {
+        val episode = episodeDao.getEpisodeById(episodeId) ?: return@synchronized
+        if (episode.podcastId in pausedPodcasts) return@synchronized
+        if (episodeId in pausedEpisodes) {
+            rescheduleAfterCleanup.add(episodeId)
+            return@synchronized
+        }
+        if (episode.isDownloaded || !episode.localFilePath.isNullOrBlank()) return@synchronized
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 android.util.Log.d("SmartListening", "Scheduling debounced download (${debounceMs}ms) for episode $episodeId ($audioUrl)")
@@ -125,8 +140,25 @@ class SmartListeningManager @Inject constructor(
         }
 
         val previous = pendingDownloadJobs.putIfAbsent(episodeId, job)
-        if (previous == null) {
-            job.start()
+        if (previous == null) job.start() else job.cancel()
+    }
+
+    /** Holds suppression through the caller's Room deletion, without a network/filesystem transaction. */
+    suspend fun <T> withPodcastDownloadsPaused(podcastId: Long, block: suspend () -> T): T {
+        val jobs = synchronized(ownershipLock) {
+            val owners = pendingDownloadJobs.filterKeys { episodeDao.getEpisodeById(it)?.podcastId == podcastId }.values.toList()
+            pausedPodcasts[podcastId] = (pausedPodcasts[podcastId] ?: 0) + 1
+            owners
+        }
+        try {
+            jobs.forEach { it.cancel() }
+            jobs.forEach { it.join() }
+            return block()
+        } finally {
+            synchronized(ownershipLock) {
+                val remaining = pausedPodcasts.getValue(podcastId) - 1
+                if (remaining == 0) pausedPodcasts.remove(podcastId) else pausedPodcasts[podcastId] = remaining
+            }
         }
     }
 
@@ -149,58 +181,75 @@ class SmartListeningManager @Inject constructor(
 
                 val call = client.newCall(request)
 
-                val result: DownloadFinalizer.Result = suspendCancellableCoroutine { continuation ->
-                    continuation.invokeOnCancellation { call.cancel() }
+                val callbackFinished = CompletableDeferred<Unit>()
+                val result: DownloadFinalizer.Result = try {
+                    suspendCancellableCoroutine { continuation ->
+                        continuation.invokeOnCancellation { call.cancel() }
 
-                    call.enqueue(object : Callback {
-                        override fun onFailure(call: Call, e: IOException) {
-                            if (continuation.isCancelled) return
-                            continuation.resumeWith(kotlin.Result.failure(e))
-                        }
-
-                        override fun onResponse(call: Call, response: Response) {
-                            try {
-                                response.use { resp ->
-                                    if (!resp.isSuccessful) {
-                                        android.util.Log.w("SmartListening", "Download HTTP failed with code ${resp.code} for $audioUrl")
-                                        val clean = DownloadFinalizer.cleanupTempFile(tempFile, fileOps)
-                                        if (continuation.isActive) {
-                                            continuation.resume(
-                                                DownloadFinalizer.Result(success = false, cleanupFailed = !clean, errorMessage = "HTTP ${resp.code}: ${resp.message}")
-                                            )
-                                        }
-                                        return
-                                    }
-                                    val body = resp.body
-                                    if (body == null) {
-                                        val clean = DownloadFinalizer.cleanupTempFile(tempFile, fileOps)
-                                        if (continuation.isActive) {
-                                            continuation.resume(
-                                                DownloadFinalizer.Result(success = false, cleanupFailed = !clean, errorMessage = "Empty HTTP response body")
-                                            )
-                                        }
-                                        return
-                                    }
-                                    val finalizerResult = body.byteStream().use { input ->
-                                        DownloadFinalizer.downloadAndFinalize(
-                                            tempFile = tempFile,
-                                            targetFile = targetFile,
-                                            dataStream = input,
-                                            isCancelled = { continuation.isCancelled },
-                                            fileOps = fileOps
-                                        )
-                                    }
-                                    if (continuation.isActive) {
-                                        continuation.resume(finalizerResult)
+                        try {
+                            call.enqueue(object : Callback {
+                                override fun onFailure(call: Call, e: IOException) {
+                                    try {
+                                        if (continuation.isActive) continuation.resumeWith(kotlin.Result.failure(e))
+                                    } finally {
+                                        callbackFinished.complete(Unit)
                                     }
                                 }
-                            } catch (e: Throwable) {
-                                if (continuation.isActive) {
-                                    continuation.resumeWith(kotlin.Result.failure(e))
+
+                                override fun onResponse(call: Call, response: Response) {
+                                    try {
+                                        response.use { resp ->
+                                            if (!resp.isSuccessful) {
+                                                android.util.Log.w("SmartListening", "Download HTTP failed with code ${resp.code} for $audioUrl")
+                                                val clean = DownloadFinalizer.cleanupTempFile(tempFile, fileOps)
+                                                if (continuation.isActive) {
+                                                    continuation.resume(
+                                                        DownloadFinalizer.Result(success = false, cleanupFailed = !clean, errorMessage = "HTTP ${resp.code}: ${resp.message}")
+                                                    )
+                                                }
+                                                return
+                                            }
+                                            val body = resp.body
+                                            if (body == null) {
+                                                val clean = DownloadFinalizer.cleanupTempFile(tempFile, fileOps)
+                                                if (continuation.isActive) {
+                                                    continuation.resume(
+                                                        DownloadFinalizer.Result(success = false, cleanupFailed = !clean, errorMessage = "Empty HTTP response body")
+                                                    )
+                                                }
+                                                return
+                                            }
+                                            val finalizerResult = body.byteStream().use { input ->
+                                                DownloadFinalizer.downloadAndFinalize(
+                                                    tempFile = tempFile,
+                                                    targetFile = targetFile,
+                                                    dataStream = input,
+                                                    isCancelled = { continuation.isCancelled },
+                                                    fileOps = fileOps
+                                                )
+                                            }
+                                            if (continuation.isActive) {
+                                                continuation.resume(finalizerResult)
+                                            }
+                                        }
+                                    } catch (e: Throwable) {
+                                        if (continuation.isActive) {
+                                            continuation.resumeWith(kotlin.Result.failure(e))
+                                        }
+                                    } finally {
+                                        callbackFinished.complete(Unit)
+                                    }
                                 }
-                            }
+                            })
+                        } catch (error: Exception) {
+                            callbackFinished.complete(Unit)
+                            if (continuation.isActive) continuation.resumeWith(kotlin.Result.failure(error))
                         }
-                    })
+                    }
+                } finally {
+                    // Coroutine cancellation resumes immediately; OkHttp may still be writing.
+                    // Keep the owner alive until its callback closes the body and output stream.
+                    withContext(NonCancellable) { callbackFinished.await() }
                 }
 
                 if (!result.success) {
@@ -210,6 +259,7 @@ class SmartListeningManager @Inject constructor(
 
                 ensureActive()
                 preDaoHook?.invoke()
+                ensureActive()
 
                 episodeDao.updateDownloadState(episodeId = episodeId, isDownloaded = true, localFilePath = result.finalFile!!.absolutePath)
                 roomCommitted = true
@@ -240,34 +290,54 @@ class SmartListeningManager @Inject constructor(
         }
 
     suspend fun cleanupEpisodeFile(episodeId: Long): CleanupResult = withContext(Dispatchers.IO) {
-        pendingDownloadJobs[episodeId]?.cancelAndJoin()
-
-        val episode = episodeDao.getEpisodeById(episodeId)
-            ?: return@withContext CleanupResult.Success
-
-        if (!episode.localFilePath.isNullOrBlank()) {
-            val file = File(episode.localFilePath)
-            val deleted = fileOps.delete(file)
-            if (!deleted) {
-                android.util.Log.e("SmartListening", "Failed to delete audio file: ${file.absolutePath} for episode $episodeId. Skipping Room state reset to prevent desync.")
-                return@withContext CleanupResult.DeleteFailed(episode.localFilePath)
-            }
-            // Only clear the state that owned the deleted file. A newer download may have
-            // committed a different path while this cleanup was deleting the old one.
-            episodeDao.clearDownloadStateIfMatches(
-                episodeId = episodeId,
-                expectedIsDownloaded = episode.isDownloaded,
-                expectedLocalFilePath = episode.localFilePath
-            )
-        } else if (episode.isDownloaded) {
-            // No file is linked, so there is nothing to delete before clearing stale metadata.
-            episodeDao.clearDownloadStateIfMatches(
-                episodeId = episodeId,
-                expectedIsDownloaded = true,
-                expectedLocalFilePath = null
-            )
+        val owner = synchronized(ownershipLock) {
+            pausedEpisodes[episodeId] = (pausedEpisodes[episodeId] ?: 0) + 1
+            pendingDownloadJobs[episodeId]
         }
-        CleanupResult.Success
+        var cleaned = false
+        try {
+            owner?.cancelAndJoin()
+            val episode = episodeDao.getEpisodeById(episodeId)
+            val directory = File(context.filesDir, "podcasts")
+            // A cancelled/failed download can leave a file before its path reaches Room.
+            // The ID prefix is durable ownership information, also available after process restart.
+            val ownedFiles = if (directory.exists()) {
+                directory.listFiles { _, name -> name.startsWith("ep_${episodeId}_") }
+                    ?.toList() ?: throw IOException("Could not list downloaded episode files")
+            } else emptyList()
+            val linkedFile = episode?.localFilePath?.takeIf { it.isNotBlank() }?.let(::File)
+            for (file in (ownedFiles + listOfNotNull(linkedFile)).distinctBy { it.absolutePath }) {
+                if (fileOps.exists(file) && !fileOps.delete(file)) {
+                    return@withContext CleanupResult.DeleteFailed(file.absolutePath)
+                }
+            }
+            if (episode != null && (episode.isDownloaded || !episode.localFilePath.isNullOrBlank())) {
+                episodeDao.clearDownloadStateIfMatches(
+                    episodeId, episode.isDownloaded, episode.localFilePath
+                )
+            }
+            cleaned = true
+            CleanupResult.Success
+        } finally {
+            val reschedule = synchronized(ownershipLock) {
+                val remaining = pausedEpisodes.getValue(episodeId) - 1
+                if (remaining == 0) {
+                    pausedEpisodes.remove(episodeId)
+                    rescheduleAfterCleanup.remove(episodeId)
+                } else {
+                    pausedEpisodes[episodeId] = remaining
+                    false
+                }
+            }
+            // A re-add emission may have been suppressed while cleanup was running. Recheck
+            // current Room state after success rather than replaying the observer's old snapshot.
+            if (cleaned && reschedule) scope.launch {
+                val current = episodeDao.getEpisodeById(episodeId)
+                if (current != null && playlistDao.isEpisodeInPlaylist(episodeId) && !current.audioUrl.isNullOrBlank()) {
+                    scheduleDebouncedDownload(episodeId, current.audioUrl)
+                }
+            }
+        }
     }
 
     internal fun getPendingDownloadJob(episodeId: Long): Job? = pendingDownloadJobs[episodeId]

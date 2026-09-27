@@ -11,6 +11,7 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.playback.SmartListeningManager
 import com.example.mpod.ui.util.cleanFeedText
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -37,6 +38,7 @@ class SubscriptionsViewModel @Inject constructor(
 
     private var pendingUnsubscribeJob: Job? = null
     private var refreshInFlight = false
+    private var failedUnsubscribePodcastId: Long? = null
     private val markingPodcastIds = mutableSetOf<Long>()
 
     init {
@@ -91,6 +93,7 @@ class SubscriptionsViewModel @Inject constructor(
     fun refreshAll() {
         if (_state.value.isRefreshingAll || refreshInFlight) return
         refreshInFlight = true
+        failedUnsubscribePodcastId = null
         _state.value = _state.value.copy(isRefreshingAll = true, actionErrorMessage = null)
 
         viewModelScope.launch {
@@ -111,6 +114,7 @@ class SubscriptionsViewModel @Inject constructor(
 
     fun refreshPodcast(podcastId: Long) {
         if (_state.value.isRefreshingAll || podcastId in _state.value.refreshingPodcastIds) return
+        failedUnsubscribePodcastId = null
         _state.value = _state.value.copy(
             refreshingPodcastIds = _state.value.refreshingPodcastIds + podcastId,
             actionErrorMessage = null
@@ -169,20 +173,34 @@ class SubscriptionsViewModel @Inject constructor(
     }
 
     internal fun unsubscribePodcastNow(podcastId: Long) {
+        if (podcastId in _state.value.unsubscribingPodcastIds) return
+        failedUnsubscribePodcastId = null
         _state.value = _state.value.copy(
             pendingUnsubscribe = null,
-            unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId
+            unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds + podcastId,
+            actionErrorMessage = null
         )
         viewModelScope.launch {
             try {
                 podcastRepository.unsubscribe(podcastId)
-                queueInvalidator.invalidate()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                failedUnsubscribePodcastId = podcastId
+                _state.value = _state.value.copy(
+                    actionErrorMessage = error.message ?: "Could not unsubscribe. Please try again."
+                )
             } finally {
                 _state.value = _state.value.copy(
                     unsubscribingPodcastIds = _state.value.unsubscribingPodcastIds - podcastId
                 )
             }
         }
+    }
+
+    fun retryLastAction() {
+        val podcastId = failedUnsubscribePodcastId
+        if (podcastId != null) unsubscribePodcastNow(podcastId) else refreshAll()
     }
 
     fun markAllListened(podcastId: Long) {

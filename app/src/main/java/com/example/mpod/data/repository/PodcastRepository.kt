@@ -16,13 +16,14 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.playback.SmartListeningManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import okhttp3.Request
-import java.io.File
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -187,17 +188,28 @@ class PodcastRepository @Inject constructor(
 
     suspend fun unsubscribe(podcastId: Long) = withContext(Dispatchers.IO) {
         markActionMutex.withLock {
-            val episodes = episodeDao.getEpisodesByPodcastId(podcastId)
-            for (ep in episodes) {
-                if (!ep.localFilePath.isNullOrBlank()) {
-                    val f = File(ep.localFilePath)
-                    if (f.exists()) f.delete()
+            smartListeningManager.withPodcastDownloadsPaused(podcastId) {
+                val episodes = episodeDao.getEpisodesByPodcastId(podcastId)
+                for (episode in episodes) {
+                    when (smartListeningManager.cleanupEpisodeFile(episode.id)) {
+                        CleanupResult.Success -> Unit
+                        is CleanupResult.DeleteFailed -> throw IllegalStateException(
+                            "Could not delete downloaded audio. Please try unsubscribing again."
+                        )
+                    }
                 }
-            }
-            val activeEpisodeId = appSettingsDataStore.getActiveEpisodeId()
-            podcastDao.deleteById(podcastId)
-            if (activeEpisodeId != null && episodeDao.getEpisodeById(activeEpisodeId) == null) {
-                appSettingsDataStore.setActiveEpisodeId(null)
+                val activeEpisodeId = appSettingsDataStore.getActiveEpisodeId()
+                ensureActive()
+                withContext(NonCancellable) {
+                    podcastDao.deleteById(podcastId) // Room FK cascades episodes and playlist atomically.
+                    try {
+                        if (activeEpisodeId != null && episodeDao.getEpisodeById(activeEpisodeId) == null) {
+                            appSettingsDataStore.setActiveEpisodeId(null)
+                        }
+                    } finally {
+                        queueInvalidator.invalidate()
+                    }
+                }
             }
         }
     }

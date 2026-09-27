@@ -92,7 +92,7 @@ fun SubscriptionsRoute(
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onRetryLoad = viewModel::refresh,
-        onRetryRefresh = viewModel::refreshAll,
+        onRetryRefresh = viewModel::retryLastAction,
         onAddRssFeed = onAddRssFeed,
         onImportOpml = onImportOpml
     )

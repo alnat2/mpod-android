@@ -430,7 +430,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
     }
 
     @Test
-    fun cleanupWithoutMetadata_readdedDownloadCommitsBeforeCleanupReturns_remainsConsistent() = runBlocking {
+    fun cleanupWithoutMetadata_readdWaitsForCleanup_thenDownloadsConsistently() = runBlocking {
         awaitLoaded()
         store.episodes.update(episode(101).copy(audioUrl = server.url("/101.mp3").toString()))
         server.enqueue(MockResponse().setBody("readded audio"))
@@ -443,9 +443,12 @@ class SubscriptionsMarkAllListenedConsistencyTest {
             read.awaitEntered() // Cleanup has consumed false/null, after its job lookup/join.
             store.cleanupReadGate = null // New download setup reads must not share this barrier.
             viewModel.addEpisodeToPlaylist(101)
-            awaitValidReaddedDownload()
+            withTimeout(TIMEOUT) { store.playlistFlow.first { items -> items.any { it.episode.id == 101L } } }
+            assertNull("Cleanup suppression prevents a new owner", manager.getPendingDownloadJob(101))
+            assertFalse(store.snapshot().single { it.id == 101L }.isDownloaded)
             read.release.countDown()
             assertEquals(CleanupResult.Success, withTimeout(TIMEOUT) { cleanup.await() })
+            awaitValidReaddedDownload()
             assertReaddedDownloadConsistent()
         } finally {
             read.release.countDown()
@@ -505,10 +508,12 @@ class SubscriptionsMarkAllListenedConsistencyTest {
             // Same public cleanup API used by individual mark-listened and playback completion.
             assertEquals(CleanupResult.Success, manager.cleanupEpisodeFile(101))
             viewModel.addEpisodeToPlaylist(101)
-            awaitValidReaddedDownload()
-            val newFile = File(store.snapshot().single { it.id == 101L }.localFilePath!!)
+            withTimeout(TIMEOUT) { store.playlistFlow.first { items -> items.any { it.episode.id == 101L } } }
+            assertNull("Other cleanup still owns suppression", manager.getPendingDownloadJob(101))
             deletion.release.countDown()
             assertTrue(withTimeout(TIMEOUT) { mark.await() }.cleanupFailures.isEmpty())
+            awaitValidReaddedDownload()
+            val newFile = File(store.snapshot().single { it.id == 101L }.localFilePath!!)
             val final = store.snapshot().single { it.id == 101L }
             println("OVERLAPPING_CLEANUP downloaded=${final.isDownloaded}, path=${final.localFilePath}, newFileExists=${newFile.exists()}, queued=${store.playlist.isEpisodeInPlaylist(101)}")
             assertReaddedDownloadConsistent()
