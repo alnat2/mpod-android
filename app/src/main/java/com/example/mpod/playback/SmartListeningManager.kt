@@ -151,6 +151,9 @@ class SmartListeningManager @Inject constructor(
             owners
         }
         try {
+            // The podcast pause was installed before releasing ownershipLock. Scheduling
+            // checks it under the same lock, so no new owner can register before cancellation;
+            // cancelling and joining this captured set outside the lock is sufficient.
             jobs.forEach { it.cancel() }
             jobs.forEach { it.join() }
             return block()
