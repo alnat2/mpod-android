@@ -117,7 +117,7 @@
 
 ## BUG-R04 — неявная debug-подпись release APK
 
-**Статус:** IMPLEMENTED — developer verification завершена; решение владельца о постоянном ключе и переходе существующих установок, код-ревью и QA acceptance ожидаются. **Приоритет:** высокий перед распространением.
+**Статус:** IMPLEMENTED — developer verification завершена; решение владельца о постоянном ключе и переходе существующих установок, повторное код-ревью и QA acceptance ожидаются. **Приоритет:** высокий перед распространением.
 
 **Где:** `app/build.gradle.kts`, `app/debug.keystore`, `.github/workflows/build-release.yml`, документация сборки/поставки.
 
@@ -137,7 +137,9 @@
 
 **Результат реализации (28.09.2026):** `release` использует только полный набор переменных закрытого ключа и отклоняет сертификат из `app/debug.keystore`, включая копию keystore. Отдельный `qaRelease` остаётся минифицированным, но имеет ID `com.prod.mpod.signingtest` и тестовую подпись; CI публикует только явно названный QA-артефакт. Условия сборки и варианты переноса существующих установок описаны в `docs/android-release-signing.md`. Ни applicationId установленного приложения, ни его данные не изменялись.
 
-**Developer verification:** без ключа `assembleRelease` завершился ошибкой со списком четырёх переменных; неполная конфигурация указала три отсутствующие переменные. Копия debug-keystore с полным набором переменных отклонена по SHA-256 сертификата. Одноразовый закрытый ключ прошёл проверку и подписал `com.prod.mpod`; `apksigner verify --print-certs` показал сертификат временного fixture, отличный от debug. `assembleQaRelease`, 190/190 Debug unit-тестов, Debug/Release lint прошли без release-секретов; `apksigner` подтвердил тестовый сертификат и `aapt` — ID `com.prod.mpod.signingtest`. `git diff --check` прошёл.
+**Developer verification:** без ключа `assembleRelease` завершился ошибкой со списком четырёх переменных; неполная конфигурация указала три отсутствующие переменные. Копия debug-keystore с полным набором переменных отклонена по сертификату. Одноразовый закрытый ключ прошёл проверку и подписал `com.prod.mpod`; `apksigner verify --print-certs` показал сертификат временного fixture, отличный от debug. `assembleQaRelease`, 190/190 Debug unit-тестов, Debug/Release lint прошли без release-секретов; `apksigner` подтвердил тестовый сертификат и `aapt` — ID `com.prod.mpod.signingtest`. `git diff --check` прошёл.
+
+**После код-ревью (28.09.2026):** task binding расширен на `packageReleaseBundle` и другие release packaging/signing tasks без привязки к одному фиксированному списку; сравнение выполняется с актуальным сертификатом `app/debug.keystore`. CI сохраняет лог тестов как artifact вместо записи ветки, использует `contents: read` и обычный checkout. Версия Android build tools зафиксирована на 35.0.0; инструкция поясняет работу `validateReleaseSigning` и отличие компиляции Android-тестов от их запуска. Повторно прошли 190/190 unit-тестов, сборка Android test APK, Debug/Release lint, `assembleQaRelease` и `assembleReleaseUnitTest` без секретов; прямой `packageReleaseBundle` без ключа отклонён; копия debug-сертификата отклонена, одноразовый закрытый ключ принят. YAML workflow разобран парсером; удалённый GitHub Actions run не проводился.
 
 **Ограничения / QA acceptance:** временный ключ и подписанный им APK использовались только для проверки и удалены. Постоянный ключ и способ сохранения либо переноса уже установленных `com.prod.mpod` ещё не определены владельцем; новый release нельзя выдавать как совместимое обновление. Физический телефон и установка APK не проверялись, отдельная QA acceptance не проводилась.
 

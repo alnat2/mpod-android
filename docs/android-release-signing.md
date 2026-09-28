@@ -11,6 +11,8 @@
 
 Set these in the local environment or a protected CI secret store. Do not commit the keystore, passwords, or an environment file containing them. Do not pass passwords on a command line or enable Gradle debug logging for a signing build.
 
+The `validateReleaseSigning` Gradle task runs before release APK/AAB packaging. It lists missing variables, checks that the keystore file and alias exist, and compares the selected certificate with the current checked-in debug certificate. It rejects that certificate even if the debug keystore was copied to another path. Validation runs when a release artifact is built, so Debug tests and lint remain available without release secrets.
+
 With all four values set, build the distributable APK:
 
 ```sh
@@ -25,7 +27,7 @@ For local or CI checks of the minified build without a private key, use the expl
 ./gradlew :app:assembleQaRelease
 ```
 
-Its output is `app/build/outputs/apk/qaRelease/app-qaRelease.apk`, signed with the checked-in test key and installed as `com.prod.mpod.signingtest`. It cannot update an existing `com.prod.mpod` installation. GitHub Actions uploads it as `mpod-qa-test-signed-apk` and verifies its signature and package. It is not a distributable production APK. Debug tests and lint do not need release signing secrets.
+Its output is `app/build/outputs/apk/qaRelease/app-qaRelease.apk`, signed with the checked-in test key and installed as `com.prod.mpod.signingtest`. It cannot update an existing `com.prod.mpod` installation. GitHub Actions uploads it as `mpod-qa-test-signed-apk` and verifies its certificate digest and package. CI runs JVM unit tests and compiles the Android instrumentation test APK; it does not execute instrumentation tests on an emulator. The QA APK is not a distributable production APK.
 
 ## Existing installations
 

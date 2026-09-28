@@ -1,5 +1,4 @@
 import java.security.KeyStore
-import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.android.application)
@@ -18,7 +17,6 @@ val releaseSigningKeys = listOf(
     "MPOD_RELEASE_KEY_PASSWORD",
 )
 val releaseSigning = releaseSigningKeys.associateWith(::env)
-val checkedInDebugCertificateSha256 = "61f0b1bb4485fcf4333e005e1adb43115340eb6b63b8f378cce5319430a4d012"
 
 configurations.all {
     resolutionStrategy.eachDependency {
@@ -31,8 +29,10 @@ configurations.all {
 }
 
 android {
+    // Generated code keeps the historical namespace; installed apps use the product applicationId.
     namespace = "com.example.mpod"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "com.prod.mpod"
@@ -117,17 +117,24 @@ val validateReleaseSigning = tasks.register("validateReleaseSigning") {
         )
         val certificate = store.getCertificate(releaseSigning.getValue("MPOD_RELEASE_KEY_ALIAS")!!)
             ?: error("MPOD_RELEASE_KEY_ALIAS was not found in the release keystore.")
-        val certificateSha256 = MessageDigest.getInstance("SHA-256")
-            .digest(certificate.encoded)
-            .joinToString("") { "%02x".format(it) }
-        check(certificateSha256 != checkedInDebugCertificateSha256) {
+        val debugCertificate = KeyStore.getInstance(file("debug.keystore"), "android".toCharArray())
+            .getCertificate("androiddebugkey")
+            ?: error("The checked-in debug.keystore has no androiddebugkey certificate.")
+        check(!certificate.encoded.contentEquals(debugCertificate.encoded)) {
             "The checked-in debug certificate cannot sign a distributable release."
         }
     }
 }
 
 tasks.matching {
-    it.name in setOf("assembleRelease", "packageRelease", "bundleRelease", "signReleaseBundle")
+    val name = it.name
+    val assemblesReleaseArtifact = name.startsWith("assembleRelease") &&
+        !name.endsWith("UnitTest") && !name.endsWith("AndroidTest")
+    val bundlesReleaseArtifact = name.startsWith("bundleRelease") &&
+        name != "bundleReleaseResources" && !name.startsWith("bundleReleaseClasses")
+    assemblesReleaseArtifact || bundlesReleaseArtifact ||
+        (name.startsWith("packageRelease") && name != "packageReleaseResources") ||
+        name.startsWith("signRelease")
 }.configureEach {
     dependsOn(validateReleaseSigning)
 }
