@@ -170,6 +170,8 @@
 
 **Изменённые файлы:** `AppSettingsDataStore.kt`, новый `PreferencesModule.kt`, `MainActivity.kt`, `MpodApplication.kt`, `ProxyHttpClientFactory.kt`, `PodcastRepository.kt`, `PlaybackService.kt`, `AutoRefreshWorker.kt`, `HomeViewModel.kt`, `SettingsViewModel.kt`; test fakes и их потребители; новый `AppSettingsDataStoreTest.kt`.
 
+**Коммит:** `8a89a19`.
+
 **Developer verification:** `testDebugUnitTest` — PASS; `assembleDebugAndroidTest` — PASS; `lintDebug` — PASS; `git diff --check` — PASS. Targeted instrumented test не запущен: на момент проверки `adb devices` не показал подключённых эмуляторов/телефонов, а `connectedDebugAndroidTest` завершился с `No connected devices`.
 
 **QA acceptance:** не проводилась. Android test APK собран, но реальная запись/повторное чтение на эмуляторе требует доступного устройства.
