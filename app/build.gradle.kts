@@ -51,7 +51,7 @@ android {
             keyAlias = releaseSigning["MPOD_RELEASE_KEY_ALIAS"]
             keyPassword = releaseSigning["MPOD_RELEASE_KEY_PASSWORD"]
         }
-        create("qaRelease") {
+        create("localRelease") {
             storeFile = file("debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -69,11 +69,10 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
-        create("qaRelease") {
+        create("localRelease") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".signingtest"
             matchingFallbacks += listOf("release")
-            signingConfig = signingConfigs.getByName("qaRelease")
+            signingConfig = signingConfigs.getByName("localRelease")
         }
     }
     compileOptions {
@@ -104,7 +103,7 @@ val validateReleaseSigning = tasks.register("validateReleaseSigning") {
         val missing = releaseSigningKeys.filter { releaseSigning[it] == null }
         check(missing.isEmpty()) {
             "Release signing is incomplete. Set ${missing.joinToString()} outside Git, " +
-                "or build assembleQaRelease for a clearly identified test APK."
+                "or build assembleLocalRelease for the explicitly named local APK."
         }
         val keystore = file(releaseSigning.getValue("MPOD_RELEASE_STORE_FILE")!!)
         check(keystore.isFile) { "MPOD_RELEASE_STORE_FILE must point to an existing keystore file." }

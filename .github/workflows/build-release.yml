@@ -1,4 +1,4 @@
-name: Android QA release build
+name: Android local release build
 
 on:
   push:
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    name: Verify and build QA APK
+    name: Verify and build local APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -42,16 +42,16 @@ jobs:
       - name: Run Android lint
         run: ./gradlew lintDebug lintRelease --console=plain
 
-      - name: Build QA APK with test signing
-        run: ./gradlew assembleQaRelease --console=plain
+      - name: Build local APK with the existing signing key
+        run: ./gradlew assembleLocalRelease --console=plain
 
-      - name: Verify QA APK signature and package
+      - name: Verify local APK signature and package
         run: |
-          apk=app/build/outputs/apk/qaRelease/app-qaRelease.apk
+          apk=app/build/outputs/apk/localRelease/app-localRelease.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$apk" |
             grep -F 'Signer #1 certificate SHA-256 digest: 61f0b1bb4485fcf4333e005e1adb43115340eb6b63b8f378cce5319430a4d012'
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" |
-            grep -F "package: name='com.prod.mpod.signingtest'"
+            grep -F "package: name='com.prod.mpod'"
 
       - name: Upload reports
         if: always()
@@ -64,9 +64,9 @@ jobs:
             app/build/test-results/
           if-no-files-found: ignore
 
-      - name: Upload QA APK
+      - name: Upload local APK
         uses: actions/upload-artifact@v4
         with:
-          name: mpod-qa-test-signed-apk
-          path: app/build/outputs/apk/qaRelease/app-qaRelease.apk
+          name: mpod-local-legacy-signed-apk
+          path: app/build/outputs/apk/localRelease/app-localRelease.apk
           if-no-files-found: error
