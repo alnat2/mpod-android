@@ -13,7 +13,7 @@ import com.example.mpod.data.local.MpodDatabase
 import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
@@ -51,7 +51,7 @@ class UnsubscribeDownloadTest {
         val client = ProxyHttpClientFactory().apply { updateProxy(AppSettings(isProxyEnabled = false)) }
         manager = SmartListeningManager(object : ContextWrapper(context) { override fun getFilesDir() = directory }, db.playlistDao(), db.episodeDao(), client)
         manager.debounceMs = 0
-        val settings = object : AppSettingsDataStore() {
+        val settings = object : FakeAppSettingsStore() {
             override suspend fun getActiveEpisodeId() = active
             override suspend fun setActiveEpisodeId(episodeId: Long?) { active = episodeId }
         }

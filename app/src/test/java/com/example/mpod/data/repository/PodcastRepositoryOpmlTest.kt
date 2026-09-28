@@ -6,7 +6,7 @@ import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.Flow
@@ -116,10 +116,7 @@ class PodcastRepositoryOpmlTest {
         assertEquals(0, fakeEpisodeDao.insertCount.get())
     }
 
-    class FakeAppSettingsDataStore : AppSettingsDataStore() {
-        val stateFlow = MutableStateFlow(AppSettings())
-        override val settingsFlow: Flow<AppSettings> = stateFlow
-    }
+    class FakeAppSettingsDataStore : FakeAppSettingsStore()
 
     class FakePodcastDao : PodcastDao {
         val insertCount = AtomicInteger(0)

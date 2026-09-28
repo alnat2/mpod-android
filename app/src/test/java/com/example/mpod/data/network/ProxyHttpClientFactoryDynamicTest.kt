@@ -1,7 +1,7 @@
 package com.example.mpod.data.network
 
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -168,8 +168,5 @@ class ProxyHttpClientFactoryDynamicTest {
 
     class FakeAppSettingsDataStore(
         initial: AppSettings = AppSettings()
-    ) : AppSettingsDataStore() {
-        val stateFlow = MutableStateFlow(initial)
-        override val settingsFlow: Flow<AppSettings> = stateFlow
-    }
+    ) : FakeAppSettingsStore(initial)
 }

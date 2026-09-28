@@ -5,7 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import coil.ImageLoader
 import coil.ImageLoaderFactory
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.AutoRefreshScheduler
 import com.example.mpod.playback.SmartListeningManager
@@ -20,7 +20,7 @@ import javax.inject.Inject
 class MpodApplication : Application(), ImageLoaderFactory, Configuration.Provider {
     @Inject lateinit var okHttpClient: OkHttpClient
     @Inject lateinit var proxyHttpClientFactory: ProxyHttpClientFactory
-    @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
+    @Inject lateinit var appSettingsDataStore: AppSettingsStore
     @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var autoRefreshScheduler: AutoRefreshScheduler
     @Inject lateinit var workerFactory: HiltWorkerFactory

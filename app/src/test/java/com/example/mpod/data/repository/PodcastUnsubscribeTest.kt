@@ -7,7 +7,7 @@ import com.example.mpod.data.local.entity.*
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.model.subscriptionRows
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.*
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsViewModel
@@ -87,7 +87,7 @@ class PodcastUnsubscribeTest {
         val client = ProxyHttpClientFactory().apply { updateProxy(AppSettings(isProxyEnabled = false)) }
         manager = SmartListeningManager(object : ContextWrapper(null) { override fun getFilesDir() = directory }, playlist, episodes, client)
         manager.debounceMs = 0
-        val settings = object : AppSettingsDataStore() {
+        val settings = object : FakeAppSettingsStore() {
             override suspend fun getActiveEpisodeId() = active
             override suspend fun setActiveEpisodeId(episodeId: Long?) { active = episodeId }
         }

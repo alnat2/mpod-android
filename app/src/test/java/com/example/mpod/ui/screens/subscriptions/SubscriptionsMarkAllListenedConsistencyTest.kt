@@ -14,7 +14,7 @@ import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.model.SubscriptionRow
 import com.example.mpod.data.local.model.subscriptionRows
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
@@ -88,7 +88,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
             override fun getFilesDir(): File = directory
         }, store.playlist, store.episodes, client)
         invalidator = PlaybackQueueInvalidator()
-        repository = PodcastRepository(store.podcasts, store.episodes, AppSettingsDataStore(), client, manager, invalidator)
+        repository = PodcastRepository(store.podcasts, store.episodes, FakeAppSettingsStore(), client, manager, invalidator)
         viewModel = SubscriptionsViewModel(store.podcasts, store.episodes, store.playlist,
             repository, PlaylistRepository(store.playlist), invalidator, manager)
     }

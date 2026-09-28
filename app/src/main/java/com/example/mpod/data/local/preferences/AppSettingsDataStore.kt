@@ -1,6 +1,5 @@
 package com.example.mpod.data.local.preferences
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,16 +8,10 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
-import javax.inject.Singleton
-
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "mpoddy_settings")
 
 data class AppSettings(
     val isAutoRefreshEnabled: Boolean = false,
@@ -35,21 +28,30 @@ data class AppSettings(
     val lastRefreshTimeFormatted: String = ""
 )
 
-@Singleton
-open class AppSettingsDataStore {
-    private val context: Context?
+interface AppSettingsStore {
+    val settingsFlow: Flow<AppSettings>
 
-    @Inject
-    constructor(@ApplicationContext context: Context) {
-        this.context = context
-    }
+    suspend fun setAutoRefreshEnabled(enabled: Boolean)
+    suspend fun setDailyRefreshTime(time: String)
+    suspend fun setProxyEnabled(enabled: Boolean)
+    suspend fun setProxySettings(
+        enabled: Boolean,
+        host: String,
+        port: Int,
+        type: String = "SOCKS5",
+        username: String = "",
+        password: String = ""
+    )
+    suspend fun setThemeMode(theme: String)
+    suspend fun setActiveEpisodeId(episodeId: Long?)
+    suspend fun getActiveEpisodeId(): Long?
+    suspend fun setPlaybackSpeed(speed: Float)
+    suspend fun setLastRefreshTime(formatted: String)
+}
 
-    /**
-     * Testing constructor allowing unit tests without Android Context.
-     */
-    constructor() {
-        this.context = null
-    }
+class AppSettingsDataStore @Inject constructor(
+    private val dataStore: DataStore<Preferences>
+) : AppSettingsStore {
 
     private object Keys {
         val AUTO_REFRESH_ENABLED = booleanPreferencesKey("auto_refresh_enabled")
@@ -66,47 +68,44 @@ open class AppSettingsDataStore {
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
     }
 
-    open val settingsFlow: Flow<AppSettings> by lazy {
-        val ctx = context ?: return@lazy emptyFlow()
-        ctx.dataStore.data.map { prefs ->
-            AppSettings(
-                isAutoRefreshEnabled = prefs[Keys.AUTO_REFRESH_ENABLED] ?: false,
-                dailyRefreshTime = prefs[Keys.DAILY_REFRESH_TIME] ?: "03:00",
-                isProxyEnabled = prefs[Keys.PROXY_ENABLED] ?: false,
-                proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
-                proxyHost = prefs[Keys.PROXY_HOST] ?: "",
-                proxyPort = prefs[Keys.PROXY_PORT] ?: 1080,
-                proxyUsername = prefs[Keys.PROXY_USERNAME] ?: "",
-                proxyPassword = prefs[Keys.PROXY_PASSWORD] ?: "",
-                themeMode = prefs[Keys.THEME_MODE] ?: "System",
-                activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
-                playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
-                lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
-            )
-        }
+    override val settingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
+        AppSettings(
+            isAutoRefreshEnabled = prefs[Keys.AUTO_REFRESH_ENABLED] ?: false,
+            dailyRefreshTime = prefs[Keys.DAILY_REFRESH_TIME] ?: "03:00",
+            isProxyEnabled = prefs[Keys.PROXY_ENABLED] ?: false,
+            proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
+            proxyHost = prefs[Keys.PROXY_HOST] ?: "",
+            proxyPort = prefs[Keys.PROXY_PORT] ?: 1080,
+            proxyUsername = prefs[Keys.PROXY_USERNAME] ?: "",
+            proxyPassword = prefs[Keys.PROXY_PASSWORD] ?: "",
+            themeMode = prefs[Keys.THEME_MODE] ?: "System",
+            activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
+            playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
+            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
+        )
     }
 
-    open suspend fun setAutoRefreshEnabled(enabled: Boolean) {
-        context?.dataStore?.edit { it[Keys.AUTO_REFRESH_ENABLED] = enabled }
+    override suspend fun setAutoRefreshEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.AUTO_REFRESH_ENABLED] = enabled }
     }
 
-    open suspend fun setDailyRefreshTime(time: String) {
-        context?.dataStore?.edit { it[Keys.DAILY_REFRESH_TIME] = time }
+    override suspend fun setDailyRefreshTime(time: String) {
+        dataStore.edit { it[Keys.DAILY_REFRESH_TIME] = time }
     }
 
-    open suspend fun setProxyEnabled(enabled: Boolean) {
-        context?.dataStore?.edit { it[Keys.PROXY_ENABLED] = enabled }
+    override suspend fun setProxyEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.PROXY_ENABLED] = enabled }
     }
 
-    open suspend fun setProxySettings(
+    override suspend fun setProxySettings(
         enabled: Boolean,
         host: String,
         port: Int,
-        type: String = "SOCKS5",
-        username: String = "",
-        password: String = ""
+        type: String,
+        username: String,
+        password: String
     ) {
-        context?.dataStore?.edit {
+        dataStore.edit {
             it[Keys.PROXY_ENABLED] = enabled
             it[Keys.PROXY_HOST] = host
             it[Keys.PROXY_PORT] = port
@@ -116,12 +115,12 @@ open class AppSettingsDataStore {
         }
     }
 
-    open suspend fun setThemeMode(theme: String) {
-        context?.dataStore?.edit { it[Keys.THEME_MODE] = theme }
+    override suspend fun setThemeMode(theme: String) {
+        dataStore.edit { it[Keys.THEME_MODE] = theme }
     }
 
-    open suspend fun setActiveEpisodeId(episodeId: Long?) {
-        context?.dataStore?.edit {
+    override suspend fun setActiveEpisodeId(episodeId: Long?) {
+        dataStore.edit {
             if (episodeId == null) {
                 it.remove(Keys.ACTIVE_EPISODE_ID)
             } else {
@@ -130,16 +129,15 @@ open class AppSettingsDataStore {
         }
     }
 
-    open suspend fun getActiveEpisodeId(): Long? {
-        val ctx = context ?: return null
-        return ctx.dataStore.data.first()[Keys.ACTIVE_EPISODE_ID]
+    override suspend fun getActiveEpisodeId(): Long? {
+        return dataStore.data.first()[Keys.ACTIVE_EPISODE_ID]
     }
 
-    open suspend fun setPlaybackSpeed(speed: Float) {
-        context?.dataStore?.edit { it[Keys.PLAYBACK_SPEED] = speed }
+    override suspend fun setPlaybackSpeed(speed: Float) {
+        dataStore.edit { it[Keys.PLAYBACK_SPEED] = speed }
     }
 
-    open suspend fun setLastRefreshTime(formatted: String) {
-        context?.dataStore?.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
+    override suspend fun setLastRefreshTime(formatted: String) {
+        dataStore.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
     }
 }

@@ -1,7 +1,7 @@
 package com.example.mpod.data.network
 
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -50,7 +50,7 @@ class ProxyHttpClientFactory @Inject constructor() {
         .followSslRedirects(true)
         .build()
 
-    fun configure(dataStore: AppSettingsDataStore, scope: CoroutineScope) {
+    fun configure(dataStore: AppSettingsStore, scope: CoroutineScope) {
         scope.launch {
             dataStore.settingsFlow
                 .map { Triple(it.isProxyEnabled, it.proxyHost, it.proxyPort to (it.proxyUsername to it.proxyPassword)) to it }

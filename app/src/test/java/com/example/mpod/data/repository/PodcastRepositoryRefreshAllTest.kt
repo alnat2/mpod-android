@@ -6,7 +6,8 @@ import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.Flow
@@ -139,7 +140,7 @@ class PodcastRepositoryRefreshAllTest {
     private fun repository(
         podcastDao: PodcastDao,
         episodeDao: EpisodeDao,
-        settings: AppSettingsDataStore
+        settings: AppSettingsStore
     ): PodcastRepository {
         val proxyHttpClientFactory = ProxyHttpClientFactory().apply {
             updateProxy(AppSettings(isProxyEnabled = false))
@@ -216,18 +217,15 @@ class PodcastRepositoryRefreshAllTest {
         }
     }
 
-    private class RecordingAppSettingsDataStore(initialLastRefresh: String) : AppSettingsDataStore() {
-        private val state = MutableStateFlow(
-            AppSettings(lastRefreshTimeFormatted = initialLastRefresh)
-        )
-        override val settingsFlow: Flow<AppSettings> = state
+    private class RecordingAppSettingsDataStore(initialLastRefresh: String) :
+        FakeAppSettingsStore(AppSettings(lastRefreshTimeFormatted = initialLastRefresh)) {
         val lastRefreshWrites = mutableListOf<String>()
         val current: AppSettings
-            get() = state.value
+            get() = stateFlow.value
 
         override suspend fun setLastRefreshTime(formatted: String) {
             lastRefreshWrites += formatted
-            state.value = state.value.copy(lastRefreshTimeFormatted = formatted)
+            stateFlow.value = stateFlow.value.copy(lastRefreshTimeFormatted = formatted)
         }
     }
 

@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.dao.PodcastDao
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
@@ -26,7 +26,7 @@ class HomeViewModel @Inject constructor(
     private val episodeDao: EpisodeDao,
     private val playlistRepository: PlaylistRepository,
     private val podcastRepository: PodcastRepository,
-    private val appSettingsDataStore: AppSettingsDataStore,
+    private val appSettingsDataStore: AppSettingsStore,
     private val queueInvalidator: PlaybackQueueInvalidator
 ) : ViewModel() {
 

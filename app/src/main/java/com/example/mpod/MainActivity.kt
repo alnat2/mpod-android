@@ -8,7 +8,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.lifecycleScope
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 
 import com.example.mpod.ui.navigation.AppNavigation
 import com.example.mpod.ui.theme.MpodTheme
@@ -20,7 +20,7 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
+    @Inject lateinit var appSettingsDataStore: AppSettingsStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

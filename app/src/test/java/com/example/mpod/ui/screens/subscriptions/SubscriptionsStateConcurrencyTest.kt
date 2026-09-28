@@ -8,7 +8,7 @@ import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.model.subscriptionRows
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
@@ -79,7 +79,7 @@ class SubscriptionsStateConcurrencyTest {
         val client = ProxyHttpClientFactory()
         val manager = repositoryCleanupManager(episodes, client)
         val invalidator = PlaybackQueueInvalidator()
-        val repository = PodcastRepository(podcastDao, episodes, AppSettingsDataStore(), client, manager, invalidator)
+        val repository = PodcastRepository(podcastDao, episodes, FakeAppSettingsStore(), client, manager, invalidator)
         viewModel = SubscriptionsViewModel(podcastDao, episodes, playlist, repository,
             PlaylistRepository(playlist), invalidator, manager)
         withTimeout(TIMEOUT) { viewModel.state.first { !it.isLoading } }

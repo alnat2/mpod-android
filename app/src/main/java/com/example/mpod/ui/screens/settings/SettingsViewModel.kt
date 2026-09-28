@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.preferences.AppSettings
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.AutoRefreshScheduler
@@ -26,7 +26,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val appSettingsDataStore: AppSettingsDataStore,
+    private val appSettingsDataStore: AppSettingsStore,
     private val podcastRepository: PodcastRepository,
     private val autoRefreshScheduler: AutoRefreshScheduler,
     private val proxyHttpClientFactory: ProxyHttpClientFactory,

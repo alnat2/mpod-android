@@ -19,7 +19,7 @@ import androidx.media3.session.MediaSessionService
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.google.common.collect.ImmutableList
@@ -49,7 +49,7 @@ class PlaybackService : MediaSessionService() {
 
     @Inject lateinit var playlistRepository: PlaylistRepository
     @Inject lateinit var episodeDao: EpisodeDao
-    @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
+    @Inject lateinit var appSettingsDataStore: AppSettingsStore
     @Inject lateinit var proxyHttpClientFactory: ProxyHttpClientFactory
     @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var queueInvalidator: PlaybackQueueInvalidator

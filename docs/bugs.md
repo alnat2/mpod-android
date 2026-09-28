@@ -149,7 +149,7 @@
 
 ## BUG-R05 — пустое хранилище настроек маскирует ошибки тестов
 
-**Статус:** OPEN. **Приоритет:** низкий, технический долг.
+**Статус:** IMPLEMENTED — developer verification завершена; QA acceptance ожидается. **Приоритет:** низкий, технический долг.
 
 **Где:** `app/src/main/java/com/example/mpod/data/local/preferences/AppSettingsDataStore.kt`, DI и тестовые реализации этого класса.
 
@@ -165,6 +165,14 @@
 **Проверки:** записать тему, параметры прокси, скорость и activeEpisodeId → закрыть хранилище → открыть заново → получить прежние значения; очистка activeEpisodeId сохраняет null; значения первого запуска прежние. Существующие проверки refresh timestamp и динамического прокси проходят с новым fake.
 
 **Готово, когда:** нельзя создать случайное «успешное, но ничего не сохраняющее» хранилище; проверены реальные запись и повторное чтение без сброса данных приложения.
+
+**Результат реализации (28.09.2026):** введён `AppSettingsStore`; `AppSettingsDataStore` теперь принимает обязательный `DataStore<Preferences>`, а Hilt создаёт единственный store для файла `mpoddy_settings`. Nullable Context и пустой конструктор удалены. Unit-test fake перенесён в test source set и хранит все поддерживаемые изменения; production-потребители зависят от контракта. Добавлен instrumented regression с временным файлом, завершением scope перед повторным открытием и проверкой очистки `activeEpisodeId`.
+
+**Изменённые файлы:** `AppSettingsDataStore.kt`, новый `PreferencesModule.kt`, `MainActivity.kt`, `MpodApplication.kt`, `ProxyHttpClientFactory.kt`, `PodcastRepository.kt`, `PlaybackService.kt`, `AutoRefreshWorker.kt`, `HomeViewModel.kt`, `SettingsViewModel.kt`; test fakes и их потребители; новый `AppSettingsDataStoreTest.kt`.
+
+**Developer verification:** `testDebugUnitTest` — PASS; `assembleDebugAndroidTest` — PASS; `lintDebug` — PASS; `git diff --check` — PASS. Targeted instrumented test не запущен: на момент проверки `adb devices` не показал подключённых эмуляторов/телефонов, а `connectedDebugAndroidTest` завершился с `No connected devices`.
+
+**QA acceptance:** не проводилась. Android test APK собран, но реальная запись/повторное чтение на эмуляторе требует доступного устройства.
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 

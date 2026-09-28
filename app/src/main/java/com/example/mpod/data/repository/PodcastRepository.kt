@@ -6,7 +6,7 @@ import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
-import com.example.mpod.data.local.preferences.AppSettingsDataStore
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.rss.OpmlParser
 import com.example.mpod.data.rss.ParsedPodcastFeed
@@ -48,7 +48,7 @@ data class MarkAllListenedResult(
 class PodcastRepository @Inject constructor(
     private val podcastDao: PodcastDao,
     private val episodeDao: EpisodeDao,
-    private val appSettingsDataStore: AppSettingsDataStore,
+    private val appSettingsDataStore: AppSettingsStore,
     private val proxyHttpClientFactory: ProxyHttpClientFactory,
     private val smartListeningManager: SmartListeningManager,
     private val queueInvalidator: PlaybackQueueInvalidator
