@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,6 +10,15 @@ plugins {
 }
 
 fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
+val releaseSigningKeys = listOf(
+    "MPOD_RELEASE_STORE_FILE",
+    "MPOD_RELEASE_STORE_PASSWORD",
+    "MPOD_RELEASE_KEY_ALIAS",
+    "MPOD_RELEASE_KEY_PASSWORD",
+)
+val releaseSigning = releaseSigningKeys.associateWith(::env)
+val checkedInDebugCertificateSha256 = "61f0b1bb4485fcf4333e005e1adb43115340eb6b63b8f378cce5319430a4d012"
 
 configurations.all {
     resolutionStrategy.eachDependency {
@@ -34,21 +46,16 @@ android {
 
     signingConfigs {
         create("release") {
-            val releaseStoreFile = env("MPOD_RELEASE_STORE_FILE")
-            if (releaseStoreFile == null) {
-                storeFile = file("debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            } else {
-                storeFile = file(releaseStoreFile)
-                storePassword = env("MPOD_RELEASE_STORE_PASSWORD")
-                    ?: error("MPOD_RELEASE_STORE_PASSWORD is required when MPOD_RELEASE_STORE_FILE is set.")
-                keyAlias = env("MPOD_RELEASE_KEY_ALIAS")
-                    ?: error("MPOD_RELEASE_KEY_ALIAS is required when MPOD_RELEASE_STORE_FILE is set.")
-                keyPassword = env("MPOD_RELEASE_KEY_PASSWORD")
-                    ?: error("MPOD_RELEASE_KEY_PASSWORD is required when MPOD_RELEASE_STORE_FILE is set.")
-            }
+            storeFile = releaseSigning["MPOD_RELEASE_STORE_FILE"]?.let(::file)
+            storePassword = releaseSigning["MPOD_RELEASE_STORE_PASSWORD"]
+            keyAlias = releaseSigning["MPOD_RELEASE_KEY_ALIAS"]
+            keyPassword = releaseSigning["MPOD_RELEASE_KEY_PASSWORD"]
+        }
+        create("qaRelease") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
@@ -61,6 +68,12 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
+        }
+        create("qaRelease") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".signingtest"
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("qaRelease")
         }
     }
     compileOptions {
@@ -82,6 +95,41 @@ android {
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
     }
+}
+
+val validateReleaseSigning = tasks.register("validateReleaseSigning") {
+    group = "verification"
+    description = "Checks that a distributable release has a complete private signing configuration."
+    doLast {
+        val missing = releaseSigningKeys.filter { releaseSigning[it] == null }
+        check(missing.isEmpty()) {
+            "Release signing is incomplete. Set ${missing.joinToString()} outside Git, " +
+                "or build assembleQaRelease for a clearly identified test APK."
+        }
+        val keystore = file(releaseSigning.getValue("MPOD_RELEASE_STORE_FILE")!!)
+        check(keystore.isFile) { "MPOD_RELEASE_STORE_FILE must point to an existing keystore file." }
+        check(keystore.canonicalFile != file("debug.keystore").canonicalFile) {
+            "The checked-in debug.keystore cannot sign a distributable release."
+        }
+        val store = KeyStore.getInstance(
+            keystore,
+            releaseSigning.getValue("MPOD_RELEASE_STORE_PASSWORD")!!.toCharArray(),
+        )
+        val certificate = store.getCertificate(releaseSigning.getValue("MPOD_RELEASE_KEY_ALIAS")!!)
+            ?: error("MPOD_RELEASE_KEY_ALIAS was not found in the release keystore.")
+        val certificateSha256 = MessageDigest.getInstance("SHA-256")
+            .digest(certificate.encoded)
+            .joinToString("") { "%02x".format(it) }
+        check(certificateSha256 != checkedInDebugCertificateSha256) {
+            "The checked-in debug certificate cannot sign a distributable release."
+        }
+    }
+}
+
+tasks.matching {
+    it.name in setOf("assembleRelease", "packageRelease", "bundleRelease", "signReleaseBundle")
+}.configureEach {
+    dependsOn(validateReleaseSigning)
 }
 
 kapt {
