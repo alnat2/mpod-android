@@ -176,7 +176,7 @@
 
 **QA acceptance:** PASS на `Pixel_9(AVD) - 17`, serial `emulator-5554`. `connectedDebugAndroidTest` выполнил 1 тест за 9 секунд; проверены запись настроек, завершение scope, повторное открытие DataStore и очистка `activeEpisodeId`. Физический телефон не проверялся; результат относится к эмулятору.
 
-**Cleanup после код-ревью (29.09.2026):** androidTest fake теперь предоставляет `stateFlow`, устаревший wrapper `FakeAppSettingsDataStore` удалён, а `AppSettingsDataStoreTest` использует `runTest`. Повторно прошли `testDebugUnitTest`, targeted `connectedDebugAndroidTest` на `Pixel_9(AVD) - 17`, `lintDebug` и `git diff --check`.
+**Cleanup после код-ревью (29.09.2026):** общий `FakeAppSettingsStore` вынесен в shared test source, подключённый к `test` и `androidTest`; устаревший wrapper `FakeAppSettingsDataStore` удалён, а `AppSettingsDataStoreTest` использует `runTest`. Повторно прошли `testDebugUnitTest`, targeted `connectedDebugAndroidTest` на `Pixel_9(AVD) - 17`, `lintDebug` и `git diff --check`.
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 

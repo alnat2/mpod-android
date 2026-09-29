@@ -93,6 +93,9 @@ android {
     }
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        val sharedTestSources = "$projectDir/src/testShared/java"
+        getByName("test").java.srcDir(sharedTestSources)
+        getByName("androidTest").java.srcDir(sharedTestSources)
     }
 }
 
