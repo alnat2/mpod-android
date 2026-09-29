@@ -180,7 +180,7 @@
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 
-**Статус:** IMPLEMENTED — developer verification и emulator QA acceptance завершены; физический телефон не проверялся. **Приоритет:** низкий.
+**Статус:** CLOSED — developer verification и emulator QA acceptance завершены; блокирующих замечаний код-ревью нет. Физический телефон не проверялся. **Приоритет:** низкий.
 
 **Где:** `SmartListeningManager.startObserving`, `stopObserving`, `pendingDownloadJobs` и teardown соответствующих тестов.
 
