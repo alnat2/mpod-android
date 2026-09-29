@@ -170,7 +170,7 @@
 
 **Изменённые файлы:** `AppSettingsDataStore.kt`, новый `PreferencesModule.kt`, `MainActivity.kt`, `MpodApplication.kt`, `ProxyHttpClientFactory.kt`, `PodcastRepository.kt`, `PlaybackService.kt`, `AutoRefreshWorker.kt`, `HomeViewModel.kt`, `SettingsViewModel.kt`; test fakes и их потребители; новый `AppSettingsDataStoreTest.kt`.
 
-**Коммиты:** `8a89a19` (реализация), `0bbb33a` (cleanup после ревью).
+**Коммиты:** `8a89a19` (реализация), `0bbb33a` и `6384e0f` (cleanup после ревью).
 
 **Developer verification:** `testDebugUnitTest` — PASS; `assembleDebugAndroidTest` — PASS; `lintDebug` — PASS; `git diff --check` — PASS. Targeted instrumented test `AppSettingsDataStoreTest.valuesSurviveScopeShutdownAndReopen` — PASS.
 
