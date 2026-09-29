@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -135,7 +134,7 @@ class PlaybackService : MediaSessionService() {
         reconcileQueueWithDatabase()
     }
 
-    suspend fun reconcileQueueWithDatabase(
+    private suspend fun reconcileQueueWithDatabase(
         preferredEpisodeId: Long? = null,
         preferFirstEpisode: Boolean = false,
         forcePlayPreferred: Boolean = false
@@ -279,10 +278,10 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-        if (playbackState != Player.STATE_ENDED) return
-        val episodeId = currentEpisodeId() ?: return
-        handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
-    }
+            if (playbackState != Player.STATE_ENDED) return
+            val episodeId = currentEpisodeId() ?: return
+            handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
+        }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
             if (applyingSettingsSpeed) return

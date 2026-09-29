@@ -209,7 +209,7 @@
 
 ## BUG-R07 — небольшая чистка PlaybackService
 
-**Статус:** OPEN. **Приоритет:** низкий; не функциональная авария.
+**Статус:** CLOSED — developer verification завершена; QA acceptance не требовалась. **Приоритет:** низкий; не функциональная авария.
 
 **Где:** `app/src/main/java/com/example/mpod/playback/PlaybackService.kt`.
 
@@ -220,6 +220,14 @@
 3. Удалить неиспользуемый импорт `kotlinx.coroutines.runBlocking`.
 
 **Проверки и готовность:** поиск вызовов, компиляция и существующие тесты reconciliation. Поведение очереди, dispatcher и завершения эпизода не меняется. Новые тесты на отступы/импорты и отдельный полный emulator gate не нужны.
+
+**Результат реализации (29.09.2026):** `reconcileQueueWithDatabase` сделан `private`, неиспользуемый импорт `runBlocking` удалён, отступы `onPlaybackStateChanged` исправлены. Поиск подтвердил только внутренние вызовы сервиса; поведение очереди не менялось.
+
+**Изменённые файлы:** `app/src/main/java/com/example/mpod/playback/PlaybackService.kt`, `docs/bugs.md`.
+
+**Коммит:** будет указан после создания коммита.
+
+**Developer verification:** `:app:testDebugUnitTest --tests com.example.mpod.playback.PlaybackQueueReconciliationTest` — PASS (`BUILD SUCCESSFUL`); `git diff --check` — PASS. QA acceptance и проверка на физическом телефоне не выполнялись: задача косметическая и не меняет runtime-поведение.
 
 ## Не включено в исправления
 
