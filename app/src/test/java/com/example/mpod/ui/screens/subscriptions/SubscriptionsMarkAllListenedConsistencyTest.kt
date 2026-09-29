@@ -100,8 +100,10 @@ class SubscriptionsMarkAllListenedConsistencyTest {
         store.afterTransactionGate?.release?.countDown()
         store.cleanupReadGate?.release?.countDown()
         viewModel.viewModelScope.cancel()
-        manager.stopObserving()
-        runBlocking { queueCollectors.forEach { it.cancel(); it.join() } }
+        runBlocking {
+            manager.stopObserving()
+            queueCollectors.forEach { it.cancel(); it.join() }
+        }
         Dispatchers.resetMain()
         server.shutdown()
         directory.deleteRecursively()

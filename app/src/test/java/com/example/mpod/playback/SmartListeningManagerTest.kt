@@ -12,6 +12,7 @@ import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -71,7 +72,7 @@ class SmartListeningManagerTest {
 
     @After
     fun tearDown() {
-        manager.stopObserving()
+        runBlocking { manager.stopObserving() }
         server.shutdown()
         tempDir.deleteRecursively()
     }
@@ -215,6 +216,41 @@ class SmartListeningManagerTest {
 
         manager.stopObserving()
         assertEquals("All pending jobs should be cleared on stopObserving", 0, manager.getPendingDownloadCount())
+    }
+
+    @Test
+    fun stopObserving_waitsForActiveOwner_beforeRestartCanCreateObserver() = runBlocking {
+        manager.debounceMs = 0
+        manager.startObserving()
+
+        val chunk = ByteArray(512) { 0x42 }
+        val buffer = Buffer()
+        repeat(1000) { buffer.write(chunk) }
+        server.enqueue(
+            MockResponse().setResponseCode(200).setBody(buffer)
+                .throttleBody(512, 50, TimeUnit.MILLISECONDS)
+        )
+
+        val item = createPlaylistItemWithEpisode(episodeId = 403L, podcastId = 1L, isDownloaded = false)
+        fakePlaylistDao.playlistFlow.value = listOf(item)
+        val podcastsDir = File(tempDir, "podcasts")
+        withTimeout(5000) {
+            while (podcastsDir.listFiles { _, name -> name.endsWith(".tmp") }.orEmpty().none { it.length() > 0 }) {
+                delay(20)
+            }
+        }
+
+        val owner = manager.getPendingDownloadJob(403L)
+        assertNotNull("Active download must have an owner", owner)
+
+        val stop = async(start = CoroutineStart.UNDISPATCHED) { manager.stopObserving() }
+        val restart = async(start = CoroutineStart.UNDISPATCHED) { manager.startObserving() }
+        stop.await()
+        restart.await()
+
+        assertTrue("stopObserving must wait for the active owner", owner!!.isCompleted)
+        assertEquals("Completed owners must not remain discoverable", 0, manager.getPendingDownloadCount())
+        assertNotNull("Restart must create the observer after stop completes", manager.activeObservationJobForTest)
     }
 
     @Test

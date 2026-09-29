@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
@@ -52,6 +54,7 @@ class SmartListeningManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingDownloadJobs = ConcurrentHashMap<Long, Job>()
+    private val lifecycleMutex = Mutex()
     private var observationJob: Job? = null
     // Scheduling and suppression share one lock, so even a previously emitted Room snapshot
     // cannot register an owner after cleanup has captured the jobs it must join.
@@ -59,6 +62,8 @@ class SmartListeningManager @Inject constructor(
     private val pausedPodcasts = mutableMapOf<Long, Int>()
     private val pausedEpisodes = mutableMapOf<Long, Int>()
     private val rescheduleAfterCleanup = mutableSetOf<Long>()
+    private var stopping = false
+    private var lifecycleGeneration = 0L
 
     internal val activeObservationJobForTest: Job?
         get() = observationJob
@@ -68,8 +73,11 @@ class SmartListeningManager @Inject constructor(
     internal var preDaoHook: (suspend () -> Unit)? = null
     internal var postDaoHook: (suspend () -> Unit)? = null
 
-    fun startObserving() {
-        if (observationJob != null) return
+    suspend fun startObserving() = lifecycleMutex.withLock {
+        if (observationJob != null) return@withLock
+        synchronized(ownershipLock) {
+            check(!stopping) { "SmartListeningManager is stopping" }
+        }
         observationJob = scope.launch {
             playlistDao.getPlaylistItemsWithEpisodesFlow().collectLatest { items ->
                 val currentPlaylistEpisodeIds = items.map { it.episode.id }.toSet()
@@ -97,16 +105,35 @@ class SmartListeningManager @Inject constructor(
         }
     }
 
-    fun stopObserving() {
-        observationJob?.cancel()
-        observationJob = null
-        for ((_, job) in pendingDownloadJobs) {
-            job.cancel()
+    suspend fun stopObserving() = lifecycleMutex.withLock {
+        synchronized(ownershipLock) {
+            stopping = true
+            lifecycleGeneration++
         }
-        pendingDownloadJobs.clear()
+        try {
+            observationJob?.cancelAndJoin()
+            observationJob = null
+
+            while (true) {
+                val jobs = pendingDownloadJobs.values.toList()
+                if (jobs.isEmpty()) break
+                jobs.forEach { it.cancelAndJoin() }
+            }
+            check(pendingDownloadJobs.isEmpty()) { "Download owners must finish before stopObserving returns" }
+        } finally {
+            synchronized(ownershipLock) {
+                pendingDownloadJobs.clear()
+                stopping = false
+            }
+        }
     }
 
-    private fun scheduleDebouncedDownload(episodeId: Long, audioUrl: String) = synchronized(ownershipLock) {
+    private fun scheduleDebouncedDownload(
+        episodeId: Long,
+        audioUrl: String,
+        expectedGeneration: Long? = null
+    ) = synchronized(ownershipLock) {
+        if (stopping || (expectedGeneration != null && expectedGeneration != lifecycleGeneration)) return@synchronized
         val episode = episodeDao.getEpisodeById(episodeId) ?: return@synchronized
         if (episode.podcastId in pausedPodcasts) return@synchronized
         if (episodeId in pausedEpisodes) {
@@ -295,11 +322,11 @@ class SmartListeningManager @Inject constructor(
     suspend fun cleanupEpisodeFile(episodeId: Long): CleanupResult = withContext(Dispatchers.IO) {
         val owner = synchronized(ownershipLock) {
             pausedEpisodes[episodeId] = (pausedEpisodes[episodeId] ?: 0) + 1
-            pendingDownloadJobs[episodeId]
+            CleanupOwner(pendingDownloadJobs[episodeId], lifecycleGeneration)
         }
         var cleaned = false
         try {
-            owner?.cancelAndJoin()
+            owner.job?.cancelAndJoin()
             val episode = episodeDao.getEpisodeById(episodeId)
             val directory = File(context.filesDir, "podcasts")
             // A cancelled/failed download can leave a file before its path reaches Room.
@@ -337,11 +364,13 @@ class SmartListeningManager @Inject constructor(
             if (cleaned && reschedule) scope.launch {
                 val current = episodeDao.getEpisodeById(episodeId)
                 if (current != null && playlistDao.isEpisodeInPlaylist(episodeId) && !current.audioUrl.isNullOrBlank()) {
-                    scheduleDebouncedDownload(episodeId, current.audioUrl)
+                    scheduleDebouncedDownload(episodeId, current.audioUrl, owner.generation)
                 }
             }
         }
     }
+
+    private data class CleanupOwner(val job: Job?, val generation: Long)
 
     internal fun getPendingDownloadJob(episodeId: Long): Job? = pendingDownloadJobs[episodeId]
     internal fun getPendingDownloadCount(): Int = pendingDownloadJobs.size

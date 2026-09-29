@@ -100,8 +100,10 @@ class PodcastUnsubscribeTest {
         releases.forEach { it.countDown() }
         viewModel.viewModelScope.cancel()
         val owners = rows.keys.mapNotNull { manager.getPendingDownloadJob(it) }
-        manager.stopObserving()
-        runBlocking { owners.forEach { it.join() } }
+        runBlocking {
+            manager.stopObserving()
+            owners.forEach { it.join() }
+        }
         server.shutdown()
         directory.deleteRecursively()
         Dispatchers.resetMain()

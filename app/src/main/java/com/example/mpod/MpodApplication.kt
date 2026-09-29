@@ -13,6 +13,7 @@ import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 
@@ -35,7 +36,7 @@ class MpodApplication : Application(), ImageLoaderFactory, Configuration.Provide
     override fun onCreate() {
         super.onCreate()
         proxyHttpClientFactory.configure(appSettingsDataStore, appScope)
-        smartListeningManager.startObserving()
+        appScope.launch { smartListeningManager.startObserving() }
     }
 
     override fun newImageLoader(): ImageLoader =

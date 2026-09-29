@@ -180,7 +180,7 @@
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 
-**Статус:** OPEN, риск требует детерминированного воспроизведения. **Приоритет:** низкий.
+**Статус:** IMPLEMENTED — developer verification и emulator QA acceptance завершены; физический телефон не проверялся. **Приоритет:** низкий.
 
 **Где:** `SmartListeningManager.startObserving`, `stopObserving`, `pendingDownloadJobs` и teardown соответствующих тестов.
 
@@ -196,6 +196,16 @@
 **Проверки:** остановка на debounce, во время передачи файла и у границы записи Room; немедленный restart; два stop подряд; повторный start не создаёт двух наблюдателей или конкурирующих владельцев одного эпизода. Уже сохранённый до остановки файл с корректной записью Room не должен удаляться только из-за stop.
 
 **Готово, когда:** после завершённого stop старая работа больше не выполняет запись, restart безопасен, cleanup может дождаться владельца. Если воспроизведение опровергает риск, сохранить доказательство и закрыть как неподтверждённый, не добавляя рефакторинг ради комментария.
+
+**Результат реализации (29.09.2026):** риск подтверждён по коду и покрыт детерминированным regression-сценарием с активной throttled-загрузкой. `startObserving()` и `stopObserving()` стали suspend-операциями, их lifecycle сериализуется через `Mutex`; stop сначала дожидается наблюдателя, затем отменяет и присоединяется к каждому download owner до очистки карты. Reschedule после cleanup получает поколение lifecycle и не может воскресить работу старого наблюдателя после stop. Запуск из `MpodApplication` выполняется в `appScope`.
+
+**Изменённые файлы:** `SmartListeningManager.kt`, `MpodApplication.kt`, `SmartListeningManagerTest.kt`; teardown-тесты обновлены под suspend-контракт; этот backlog дополнен результатом.
+
+**Коммит:** `Fix Smart Listening observer shutdown race` (финальный hash передан в handoff).
+
+**Developer verification:** через встроенный JDK Android Studio выполнен `:app:testDebugUnitTest --tests com.example.mpod.playback.SmartListeningManagerTest` — PASS (`BUILD SUCCESSFUL`); `git diff --check` — PASS. В ходе прогона исправлен отсутствующий импорт `kotlinx.coroutines.launch` в `MpodApplication`.
+
+**QA acceptance:** Pixel_9(AVD) - 17, `connectedDebugAndroidTest` с `UnsubscribeDownloadTest` — PASS, 2/2 теста. Физический телефон не проверялся.
 
 ## BUG-R07 — небольшая чистка PlaybackService
 

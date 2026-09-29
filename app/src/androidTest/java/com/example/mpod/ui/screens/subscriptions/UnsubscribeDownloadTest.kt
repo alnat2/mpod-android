@@ -80,8 +80,13 @@ class UnsubscribeDownloadTest {
         val owner = manager.getPendingDownloadJob(101)
         val observer = manager.activeObservationJobForTest
         compose.runOnUiThread { vm.viewModelScope.cancel() }
-        manager.stopObserving()
-        runBlocking { withTimeout(5000) { owner?.join(); observer?.join() } }
+        runBlocking {
+            withTimeout(5000) {
+                manager.stopObserving()
+                owner?.join()
+                observer?.join()
+            }
+        }
         server.shutdown()
         db.close()
         directory.deleteRecursively()
@@ -90,7 +95,7 @@ class UnsubscribeDownloadTest {
     @Test fun slowBody_undoThenFinalUnsubscribe_removesRoomQueueAndFiles() {
         server.enqueue(MockResponse().setBody(Buffer().write(ByteArray(128 * 1024) { 42 }))
             .throttleBody(1024, 250, TimeUnit.MILLISECONDS))
-        manager.startObserving()
+        runBlocking { manager.startObserving() }
         showScreen()
         compose.onNodeWithContentDescription("Add Slow episode to playlist").performClick()
         val downloads = File(directory, "podcasts")
