@@ -149,7 +149,7 @@
 
 ## BUG-R05 — пустое хранилище настроек маскирует ошибки тестов
 
-**Статус:** IMPLEMENTED — developer verification завершена; QA acceptance ожидается. **Приоритет:** низкий, технический долг.
+**Статус:** CLOSED — developer verification и QA acceptance завершены. **Приоритет:** низкий, технический долг.
 
 **Где:** `app/src/main/java/com/example/mpod/data/local/preferences/AppSettingsDataStore.kt`, DI и тестовые реализации этого класса.
 
@@ -172,9 +172,9 @@
 
 **Коммит:** `8a89a19`.
 
-**Developer verification:** `testDebugUnitTest` — PASS; `assembleDebugAndroidTest` — PASS; `lintDebug` — PASS; `git diff --check` — PASS. Targeted instrumented test не запущен: на момент проверки `adb devices` не показал подключённых эмуляторов/телефонов, а `connectedDebugAndroidTest` завершился с `No connected devices`.
+**Developer verification:** `testDebugUnitTest` — PASS; `assembleDebugAndroidTest` — PASS; `lintDebug` — PASS; `git diff --check` — PASS. Targeted instrumented test `AppSettingsDataStoreTest.valuesSurviveScopeShutdownAndReopen` — PASS.
 
-**QA acceptance:** не проводилась. Android test APK собран, но реальная запись/повторное чтение на эмуляторе требует доступного устройства.
+**QA acceptance:** PASS на `Pixel_9(AVD) - 17`, serial `emulator-5554`. `connectedDebugAndroidTest` выполнил 1 тест за 9 секунд; проверены запись настроек, завершение scope, повторное открытие DataStore и очистка `activeEpisodeId`. Физический телефон не проверялся; результат относится к эмулятору.
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 
