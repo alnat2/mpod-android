@@ -10,7 +10,6 @@ import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -27,7 +26,7 @@ class PodcastRepositoryOpmlTest {
 
     private lateinit var fakePodcastDao: FakePodcastDao
     private lateinit var fakeEpisodeDao: FakeEpisodeDao
-    private lateinit var fakeAppSettingsDataStore: FakeAppSettingsDataStore
+    private lateinit var fakeAppSettingsStore: FakeAppSettingsStore
     private lateinit var proxyHttpClientFactory: ProxyHttpClientFactory
     private lateinit var repository: PodcastRepository
 
@@ -35,13 +34,13 @@ class PodcastRepositoryOpmlTest {
     fun setUp() {
         fakePodcastDao = FakePodcastDao()
         fakeEpisodeDao = FakeEpisodeDao()
-        fakeAppSettingsDataStore = FakeAppSettingsDataStore()
+        fakeAppSettingsStore = FakeAppSettingsStore()
         proxyHttpClientFactory = ProxyHttpClientFactory()
 
         repository = PodcastRepository(
             podcastDao = fakePodcastDao,
             episodeDao = fakeEpisodeDao,
-            appSettingsDataStore = fakeAppSettingsDataStore,
+            appSettingsDataStore = fakeAppSettingsStore,
             proxyHttpClientFactory = proxyHttpClientFactory,
             smartListeningManager = repositoryCleanupManager(fakeEpisodeDao, proxyHttpClientFactory),
             queueInvalidator = PlaybackQueueInvalidator()
@@ -115,8 +114,6 @@ class PodcastRepositoryOpmlTest {
         assertEquals(0, fakePodcastDao.insertCount.get())
         assertEquals(0, fakeEpisodeDao.insertCount.get())
     }
-
-    class FakeAppSettingsDataStore : FakeAppSettingsStore()
 
     class FakePodcastDao : PodcastDao {
         val insertCount = AtomicInteger(0)

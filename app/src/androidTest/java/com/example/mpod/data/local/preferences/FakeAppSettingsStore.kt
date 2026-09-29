@@ -4,19 +4,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSettingsStore {
-    private val state = MutableStateFlow(initial)
-    override val settingsFlow: Flow<AppSettings> = state
+    val stateFlow = MutableStateFlow(initial)
+    override val settingsFlow: Flow<AppSettings> = stateFlow
 
     override suspend fun setAutoRefreshEnabled(enabled: Boolean) {
-        state.value = state.value.copy(isAutoRefreshEnabled = enabled)
+        stateFlow.value = stateFlow.value.copy(isAutoRefreshEnabled = enabled)
     }
 
     override suspend fun setDailyRefreshTime(time: String) {
-        state.value = state.value.copy(dailyRefreshTime = time)
+        stateFlow.value = stateFlow.value.copy(dailyRefreshTime = time)
     }
 
     override suspend fun setProxyEnabled(enabled: Boolean) {
-        state.value = state.value.copy(isProxyEnabled = enabled)
+        stateFlow.value = stateFlow.value.copy(isProxyEnabled = enabled)
     }
 
     override suspend fun setProxySettings(
@@ -27,7 +27,7 @@ open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSetti
         username: String,
         password: String
     ) {
-        state.value = state.value.copy(
+        stateFlow.value = stateFlow.value.copy(
             isProxyEnabled = enabled,
             proxyHost = host,
             proxyPort = port,
@@ -38,20 +38,20 @@ open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSetti
     }
 
     override suspend fun setThemeMode(theme: String) {
-        state.value = state.value.copy(themeMode = theme)
+        stateFlow.value = stateFlow.value.copy(themeMode = theme)
     }
 
     override suspend fun setActiveEpisodeId(episodeId: Long?) {
-        state.value = state.value.copy(activeEpisodeId = episodeId)
+        stateFlow.value = stateFlow.value.copy(activeEpisodeId = episodeId)
     }
 
-    override suspend fun getActiveEpisodeId(): Long? = state.value.activeEpisodeId
+    override suspend fun getActiveEpisodeId(): Long? = stateFlow.value.activeEpisodeId
 
     override suspend fun setPlaybackSpeed(speed: Float) {
-        state.value = state.value.copy(playbackSpeed = speed)
+        stateFlow.value = stateFlow.value.copy(playbackSpeed = speed)
     }
 
     override suspend fun setLastRefreshTime(formatted: String) {
-        state.value = state.value.copy(lastRefreshTimeFormatted = formatted)
+        stateFlow.value = stateFlow.value.copy(lastRefreshTimeFormatted = formatted)
     }
 }

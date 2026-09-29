@@ -8,7 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -36,7 +36,7 @@ class AppSettingsDataStoreTest {
     }
 
     @Test
-    fun valuesSurviveScopeShutdownAndReopen() = runBlocking {
+    fun valuesSurviveScopeShutdownAndReopen() = runTest {
         val first = newStore()
         first.setThemeMode("Dark")
         first.setProxySettings(
