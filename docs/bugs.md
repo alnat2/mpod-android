@@ -225,7 +225,7 @@
 
 **Изменённые файлы:** `app/src/main/java/com/example/mpod/playback/PlaybackService.kt`, `docs/bugs.md`.
 
-**Коммит:** будет указан после создания коммита.
+**Коммит:** `6f19d89` (`Clean up PlaybackService review findings`).
 
 **Developer verification:** `:app:testDebugUnitTest --tests com.example.mpod.playback.PlaybackQueueReconciliationTest` — PASS (`BUILD SUCCESSFUL`); `git diff --check` — PASS. QA acceptance и проверка на физическом телефоне не выполнялись: задача косметическая и не меняет runtime-поведение.
 
