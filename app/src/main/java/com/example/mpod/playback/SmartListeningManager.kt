@@ -106,23 +106,24 @@ class SmartListeningManager @Inject constructor(
     }
 
     suspend fun stopObserving() = lifecycleMutex.withLock {
-        synchronized(ownershipLock) {
-            stopping = true
-            lifecycleGeneration++
-        }
-        try {
+        // Once shutdown owns the mutex, caller cancellation must not release the lifecycle
+        // or hide owners whose OkHttp callbacks are still finishing filesystem writes.
+        withContext(NonCancellable) {
+            synchronized(ownershipLock) {
+                stopping = true
+                lifecycleGeneration++
+            }
             observationJob?.cancelAndJoin()
-            observationJob = null
 
             while (true) {
                 val jobs = pendingDownloadJobs.values.toList()
                 if (jobs.isEmpty()) break
-                jobs.forEach { it.cancelAndJoin() }
+                jobs.forEach { it.cancel() }
+                jobs.forEach { it.join() }
             }
             check(pendingDownloadJobs.isEmpty()) { "Download owners must finish before stopObserving returns" }
-        } finally {
+            observationJob = null
             synchronized(ownershipLock) {
-                pendingDownloadJobs.clear()
                 stopping = false
             }
         }

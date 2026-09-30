@@ -270,8 +270,9 @@ class PodcastUnsubscribeTest {
     }
     private fun schedule(id: Long) {
         // Reflection lets this regression run unchanged against the private baseline entry point.
-        SmartListeningManager::class.java.getDeclaredMethod("scheduleDebouncedDownload", Long::class.javaPrimitiveType, String::class.java)
-            .apply { isAccessible = true }.invoke(manager, id, server.url("/audio.mp3").toString())
+        SmartListeningManager::class.java.getDeclaredMethod(
+            "scheduleDebouncedDownload", Long::class.javaPrimitiveType, String::class.java, Long::class.javaObjectType
+        ).apply { isAccessible = true }.invoke(manager, id, server.url("/audio.mp3").toString(), null)
     }
     private fun items() = queue.mapNotNull { id -> rows[id]?.let { PlaylistItemWithEpisode(id, 0, it, "Podcast", "") } }
     private fun assertGone() {

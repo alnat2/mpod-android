@@ -14,14 +14,20 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okio.Buffer
@@ -34,8 +40,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.io.FilterOutputStream
 import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class SmartListeningManagerTest {
 
@@ -219,38 +229,157 @@ class SmartListeningManagerTest {
     }
 
     @Test
-    fun stopObserving_waitsForActiveOwner_beforeRestartCanCreateObserver() = runBlocking {
+    fun stopObserving_waitsForActiveOwner_beforeRestartCanCreateObserver() =
+        verifyStopRestartWithHeldWriter(cancelStopCaller = false)
+
+    @Test
+    fun cancelledStop_keepsOwnerDiscoverable_andBlocksRestartAndCleanup_untilWriterFinishes() =
+        verifyStopRestartWithHeldWriter(cancelStopCaller = true)
+
+    @Test
+    fun stopObserving_afterRoomCommit_preservesSavedFile_andRepeatedStopIsSafe() = runBlocking {
+        val committed = CompletableDeferred<Unit>()
+        manager.postDaoHook = { committed.complete(Unit); awaitCancellation() }
+        server.enqueue(MockResponse().setBody("committed audio"))
         manager.debounceMs = 0
+        fakePlaylistDao.playlistFlow.value = listOf(createPlaylistItemWithEpisode(404L, 1L, false))
         manager.startObserving()
+        withTimeout(5000) { committed.await() }
+        val owner = manager.getPendingDownloadJob(404L)!!
+        val path = fakeEpisodeDao.getEpisodeById(404L)!!.localFilePath!!
 
-        val chunk = ByteArray(512) { 0x42 }
-        val buffer = Buffer()
-        repeat(1000) { buffer.write(chunk) }
-        server.enqueue(
-            MockResponse().setResponseCode(200).setBody(buffer)
-                .throttleBody(512, 50, TimeUnit.MILLISECONDS)
-        )
+        withTimeout(5000) { manager.stopObserving(); manager.stopObserving() }
 
-        val item = createPlaylistItemWithEpisode(episodeId = 403L, podcastId = 1L, isDownloaded = false)
-        fakePlaylistDao.playlistFlow.value = listOf(item)
-        val podcastsDir = File(tempDir, "podcasts")
-        withTimeout(5000) {
-            while (podcastsDir.listFiles { _, name -> name.endsWith(".tmp") }.orEmpty().none { it.length() > 0 }) {
-                delay(20)
+        assertTrue(owner.isCompleted)
+        assertNull(manager.activeObservationJobForTest)
+        assertNull(manager.getPendingDownloadJob(404L))
+        assertEquals("committed audio", File(path).readText())
+        assertEquals(path, fakeEpisodeDao.getEpisodeById(404L)!!.localFilePath)
+        assertTrue(fakeEpisodeDao.getEpisodeById(404L)!!.isDownloaded)
+        assertEquals("Stop must not reset a committed Room record", 1, fakeEpisodeDao.downloadedStates.size)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun verifyStopRestartWithHeldWriter(cancelStopCaller: Boolean) = runBlocking {
+        val writers = ControlledWriters()
+        manager.fileOps = writers
+        manager.debounceMs = 0
+        server.enqueue(MockResponse().setBody("old audio"))
+        server.enqueue(MockResponse().setBody("new audio"))
+        fakePlaylistDao.playlistFlow.value = listOf(createPlaylistItemWithEpisode(403L, 1L, false))
+        manager.startObserving()
+        val observer = manager.activeObservationJobForTest!!
+        val scheduler = TestCoroutineScheduler()
+        var stop: Job? = null
+        try {
+            withTimeout(5000) { writers.entered[0].await() }
+            val owner = manager.getPendingDownloadJob(403L)!!
+            val replacementAfterOwner = AtomicBoolean(false)
+            writers.onOpen = { index ->
+                if (index == 1) replacementAfterOwner.set(owner.isCompleted)
+            }
+
+            stop = async(StandardTestDispatcher(scheduler)) { manager.stopObserving() }
+            scheduler.runCurrent()
+            withTimeout(5000) { observer.join() }
+            scheduler.runCurrent()
+            assertTrue("Stop must cancel the old owner", owner.isCancelled)
+            assertFalse("The real OkHttp writer is still held", owner.isCompleted)
+            assertFalse(stop.isCompleted)
+
+            if (cancelStopCaller) {
+                stop.cancel()
+                // Run the cancelled caller's continuation before inspecting its lifecycle state.
+                scheduler.runCurrent()
+            }
+            val restart = async(start = CoroutineStart.UNDISPATCHED) { manager.startObserving() }
+            val cleanup = if (cancelStopCaller) async(Dispatchers.IO) { manager.cleanupEpisodeFile(403L) } else null
+            if (cleanup != null) {
+                withTimeout(5000) {
+                    while (!isEpisodeCleanupPaused(403L) && !cleanup.isCompleted) yield()
+                }
+            }
+
+            assertTrue("Cancelled stop must retain the owner until its callback finishes",
+                manager.getPendingDownloadJob(403L) === owner)
+            assertFalse("Stop must retain the lifecycle mutex while the writer is held", stop.isCompleted)
+            assertFalse("Restart must wait for the old owner", restart.isCompleted)
+            assertFalse("Cleanup must join the discoverable old owner", cleanup?.isCompleted == true)
+            assertFalse("No replacement writer before old owner completion", writers.entered[1].isCompleted)
+
+            writers.release[0].countDown()
+            withTimeout(5000) {
+                while (!stop.isCompleted) { scheduler.runCurrent(); yield() }
+                stop.join()
+                restart.await()
+                cleanup?.await()?.let { assertEquals(CleanupResult.Success, it) }
+                writers.entered[1].await()
+            }
+
+            assertTrue(owner.isCompleted)
+            val newObserver = manager.activeObservationJobForTest
+            assertNotNull("Restart creates a new observer", newObserver)
+            assertTrue(newObserver !== observer && newObserver!!.isActive)
+            val replacement = manager.getPendingDownloadJob(403L)!!
+            assertTrue("The queued episode can acquire a new owner", replacement !== owner)
+            assertTrue("Replacement starts only after old owner completes", replacementAfterOwner.get())
+            assertEquals("Only one writer for the episode may be open at once", 1, writers.maxActive.get())
+            assertEquals("The stopped owner must never commit to Room", 0, fakeEpisodeDao.downloadedStates.size)
+            assertEquals("The old owner's file is gone; only the held replacement remains", 1,
+                File(tempDir, "podcasts").listFiles().orEmpty().size)
+
+            writers.release[1].countDown()
+            withTimeout(5000) { replacement.join() }
+            assertEquals("Only the replacement commits", 1, fakeEpisodeDao.downloadedStates.size)
+            val path = fakeEpisodeDao.getEpisodeById(403L)!!.localFilePath!!
+            assertEquals("new audio", File(path).readText())
+            withTimeout(5000) { manager.stopObserving(); manager.stopObserving() }
+            assertNull(manager.activeObservationJobForTest)
+            assertEquals(0, manager.getPendingDownloadCount())
+            assertEquals(0, writers.active.get())
+            assertEquals("new audio", File(path).readText())
+        } finally {
+            writers.release.forEach { it.countDown() }
+            // Also drain the controlled dispatcher on assertion failure so teardown cannot hang.
+            withTimeout(5000) {
+                while (stop?.isCompleted == false) { scheduler.runCurrent(); yield() }
             }
         }
+    }
 
-        val owner = manager.getPendingDownloadJob(403L)
-        assertNotNull("Active download must have an owner", owner)
+    private fun isEpisodeCleanupPaused(episodeId: Long): Boolean {
+        val lock = SmartListeningManager::class.java.getDeclaredField("ownershipLock")
+            .apply { isAccessible = true }.get(manager)!!
+        val paused = SmartListeningManager::class.java.getDeclaredField("pausedEpisodes")
+            .apply { isAccessible = true }.get(manager) as Map<*, *>
+        return synchronized(lock) { paused.containsKey(episodeId) }
+    }
 
-        val stop = async(start = CoroutineStart.UNDISPATCHED) { manager.stopObserving() }
-        val restart = async(start = CoroutineStart.UNDISPATCHED) { manager.startObserving() }
-        stop.await()
-        restart.await()
+    private class ControlledWriters : FileOperations {
+        val entered = List(2) { CompletableDeferred<Unit>() }
+        val release = List(2) { CountDownLatch(1) }
+        val active = AtomicInteger()
+        val maxActive = AtomicInteger()
+        private val opened = AtomicInteger()
+        @Volatile var onOpen: (Int) -> Unit = {}
 
-        assertTrue("stopObserving must wait for the active owner", owner!!.isCompleted)
-        assertEquals("Completed owners must not remain discoverable", 0, manager.getPendingDownloadCount())
-        assertNotNull("Restart must create the observer after stop completes", manager.activeObservationJobForTest)
+        override fun openOutputStream(file: File): OutputStream {
+            val index = opened.getAndIncrement()
+            val output = file.outputStream()
+            maxActive.accumulateAndGet(active.incrementAndGet(), ::maxOf)
+            onOpen(index)
+            return object : FilterOutputStream(output) {
+                override fun write(b: ByteArray, off: Int, len: Int) {
+                    entered[index].complete(Unit)
+                    check(release[index].await(10, TimeUnit.SECONDS)) { "Writer barrier timed out" }
+                    out.write(b, off, len)
+                }
+
+                override fun close() {
+                    try { super.close() } finally { active.decrementAndGet() }
+                }
+            }
+        }
     }
 
     @Test
