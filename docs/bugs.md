@@ -180,7 +180,7 @@
 
 ## BUG-R06 — ранняя потеря владельцев загрузок при stopObserving
 
-**Статус:** CLOSED — developer verification и emulator QA acceptance завершены; блокирующих замечаний код-ревью нет. Физический телефон не проверялся. **Приоритет:** низкий.
+**Статус:** исправлено после замечаний к `9be38f6`; developer verification завершена, **повторное ревью ожидается**. Новая QA acceptance не выполнялась. Физический телефон не проверялся. **Приоритет:** низкий.
 
 **Где:** `SmartListeningManager.startObserving`, `stopObserving`, `pendingDownloadJobs` и teardown соответствующих тестов.
 
@@ -197,15 +197,28 @@
 
 **Готово, когда:** после завершённого stop старая работа больше не выполняет запись, restart безопасен, cleanup может дождаться владельца. Если воспроизведение опровергает риск, сохранить доказательство и закрыть как неподтверждённый, не добавляя рефакторинг ради комментария.
 
-**Результат реализации (29.09.2026):** риск подтверждён по коду и покрыт детерминированным regression-сценарием с активной throttled-загрузкой. `startObserving()` и `stopObserving()` стали suspend-операциями, их lifecycle сериализуется через `Mutex`; stop сначала дожидается наблюдателя, затем отменяет и присоединяется к каждому download owner до очистки карты. Reschedule после cleanup получает поколение lifecycle и не может воскресить работу старого наблюдателя после stop. Запуск из `MpodApplication` выполняется в `appScope`.
+**Первоначальная реализация (29.09.2026), коммит `9be38f6`:** `startObserving()` и `stopObserving()` стали suspend-операциями с lifecycle `Mutex`; reschedule после cleanup проверяет поколение lifecycle. Запуск из `MpodApplication` выполняется в `appScope`. Ревью выявило три недочёта: несовместимый reflection-вызов в 7 regression-тестах BUG-R01, потерю владельцев при отмене вызывающей stop coroutine и гонку assertion в тесте stop → restart. Поэтому прежнее закрытие R06 пересмотрено.
 
-**Изменённые файлы:** `SmartListeningManager.kt`, `MpodApplication.kt`, `SmartListeningManagerTest.kt`; teardown-тесты обновлены под suspend-контракт; этот backlog дополнен результатом.
+**Исправление (01.10.2026), коммит `d5f2100` — `Fix BUG-R06 shutdown cancellation and regression coverage`:** после захвата lifecycle mutex stop выполняется в `withContext(NonCancellable)`. Он запрещает планирование, меняет поколение, отменяет и дожидается наблюдателя, затем отменяет все захваченные загрузки перед ожиданием каждой. Ссылки на владельцев сохраняются до завершения их работы и OkHttp callback; безусловный `clear()` удалён. Ссылка наблюдателя обнуляется и запрет снимается только после завершения старой работы. Production `runBlocking` не добавлен. Reflection-helper BUG-R01 теперь использует JVM-сигнатуру `long, String, Long` и передаёт `null` третьим аргументом; исходные сценарии и assertions сохранены.
 
-**Коммит:** `Fix Smart Listening observer shutdown race` (финальный hash передан в handoff).
+**Новые и обновлённые regression-сценарии:**
 
-**Developer verification:** через встроенный JDK Android Studio выполнен `:app:testDebugUnitTest --tests com.example.mpod.playback.SmartListeningManagerTest` — PASS (`BUILD SUCCESSFUL`); `git diff --check` — PASS. В ходе прогона исправлен отсутствующий импорт `kotlinx.coroutines.launch` в `MpodApplication`.
+- `cancelledStop_keepsOwnerDiscoverable_andBlocksRestartAndCleanup_untilWriterFinishes`: реальный OkHttp callback удерживается в записи OutputStream через latch. Управляемый coroutine dispatcher выполняет отмену вызывающей stop coroutine до проверок; cleanup должен войти в pause или завершиться, прежде чем проверяется ожидание. Пока writer удерживается, старый владелец доступен, stop/restart/cleanup не завершаются и второй writer не появляется. После освобождения callback старый владелец завершён, cleanup успешен, restart создаёт нового наблюдателя и владельца; только новая загрузка записывает DAO. Проверяются отсутствие файлов старой загрузки, отсутствие одновременных writers и повторный stop.
+- `stopObserving_waitsForActiveOwner_beforeRestartCanCreateObserver`: тот же управляемый writer-сценарий без отмены stop; порядок задаётся барьерами и завершением jobs. Тест допускает нового владельца после restart и проверяет, что его writer открывается только после завершения старого владельца. Проверка пустой карты после restart удалена.
+- `stopObserving_afterRoomCommit_preservesSavedFile_andRepeatedStopIsSafe`: остановка у post-DAO барьера и повторный stop сохраняют содержимое файла и корректный путь/isDownloaded в DAO, без сброса записи.
 
-**QA acceptance:** Pixel_9(AVD) - 17, `connectedDebugAndroidTest` с `UnsubscribeDownloadTest` — PASS, 2/2 теста. Физический телефон не проверялся.
+**FAIL-before / PASS-after:** новые тесты сначала запущены при неизменённом production `SmartListeningManager.kt`, идентичном версии `9be38f6` (база checkout `31a6545`). Из 11 тестов один FAIL: cancellation regression с `AssertionError: Cancelled stop must retain the owner until its callback finishes`; остальные два lifecycle-сценария и все 8 восстановленных `PodcastUnsubscribeTest` — PASS. После production-исправления целевые классы прошли полностью: `SmartListeningManagerTest` 24/24 и `PodcastUnsubscribeTest` 8/8. Таким образом дефект отмены stop воспроизведён тестом, а не только анализом кода.
+
+**Developer verification (01.10.2026):** project Gradle wrapper со встроенным JDK Android Studio; полный `:app:testDebugUnitTest` — PASS, 193 теста, 0 failures/errors/skipped; `:app:lintDebug` — PASS (`BUILD SUCCESSFUL`); `git diff --check` — PASS.
+
+**Изменённые файлы для повторного ревью:**
+
+- `app/src/main/java/com/example/mpod/playback/SmartListeningManager.kt`
+- `app/src/test/java/com/example/mpod/playback/SmartListeningManagerTest.kt`
+- `app/src/test/java/com/example/mpod/data/repository/PodcastUnsubscribeTest.kt`
+- `docs/bugs.md` (фиксация результата отдельным documentation-коммитом).
+
+**Ограничения и QA acceptance:** новый regression использует реальные OkHttp callbacks и файловую систему, но fake DAO; инструментальная проверка реального Room, эмулятора и физического телефона для `d5f2100` не выполнялась. Исторический PASS `UnsubscribeDownloadTest` (2/2 на Pixel_9(AVD) - 17) относится к первоначальной реализации и не считается приёмкой текущих исправлений. Повторное ревью ещё не выполнено; статусы остальных багов не изменены.
 
 ## BUG-R07 — небольшая чистка PlaybackService
 
