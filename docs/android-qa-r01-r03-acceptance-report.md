@@ -4,7 +4,7 @@
 
 **Кандидат:** `60bd3f57e77bd7165979114e03aaa1ee2d68a1dd`
 
-**Рабочее дерево:** тестировался указанный commit; в рабочем дереве были пользовательские изменения в `docs/bugs.md` и `docs/bug-r01-r03-qa-instructions.md`. Файлы приложения не менялись.
+**Рабочее дерево:** тестировался указанный commit; в рабочем дереве были пользовательские изменения в [docs/bugs.md (сохранённая итоговая версия)](https://github.com/alnat2/mpod-android/blob/d752754b2a7c45b0c2a249a63c8ecc9556bcf0d6/docs/bugs.md) и `docs/bug-r01-r03-qa-instructions.md`. Файлы приложения не менялись.
 
 **APK:** `localRelease`, `com.prod.mpod`, versionName `1.0.19`, versionCode `20`; SHA-256 `0c29289acdb04f8260abf1436a30f821e2188067dcb61c89c3026fbea20fc30e`. Сертификат SHA-256 `61f0b1bb4485fcf4333e005e1adb43115340eb6b63b8f378cce5319430a4d012`.
 
@@ -20,7 +20,7 @@
 ## BUG-R03 — PASS
 
 - `SubscriptionsQueryTest`: 3/3 PASS на настоящей Room/SQLite. Пройдены тесты постоянного числа запросов при 1 и 30 podcast, доставки projection (metadata, флаги, очередь, пустой podcast) и равенства projection при изменении только позиции.
-- На совпадающем коде `60bd3f5` mapping принимается по независимому полному unit-прогону `193/193 PASS` от 01.10.2026, зафиксированному в `docs/bugs.md`.
+- На совпадающем коде `60bd3f5` mapping принимается по независимому полному unit-прогону `193/193 PASS` от 01.10.2026, зафиксированному в [архиве закрытого backlog](https://github.com/alnat2/mpod-android/blob/d752754b2a7c45b0c2a249a63c8ecc9556bcf0d6/docs/bugs.md).
 - В `localRelease` свежая QA-подписка A получила revision 2 без переоткрытия экрана. Room/UI показали 4 выпуска в порядке 4, 3, 2, 1; счётчик изменился на 4/4. Episode 4 появился в очереди, кнопка стала Remove from playlist, загрузка завершилась (`isDownloaded=1`, непустой путь) без переоткрытия. Удаление из очереди вернуло Add to playlist. Переключение episode 4 в listened немедленно обновило Room, счётчик и фильтр; Show all снова показал выпуск.
 - Обязательный сценарий выполнен на `localRelease`: `QA aliases episode 5` запущен из Player; при переходе в Subscriptions выбран A обычным горизонтальным свайпом и выполнен Refresh. UI A показал `5 / 5 episodes` и новый `QA race episode 5`. MediaSession B до Refresh: `PLAYING`, скорость `1.0`, позиция `0 ms`; после Refresh: `PLAYING`, metadata `QA aliases episode 5`, позиция `21,539 ms`; следующий замер — `42,560 ms`. Воспроизведение продолжалось и позиция росла. Для continuity-прогона использован только локальный fixture с трёхминутным WAV, чтобы тестовый трек не закончился во время замеров; APK и код кандидата не менялись.
 - Карусель переключилась обычным свайпом; отдельный дефект жеста не подтверждён.
