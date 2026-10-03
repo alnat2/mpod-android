@@ -18,14 +18,20 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.InputStream
 import java.text.SimpleDateFormat
+import java.util.Collections
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
@@ -174,11 +180,18 @@ class PodcastRepository @Inject constructor(
 
     suspend fun refreshAllPodcasts(): Result<Unit> = withContext(Dispatchers.IO) {
         val podcasts = podcastDao.getAllPodcasts()
-        val failures = mutableListOf<String>()
-        for (pod in podcasts) {
-            refreshPodcast(pod.id).onFailure { e ->
-                failures.add("${pod.title}: ${e.message ?: "refresh failed"}")
-            }
+        val semaphore = Semaphore(4)
+        val failures = Collections.synchronizedList(mutableListOf<String>())
+        coroutineScope {
+            podcasts.map { pod ->
+                async {
+                    semaphore.withPermit {
+                        refreshPodcast(pod.id).onFailure { e ->
+                            failures.add("${pod.title}: ${e.message ?: "refresh failed"}")
+                        }
+                    }
+                }
+            }.awaitAll()
         }
         if (failures.isNotEmpty()) {
             Result.failure(
