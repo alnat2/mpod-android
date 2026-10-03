@@ -83,6 +83,7 @@ class PodcastRepository @Inject constructor(
             }
 
             val parsedFeed = fetchAndParseFeed(normalizedUrl)
+                ?: throw IllegalStateException("Unexpected 304 on new podcast subscription")
             val podcastEntity = PodcastEntity(
                 feedUrl = normalizedUrl,
                 title = if (parsedFeed.title.isNotBlank()) parsedFeed.title else normalizedUrl,
@@ -124,14 +125,18 @@ class PodcastRepository @Inject constructor(
             val podcast = podcastDao.getPodcastById(podcastId)
                 ?: return@withContext Result.failure(IllegalArgumentException("Podcast not found: $podcastId"))
 
-            val parsedFeed = fetchAndParseFeed(podcast.feedUrl)
+            val parsedFeed = fetchAndParseFeed(podcast.feedUrl, podcast.lastBuildDate)
+            if (parsedFeed == null) {
+                podcastDao.update(podcast.copy(lastRefreshedAt = System.currentTimeMillis()))
+                return@withContext Result.success(Unit)
+            }
             val updatedPodcast = podcast.copy(
                 title = if (parsedFeed.title.isNotBlank()) parsedFeed.title else podcast.title,
                 description = if (parsedFeed.description.isNotBlank()) parsedFeed.description else podcast.description,
                 author = if (parsedFeed.author.isNotBlank()) parsedFeed.author else podcast.author,
                 artworkUrl = if (parsedFeed.artworkUrl.isNotBlank()) parsedFeed.artworkUrl else podcast.artworkUrl,
                 link = if (parsedFeed.link.isNotBlank()) parsedFeed.link else podcast.link,
-                lastBuildDate = parsedFeed.lastBuildDate,
+                lastBuildDate = if (parsedFeed.lastBuildDate.isNotBlank()) parsedFeed.lastBuildDate else podcast.lastBuildDate,
                 lastRefreshedAt = System.currentTimeMillis()
             )
             podcastDao.update(updatedPodcast)
@@ -288,18 +293,29 @@ class PodcastRepository @Inject constructor(
         OpmlParser.generateOpml(podcasts)
     }
 
-    private suspend fun fetchAndParseFeed(url: String): ParsedPodcastFeed {
+    private suspend fun fetchAndParseFeed(
+        url: String,
+        lastBuildDate: String? = null
+    ): ParsedPodcastFeed? {
         val client = proxyHttpClientFactory.createClient()
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url(url)
             .header(
                 "User-Agent",
                 "mpoddy/${BuildConfig.VERSION_NAME} (Android; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             )
             .header("Accept", "application/rss+xml, application/xml, application/atom+xml, text/xml, */*")
-            .build()
+
+        if (!lastBuildDate.isNullOrBlank()) {
+            requestBuilder.header("If-Modified-Since", lastBuildDate)
+        }
+
+        val request = requestBuilder.build()
 
         client.newCall(request).execute().use { response ->
+            if (response.code == 304) {
+                return null
+            }
             if (!response.isSuccessful) {
                 throw IllegalStateException("HTTP ${response.code} fetching feed: ${response.message}")
             }

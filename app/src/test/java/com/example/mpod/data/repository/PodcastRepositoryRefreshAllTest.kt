@@ -63,6 +63,26 @@ class PodcastRepositoryRefreshAllTest {
     }
 
     @Test
+    fun refreshAll_http304NotModified_isTreatedAsSuccess() = runBlocking {
+        server.respondByPath(
+            "/cached1" to MockResponse().setResponseCode(304),
+            "/cached2" to MockResponse().setResponseCode(304)
+        )
+        val podcasts = listOf(
+            podcast(1L, "/cached1", "First cached"),
+            podcast(2L, "/cached2", "Second cached")
+        )
+        val settings = RecordingAppSettingsDataStore(PREVIOUS_LAST_REFRESH)
+        val repository = repository(podcasts, initialEpisodes(), settings)
+
+        val result = repository.refreshAllPodcasts()
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, settings.lastRefreshWrites.size)
+        assertTrue(settings.lastRefreshWrites.single().startsWith("Last refresh today at "))
+    }
+
+    @Test
     fun refreshAll_partialFailure_preservesTimestampAndCompleteLibrary() = runBlocking {
         server.respondByPath(
             "/healthy" to rssFeed("Healthy updated", "healthy-new"),

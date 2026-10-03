@@ -44,8 +44,8 @@ class ProxyHttpClientFactory @Inject constructor() {
                     .build()
             } else null
         }
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
@@ -53,7 +53,16 @@ class ProxyHttpClientFactory @Inject constructor() {
     fun configure(dataStore: AppSettingsStore, scope: CoroutineScope) {
         scope.launch {
             dataStore.settingsFlow
-                .map { Triple(it.isProxyEnabled, it.proxyHost, it.proxyPort to (it.proxyUsername to it.proxyPassword)) to it }
+                .map {
+                    listOf(
+                        it.isProxyEnabled,
+                        it.proxyType,
+                        it.proxyHost,
+                        it.proxyPort,
+                        it.proxyUsername,
+                        it.proxyPassword
+                    ) to it
+                }
                 .distinctUntilChanged { old, new -> old.first == new.first }
                 .collect { (_, settings) ->
                     updateProxy(settings)
@@ -89,8 +98,8 @@ class ProxyHttpClientFactory @Inject constructor() {
             proxyPassword: String = ""
         ): OkHttpClient {
             val builder = OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
 
