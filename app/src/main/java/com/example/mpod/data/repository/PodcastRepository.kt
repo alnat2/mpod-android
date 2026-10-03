@@ -292,7 +292,11 @@ class PodcastRepository @Inject constructor(
         val client = proxyHttpClientFactory.createClient()
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
+            .header(
+                "User-Agent",
+                "mpoddy/${BuildConfig.VERSION_NAME} (Android; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            )
+            .header("Accept", "application/rss+xml, application/xml, application/atom+xml, text/xml, */*")
             .build()
 
         client.newCall(request).execute().use { response ->
