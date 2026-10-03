@@ -119,4 +119,43 @@ class RssFeedParserTest {
         assertEquals(1000L, ep1.durationSeconds)
         assertEquals("https://example.com/alias.mp3", ep1.audioUrl)
     }
+
+    @Test
+    fun parseRssWithCdataAndHtmlEntitiesInDescription() {
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0">
+              <channel>
+                <title>Test CDATA Feed</title>
+                <description>Feed &amp; Description</description>
+                <item>
+                  <title><![CDATA[Episode & Title with CDATA]]></title>
+                  <guid>ep-cdata-1</guid>
+                  <description>Start text <![CDATA[Inside CDATA]]> &amp; end text</description>
+                  <enclosure url="https://example.com/audio.mp3" />
+                </item>
+              </channel>
+            </rss>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml.byteInputStream())
+        assertEquals("Test CDATA Feed", feed.title)
+        assertEquals("Feed & Description", feed.description)
+        val ep = feed.episodes.single()
+        assertEquals("Episode & Title with CDATA", ep.title)
+        assertEquals("Start text Inside CDATA & end text", ep.description)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun parseHtmlWebpageThrowsClearException() {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+              <head><title>Cloudflare DDoS protection</title></head>
+              <body>Just a moment...</body>
+            </html>
+        """.trimIndent()
+
+        RssFeedParser.parse(html.byteInputStream())
+    }
 }

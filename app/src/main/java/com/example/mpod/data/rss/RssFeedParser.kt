@@ -68,7 +68,13 @@ object RssFeedParser {
     }
 
     private fun readRss(parser: XmlPullParser): ParsedPodcastFeed {
-        parser.require(XmlPullParser.START_TAG, null, "rss")
+        val rootName = parser.name?.lowercase(Locale.US)
+        if (rootName == "html") {
+            throw IllegalArgumentException("Received HTML webpage instead of RSS XML feed (likely bot protection or invalid URL)")
+        }
+        if (rootName != "rss") {
+            throw IllegalArgumentException("Unsupported feed root element: <$rootName>, expected <rss>")
+        }
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
             if (parser.name.equals("channel", ignoreCase = true)) {
@@ -194,12 +200,23 @@ object RssFeedParser {
     }
 
     private fun readText(parser: XmlPullParser): String {
-        var result = ""
-        if (parser.next() == XmlPullParser.TEXT) {
-            result = parser.text ?: ""
-            parser.nextTag()
+        val sb = StringBuilder()
+        var depth = 1
+        while (depth > 0) {
+            when (parser.next()) {
+                XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.ENTITY_REF -> {
+                    sb.append(parser.text.orEmpty())
+                }
+                XmlPullParser.START_TAG -> {
+                    depth++
+                }
+                XmlPullParser.END_TAG -> {
+                    depth--
+                }
+                XmlPullParser.END_DOCUMENT -> break
+            }
         }
-        return result
+        return sb.toString()
     }
 
     private fun skip(parser: XmlPullParser) {
