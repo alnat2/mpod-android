@@ -15,7 +15,7 @@ open class IpGeoService @Inject constructor(
         val httpClient = client ?: proxyHttpClientFactory.createClient()
         runCatching {
             val request = Request.Builder()
-                .url("http://ip-api.com/json/?fields=query,countryCode,status")
+                .url("https://api.country.is")
                 .header("User-Agent", "mpoddy/1.0")
                 .build()
             httpClient.newCall(request).execute().use { response ->
@@ -25,7 +25,7 @@ open class IpGeoService @Inject constructor(
             }
         }.recoverCatching {
             val fallbackRequest = Request.Builder()
-                .url("https://api.country.is")
+                .url("http://ip-api.com/json/?fields=query,countryCode,status")
                 .header("User-Agent", "mpoddy/1.0")
                 .build()
             httpClient.newCall(fallbackRequest).execute().use { response ->
@@ -39,6 +39,6 @@ open class IpGeoService @Inject constructor(
 
 internal fun parseIpGeoJson(jsonString: String): Pair<String, String>? {
     val ip = Regex(""""(?:query|ip)"\s*:\s*"([^"]+)"""").find(jsonString)?.groupValues?.get(1)
-    val geo = Regex(""""(?:countryCode|country)"\s*:\s*"([^"]+)"""").find(jsonString)?.groupValues?.get(1) ?: "Unknown"
+    val geo = Regex(""""(?:countryCode|country_code|country)"\s*:\s*"([^"]+)"""").find(jsonString)?.groupValues?.get(1) ?: "Unknown"
     return if (ip != null) ip to geo else null
 }

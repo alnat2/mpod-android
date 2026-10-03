@@ -46,6 +46,15 @@ class IpGeoServiceTest {
     }
 
     @Test
+    fun parseIpGeoJson_parsesCountryCodeFormatCorrectly() {
+        val json = """{"ip":"8.8.8.8","country_code":"DE"}"""
+        val result = parseIpGeoJson(json)
+        assertNotNull(result)
+        assertEquals("8.8.8.8", result?.first)
+        assertEquals("DE", result?.second)
+    }
+
+    @Test
     fun parseIpGeoJson_returnsNullForInvalidJson() {
         val json = """{"error":"not found"}"""
         val result = parseIpGeoJson(json)
