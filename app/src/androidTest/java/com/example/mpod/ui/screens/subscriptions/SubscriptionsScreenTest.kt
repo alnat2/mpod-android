@@ -436,7 +436,7 @@ class SubscriptionsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Refreshing").assertIsDisplayed()
+        composeRule.onNodeWithText("Refresh").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Refresh").assertHasNoClickAction()
     }
 

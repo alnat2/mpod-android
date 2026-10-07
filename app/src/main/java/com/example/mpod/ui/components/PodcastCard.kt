@@ -42,6 +42,7 @@ fun PodcastCard(
     modifier: Modifier = Modifier,
     imageUrl: String? = null,
     isRefreshing: Boolean = false,
+    refreshEnabled: Boolean = true,
     isUnsubscribing: Boolean = false,
     isUnsubscribePending: Boolean = false,
     unsubscribeEnabled: Boolean = true,
@@ -148,7 +149,7 @@ fun PodcastCard(
                 contentColor = MaterialTheme.colorScheme.onBackground,
                 height = 32.dp,
                 modifier = Modifier.weight(1f),
-                enabled = !isRefreshing,
+                enabled = refreshEnabled && !isRefreshing,
                 onClick = onRefresh
             )
             MpodButton(
