@@ -181,7 +181,7 @@ class PodcastUnsubscribeTest {
     }
 
     @Test fun savedFileDeleteFailure_surfacesInUi_preservesOwnership_andRetrySucceeds() = runBlocking {
-        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce } }
+        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce && it.podcasts.any { p -> p.id == 1L } } }
         val file = File(directory, "saved.mp3").apply { writeText("audio") }
         rows[101] = rows.getValue(101).copy(isDownloaded = true, localFilePath = file.absolutePath)
         manager.fileOps = object : FileOperations { override fun delete(file: File) = false }
@@ -250,13 +250,15 @@ class PodcastUnsubscribeTest {
     }
 
     @Test fun undoWithinWindow_keepsRoomAndFiles_andDoesNotCancelDownload() = runBlocking {
-        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce } }
+        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce && it.podcasts.any { p -> p.id == 1L } } }
         manager.debounceMs = 60_000
         schedule(101)
         val owner = manager.getPendingDownloadJob(101)!!
         val file = File(directory, "saved.mp3").apply { writeText("audio") }
         viewModel.schedulePodcastUnsubscribe(1)
-        assertEquals(15, viewModel.state.value.pendingUnsubscribe!!.secondsRemaining)
+        val pending = withTimeout(5000) { viewModel.state.first { it.pendingUnsubscribe != null } }.pendingUnsubscribe
+        assertNotNull(pending)
+        assertEquals(15, pending!!.secondsRemaining)
         viewModel.undoPodcastUnsubscribe(1)
         assertNull(viewModel.state.value.pendingUnsubscribe)
         assertTrue(rows.containsKey(101))
