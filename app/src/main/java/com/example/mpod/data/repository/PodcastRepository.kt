@@ -320,7 +320,11 @@ class PodcastRepository @Inject constructor(
             .header("Accept", "application/rss+xml, application/xml, application/atom+xml, text/xml, */*")
 
         if (!lastBuildDate.isNullOrBlank()) {
-            requestBuilder.header("If-Modified-Since", lastBuildDate)
+            if (lastBuildDate.startsWith("\"") || lastBuildDate.startsWith("W/\"")) {
+                requestBuilder.header("If-None-Match", lastBuildDate)
+            } else {
+                requestBuilder.header("If-Modified-Since", lastBuildDate)
+            }
         }
 
         val request = requestBuilder.build()
@@ -332,8 +336,14 @@ class PodcastRepository @Inject constructor(
             if (!response.isSuccessful) {
                 throw IllegalStateException("HTTP ${response.code} fetching feed: ${response.message}")
             }
+            val httpCacheTag = response.header("ETag") ?: response.header("Last-Modified")
             val body = response.body?.byteStream() ?: throw IllegalStateException("Empty response body")
-            return RssFeedParser.parse(body)
+            val parsed = RssFeedParser.parse(body.buffered())
+            return if (parsed.lastBuildDate.isBlank() && !httpCacheTag.isNullOrBlank()) {
+                parsed.copy(lastBuildDate = httpCacheTag)
+            } else {
+                parsed
+            }
         }
     }
 

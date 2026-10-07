@@ -45,7 +45,7 @@ class ProxyHttpClientFactory @Inject constructor() {
             } else null
         }
         .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
@@ -99,7 +99,7 @@ class ProxyHttpClientFactory @Inject constructor() {
         ): OkHttpClient {
             val builder = OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
 

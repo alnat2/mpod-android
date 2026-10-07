@@ -83,6 +83,24 @@ class PodcastRepositoryRefreshAllTest {
     }
 
     @Test
+    fun refreshAll_etagCachedPodcast_sendsIfNoneMatchAndSucceedsOn304() = runBlocking {
+        server.respondByPath(
+            "/etag-feed" to MockResponse().setResponseCode(304)
+        )
+        val podcastWithEtag = podcast(1L, "/etag-feed", "Etag podcast").copy(
+            lastBuildDate = "\"dlwsnepajq4d299lj\""
+        )
+        val settings = RecordingAppSettingsDataStore(PREVIOUS_LAST_REFRESH)
+        val repository = repository(listOf(podcastWithEtag), initialEpisodes(), settings)
+
+        val result = repository.refreshAllPodcasts()
+
+        assertTrue(result.isSuccess)
+        val request = server.takeRequest()
+        assertEquals("\"dlwsnepajq4d299lj\"", request.getHeader("If-None-Match"))
+    }
+
+    @Test
     fun refreshAll_partialFailure_preservesTimestampAndCompleteLibrary() = runBlocking {
         server.respondByPath(
             "/healthy" to rssFeed("Healthy updated", "healthy-new"),
