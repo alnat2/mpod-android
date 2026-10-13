@@ -60,7 +60,7 @@ class DynamicProxySelectorTest {
     }
 
     @Test
-    fun enabledProxyWithBlankHost_throwsException_andDisallowsDirect() {
+    fun enabledProxyWithBlankHost_throwsException_andFallsBackToDirectInSelector() {
         val settings = AppSettings(
             isProxyEnabled = true,
             proxyHost = "   ",
@@ -74,19 +74,16 @@ class DynamicProxySelectorTest {
             assertTrue(e.message?.contains("Proxy host cannot be blank") == true)
         }
 
-        // Test in selector: select() must throw IllegalStateException
+        // Test in selector: select() must gracefully fall back to direct, never throw
         val selector = DynamicProxySelector()
         selector.updateProxy(settings)
-        try {
-            selector.select(URI.create("https://example.com/feed.xml"))
-            fail("Expected IllegalStateException from select() for enabled proxy with blank host")
-        } catch (e: IllegalStateException) {
-            assertTrue(e.message?.contains("Proxy configuration error") == true)
-        }
+        val proxies = selector.select(URI.create("https://example.com/feed.xml"))
+        assertEquals(listOf(Proxy.NO_PROXY), proxies)
+        assertNotNull(selector.lastConfigError)
     }
 
     @Test
-    fun enabledProxyWithInvalidPort_throwsException_andDisallowsDirect() {
+    fun enabledProxyWithInvalidPort_throwsException_andFallsBackToDirectInSelector() {
         for (invalidPort in listOf(0, -1, 65536, 70000)) {
             val settings = AppSettings(
                 isProxyEnabled = true,
@@ -103,17 +100,14 @@ class DynamicProxySelectorTest {
 
             val selector = DynamicProxySelector()
             selector.updateProxy(settings)
-            try {
-                selector.select(URI.create("https://example.com/feed.xml"))
-                fail("Expected IllegalStateException for invalid port $invalidPort")
-            } catch (e: IllegalStateException) {
-                assertTrue(e.message?.contains("Proxy configuration error") == true)
-            }
+            val proxies = selector.select(URI.create("https://example.com/feed.xml"))
+            assertEquals(listOf(Proxy.NO_PROXY), proxies)
+            assertNotNull(selector.lastConfigError)
         }
     }
 
     @Test
-    fun enabledProxyWithUnsupportedType_throwsException_andDisallowsDirect() {
+    fun enabledProxyWithUnsupportedType_throwsException_andFallsBackToDirectInSelector() {
         val settings = AppSettings(
             isProxyEnabled = true,
             proxyHost = "127.0.0.1",
@@ -129,12 +123,9 @@ class DynamicProxySelectorTest {
 
         val selector = DynamicProxySelector()
         selector.updateProxy(settings)
-        try {
-            selector.select(URI.create("https://example.com/feed.xml"))
-            fail("Expected IllegalStateException for unsupported type FTP")
-        } catch (e: IllegalStateException) {
-            assertTrue(e.message?.contains("Proxy configuration error") == true)
-        }
+        val proxies = selector.select(URI.create("https://example.com/feed.xml"))
+        assertEquals(listOf(Proxy.NO_PROXY), proxies)
+        assertNotNull(selector.lastConfigError)
     }
 
     @Test
@@ -227,7 +218,7 @@ class DynamicProxySelectorTest {
     }
 
     @Test
-    fun selectBeforeInitialization_waitsForInitialProxy_doesNotFallBackToDirect() = runBlocking {
+    fun selectBeforeInitialization_waitsForInitialProxy_includesDirectFallback() = runBlocking {
         val selector = DynamicProxySelector()
 
         val selectJob = async(Dispatchers.IO) {
@@ -244,42 +235,50 @@ class DynamicProxySelectorTest {
         ))
 
         val proxies = selectJob.await()
-        assertEquals(1, proxies.size)
+        assertEquals(2, proxies.size)
         assertEquals(Proxy.Type.SOCKS, proxies[0].type())
+        assertEquals(Proxy.NO_PROXY, proxies[1])
         val addr = proxies[0].address() as InetSocketAddress
         assertEquals("10.0.0.1", addr.hostName)
         assertEquals(1080, addr.port)
     }
 
     @Test
-    fun initialStateNotArrived_awaitTimesOut_throwsIllegalStateException_noDirectFallback() {
+    fun configuredProxyIncludesDirectFallbackInRouteList() {
         val selector = DynamicProxySelector()
-
-        var caughtException: Exception? = null
-        try {
-            // Await with short timeout
-            val initialized = selector.awaitInitialization(50)
-            assertFalse(initialized)
-            selector.select(URI.create("https://example.com/feed.xml"))
-        } catch (e: Exception) {
-            caughtException = e
-        }
-
-        assertNotNull("Expected IllegalStateException on timeout", caughtException)
-        assertTrue(caughtException is IllegalStateException)
-        assertTrue(caughtException?.message?.contains("direct fallback is disallowed") == true)
+        selector.updateProxy(AppSettings(
+            isProxyEnabled = true,
+            proxyHost = "127.0.0.1",
+            proxyPort = 1080,
+            proxyType = "SOCKS5"
+        ))
+        val routes = selector.select(URI.create("https://example.com/audio.mp3"))
+        assertEquals(2, routes.size)
+        assertEquals(Proxy.Type.SOCKS, routes[0].type())
+        assertEquals(Proxy.NO_PROXY, routes[1])
     }
 
     @Test
-    fun waitingThreadInterrupted_throwsIllegalStateException_noDirectFallback() {
+    fun initialStateNotArrived_awaitTimesOut_gracefullyFallsBackToDirect() {
         val selector = DynamicProxySelector()
 
-        var caughtException: Exception? = null
+        // Await with short timeout
+        val initialized = selector.awaitInitialization(50)
+        assertFalse(initialized)
+        val proxies = selector.select(URI.create("https://example.com/feed.xml"))
+        assertEquals(1, proxies.size)
+        assertEquals(Proxy.NO_PROXY, proxies[0])
+    }
+
+    @Test
+    fun waitingThreadInterrupted_gracefullyFallsBackToDirect() {
+        val selector = DynamicProxySelector()
+
+        var selectedProxies: List<Proxy>? = null
         val thread = Thread {
             try {
-                selector.select(URI.create("https://example.com/feed.xml"))
-            } catch (e: Exception) {
-                caughtException = e
+                selectedProxies = selector.select(URI.create("https://example.com/feed.xml"))
+            } catch (_: Exception) {
             }
         }
 
@@ -288,9 +287,9 @@ class DynamicProxySelectorTest {
         thread.interrupt()
         thread.join(2000)
 
-        assertNotNull("Expected IllegalStateException on interruption", caughtException)
-        assertTrue(caughtException is IllegalStateException)
-        assertTrue(caughtException?.message?.contains("direct fallback is disallowed") == true)
+        assertNotNull("Expected graceful fallback to direct connection", selectedProxies)
+        assertEquals(1, selectedProxies!!.size)
+        assertEquals(Proxy.NO_PROXY, selectedProxies!![0])
     }
 
     @Test

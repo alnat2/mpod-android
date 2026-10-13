@@ -54,8 +54,9 @@ class ProxyHttpClientFactoryDynamicTest {
             )
         )
         val socksRoute = client.proxySelector.select(URI.create("https://example.com/feed.xml"))
-        assertEquals(1, socksRoute.size)
+        assertEquals(2, socksRoute.size)
         assertEquals(Proxy.Type.SOCKS, socksRoute[0].type())
+        assertEquals(Proxy.NO_PROXY, socksRoute[1])
         assertEquals(1080, (socksRoute[0].address() as InetSocketAddress).port)
 
         // 3. Switch to HTTP
@@ -68,8 +69,9 @@ class ProxyHttpClientFactoryDynamicTest {
             )
         )
         val httpRoute = client.proxySelector.select(URI.create("https://example.com/feed.xml"))
-        assertEquals(1, httpRoute.size)
+        assertEquals(2, httpRoute.size)
         assertEquals(Proxy.Type.HTTP, httpRoute[0].type())
+        assertEquals(Proxy.NO_PROXY, httpRoute[1])
         assertEquals("proxy.example.com", (httpRoute[0].address() as InetSocketAddress).hostName)
         assertEquals(8080, (httpRoute[0].address() as InetSocketAddress).port)
 

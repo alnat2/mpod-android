@@ -92,15 +92,28 @@ class SettingsViewModel @Inject constructor(
             appSettingsDataStore.setProxyEnabled(enabled)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
-            loadCurrentIpGeo()
+            if (enabled && current.proxyHost.isBlank()) {
+                _state.value = _state.value.copy(proxyMessage = "Enter proxy address and port below.")
+            } else {
+                loadCurrentIpGeo()
+            }
         }
     }
 
     fun saveProxySettings(host: String, port: Int, username: String = "", password: String = "") {
         viewModelScope.launch {
+            val trimmedHost = host.trim()
+            if (trimmedHost.isBlank()) {
+                _state.value = _state.value.copy(proxyMessage = "Proxy address cannot be empty.")
+                return@launch
+            }
+            if (port !in 1..65535) {
+                _state.value = _state.value.copy(proxyMessage = "Invalid proxy port (1-65535).")
+                return@launch
+            }
             val updated = AppSettings(
                 isProxyEnabled = true,
-                proxyHost = host.trim(),
+                proxyHost = trimmedHost,
                 proxyPort = port,
                 proxyType = "SOCKS5",
                 proxyUsername = username.trim(),
@@ -108,7 +121,7 @@ class SettingsViewModel @Inject constructor(
             )
             appSettingsDataStore.setProxySettings(
                 enabled = true,
-                host = host.trim(),
+                host = trimmedHost,
                 port = port,
                 type = "SOCKS5",
                 username = username.trim(),

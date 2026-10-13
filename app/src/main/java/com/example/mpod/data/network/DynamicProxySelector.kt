@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class DynamicProxySelector : ProxySelector() {
 
-    private val currentProxy = AtomicReference<Proxy?>(null)
+    private val currentProxy = AtomicReference<Proxy>(Proxy.NO_PROXY)
     private val configError = AtomicReference<Throwable?>(null)
     private val initLatch = CountDownLatch(1)
 
@@ -22,7 +22,7 @@ class DynamicProxySelector : ProxySelector() {
             currentProxy.set(resolveProxy(settings))
             configError.set(null)
         } catch (t: Throwable) {
-            currentProxy.set(null)
+            currentProxy.set(Proxy.NO_PROXY)
             configError.set(t)
         } finally {
             initLatch.countDown()
@@ -45,28 +45,25 @@ class DynamicProxySelector : ProxySelector() {
     val isInitialized: Boolean
         get() = initLatch.count == 0L
 
+    val lastConfigError: Throwable?
+        get() = configError.get()
+
     override fun select(uri: URI?): List<Proxy> {
-        val initialized = if (initLatch.count > 0L) {
-            awaitInitialization(5000)
+        if (initLatch.count > 0L) {
+            awaitInitialization(1000)
+        }
+
+        val proxy = currentProxy.get() ?: Proxy.NO_PROXY
+        return if (proxy == Proxy.NO_PROXY) {
+            listOf(Proxy.NO_PROXY)
         } else {
-            true
+            // Provide configured proxy first; if unreachable, OkHttp transparently falls back to direct
+            listOf(proxy, Proxy.NO_PROXY)
         }
-
-        if (!initialized) {
-            throw IllegalStateException("Proxy configuration initialization timed out or was interrupted; direct fallback is disallowed")
-        }
-
-        configError.get()?.let { err ->
-            throw IllegalStateException("Proxy configuration error: ${err.message}", err)
-        }
-
-        val proxy = currentProxy.get()
-            ?: throw IllegalStateException("Proxy configuration not available; direct fallback is disallowed")
-        return listOf(proxy)
     }
 
     override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
-        // No-op: connection failures are handled by OkHttp caller
+        // OkHttp handles connection failures by attempting the next route in the list (Proxy.NO_PROXY)
     }
 
     companion object {
