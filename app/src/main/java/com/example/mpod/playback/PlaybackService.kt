@@ -20,6 +20,7 @@ import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.preferences.AppSettingsStore
+import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.google.common.collect.ImmutableList
@@ -69,7 +70,7 @@ class PlaybackService : MediaSessionService() {
 
         val okHttpClient = proxyHttpClientFactory.createClient()
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent("mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
+            .setUserAgent(NetworkModule.USER_AGENT)
         val defaultDataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)
 
         val audioAttributes = AudioAttributes.Builder()
@@ -178,15 +179,36 @@ class PlaybackService : MediaSessionService() {
                 player.getMediaItemAt(index).mediaId.toLongOrNull()
             }
 
+            val currentMediaUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
+            val targetMediaUri = playlistItems.find { it.episode.id == target.episodeId }
+                ?.resolveMediaUri()
+                ?.toString()
+
             val requiresRebuild = requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = currentQueueEpisodeIds,
                 roomQueueEpisodeIds = roomQueueEpisodeIds,
                 currentEpisodeId = currentEpisodeId,
                 targetEpisodeId = target.episodeId,
-                preferredEpisodeId = preferredEpisodeId
+                preferredEpisodeId = preferredEpisodeId,
+                currentMediaUri = currentMediaUri,
+                targetMediaUri = targetMediaUri
             )
 
             if (!requiresRebuild) {
+                // Update queued items whose media URI changed (e.g. background download completed for upcoming episode)
+                val activeIndex = player.currentMediaItemIndex
+                for (index in 0 until player.mediaItemCount) {
+                    if (index == activeIndex) continue
+                    if (index < playlistItems.size) {
+                        val currentUri = player.getMediaItemAt(index).localConfiguration?.uri?.toString()
+                        val targetUri = playlistItems[index].resolveMediaUri().toString()
+                        if (currentUri != targetUri) {
+                            val targetItem = playlistItems[index].toMediaItem()
+                            player.replaceMediaItem(index, targetItem)
+                        }
+                    }
+                }
+
                 if (!player.isPlaying && !player.playWhenReady) {
                     val positionDelta = kotlin.math.abs(player.currentPosition - target.positionMs)
                     if (positionDelta >= POSITION_SYNC_THRESHOLD_MS) {
@@ -334,13 +356,18 @@ class PlaybackService : MediaSessionService() {
 
     private fun currentEpisodeId(): Long? = player.currentMediaItem?.mediaId?.toLongOrNull()
 
-    private fun PlaylistItemWithEpisode.toMediaItem(): MediaItem {
+    private fun PlaylistItemWithEpisode.resolveMediaUri(): Uri {
         val ep = this.episode
-        val uri = if (ep.isDownloaded && !ep.localFilePath.isNullOrBlank() && File(ep.localFilePath).exists()) {
+        return if (ep.isDownloaded && !ep.localFilePath.isNullOrBlank() && File(ep.localFilePath).exists()) {
             Uri.fromFile(File(ep.localFilePath))
         } else {
             Uri.parse(ep.audioUrl)
         }
+    }
+
+    private fun PlaylistItemWithEpisode.toMediaItem(): MediaItem {
+        val ep = this.episode
+        val uri = resolveMediaUri()
 
         val extras = android.os.Bundle().apply {
             putLong(EXTRA_DURATION_SECONDS, ep.durationSeconds)

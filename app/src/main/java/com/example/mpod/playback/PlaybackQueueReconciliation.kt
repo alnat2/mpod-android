@@ -16,11 +16,14 @@ internal fun requiresPlayerQueueRebuild(
     roomQueueEpisodeIds: List<Long>,
     currentEpisodeId: Long?,
     targetEpisodeId: Long,
-    preferredEpisodeId: Long?
+    preferredEpisodeId: Long?,
+    currentMediaUri: String? = null,
+    targetMediaUri: String? = null
 ): Boolean {
     return preferredEpisodeId != null ||
         currentQueueEpisodeIds != roomQueueEpisodeIds ||
-        currentEpisodeId != targetEpisodeId
+        currentEpisodeId != targetEpisodeId ||
+        ((currentMediaUri != null || targetMediaUri != null) && currentMediaUri != targetMediaUri)
 }
 
 internal fun resolveQueuePlaybackTarget(

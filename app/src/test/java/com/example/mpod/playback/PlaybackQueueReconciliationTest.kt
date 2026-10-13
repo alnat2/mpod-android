@@ -47,6 +47,51 @@ class PlaybackQueueReconciliationTest {
     }
 
     @Test
+    fun changedMediaUriRebuildsPlayerEvenWhenQueueAndEpisodeMatch() {
+        assertTrue(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 2L, 3L),
+                currentEpisodeId = 2L,
+                targetEpisodeId = 2L,
+                preferredEpisodeId = null,
+                currentMediaUri = "https://cdn.example.com/audio.mp3",
+                targetMediaUri = "file:///data/user/0/com.prod.mpod/files/podcasts/ep_2.mp3"
+            )
+        )
+    }
+
+    @Test
+    fun matchingMediaUriDoesNotRebuildPlayer() {
+        assertFalse(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 2L, 3L),
+                currentEpisodeId = 2L,
+                targetEpisodeId = 2L,
+                preferredEpisodeId = null,
+                currentMediaUri = "file:///data/user/0/com.prod.mpod/files/podcasts/ep_2.mp3",
+                targetMediaUri = "file:///data/user/0/com.prod.mpod/files/podcasts/ep_2.mp3"
+            )
+        )
+    }
+
+    @Test
+    fun nullVsNonNullMediaUriRebuildsPlayer() {
+        assertTrue(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(1L, 2L, 3L),
+                currentEpisodeId = 2L,
+                targetEpisodeId = 2L,
+                preferredEpisodeId = null,
+                currentMediaUri = null,
+                targetMediaUri = "file:///data/user/0/com.prod.mpod/files/podcasts/ep_2.mp3"
+            )
+        )
+    }
+
+    @Test
     fun emptyQueueHasNoPlaybackTarget() {
         assertNull(
             resolveQueuePlaybackTarget(
