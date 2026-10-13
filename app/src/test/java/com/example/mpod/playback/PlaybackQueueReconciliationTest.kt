@@ -21,13 +21,26 @@ class PlaybackQueueReconciliationTest {
     }
 
     @Test
-    fun changedQueueRebuildsPlayer() {
-        assertTrue(
+    fun changedQueueDoesNotRebuildPlayerWhenActiveEpisodeUnchanged() {
+        assertFalse(
             requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = listOf(1L, 2L, 3L),
                 roomQueueEpisodeIds = listOf(1L, 3L),
                 currentEpisodeId = 1L,
                 targetEpisodeId = 1L,
+                preferredEpisodeId = null
+            )
+        )
+    }
+
+    @Test
+    fun removingActiveEpisodeFromQueueRebuildsPlayer() {
+        assertTrue(
+            requiresPlayerQueueRebuild(
+                currentQueueEpisodeIds = listOf(1L, 2L, 3L),
+                roomQueueEpisodeIds = listOf(2L, 3L),
+                currentEpisodeId = 1L,
+                targetEpisodeId = 2L,
                 preferredEpisodeId = null
             )
         )
@@ -162,6 +175,129 @@ class PlaybackQueueReconciliationTest {
         assertEquals(2L, target?.episodeId)
         assertEquals(32_000L, target?.positionMs)
         assertFalse(target?.playWhenReady == true)
+    }
+
+    @Test
+    fun syncActions_emptyDiffWhenQueuesIdentical() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L, 3L),
+            roomQueueIds = listOf(1L, 2L, 3L),
+            currentUris = listOf("uri1", "uri2", "uri3"),
+            targetUris = listOf("uri1", "uri2", "uri3"),
+            currentPlayingIndex = 0
+        )
+        assertTrue(actions.isEmpty())
+    }
+
+    @Test
+    fun syncActions_removesItemsNotInRoomQueue() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L, 3L),
+            roomQueueIds = listOf(1L, 3L),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.Remove(1)), actions)
+    }
+
+    @Test
+    fun syncActions_movesReorderedItems() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L, 3L),
+            roomQueueIds = listOf(1L, 3L, 2L),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.Move(fromIndex = 2, toIndex = 1)), actions)
+    }
+
+    @Test
+    fun syncActions_addsNewItemAtEnd() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L),
+            roomQueueIds = listOf(1L, 2L, 3L),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.Add(index = 2, episodeId = 3L)), actions)
+    }
+
+    @Test
+    fun syncActions_addsNewItemInMiddle() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 3L),
+            roomQueueIds = listOf(1L, 2L, 3L),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.Add(index = 1, episodeId = 2L)), actions)
+    }
+
+    @Test
+    fun syncActions_replacesUriForUpcomingItem() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L),
+            roomQueueIds = listOf(1L, 2L),
+            currentUris = listOf("uri1", "old_uri2"),
+            targetUris = listOf("uri1", "new_uri2"),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.ReplaceUri(index = 1, episodeId = 2L)), actions)
+    }
+
+    @Test
+    fun syncActions_doesNotReplaceUriForActivePlayingItem() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L),
+            roomQueueIds = listOf(1L, 2L),
+            currentUris = listOf("old_uri1", "uri2"),
+            targetUris = listOf("new_uri1", "uri2"),
+            currentPlayingIndex = 0
+        )
+        // Active item URI change is handled at rebuild level, not via hot replacement
+        assertTrue(actions.isEmpty())
+    }
+
+    @Test
+    fun syncActions_combinedRemoveMoveAndAdd() {
+        // Current: [1, 2, 3, 4]
+        // Target:  [4, 1, 5] (2 and 3 removed, 4 moved to front, 5 added at end)
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L, 3L, 4L),
+            roomQueueIds = listOf(4L, 1L, 5L),
+            currentPlayingIndex = 0
+        )
+        // Removals from end: 3 (index 2), then 2 (index 1) -> leaves [1, 4]
+        // Move 4 to index 0 -> leaves [4, 1]
+        // Add 5 at index 2 -> leaves [4, 1, 5]
+        assertEquals(
+            listOf(
+                QueueAction.Remove(2),
+                QueueAction.Remove(1),
+                QueueAction.Move(fromIndex = 1, toIndex = 0),
+                QueueAction.Add(index = 2, episodeId = 5L)
+            ),
+            actions
+        )
+    }
+
+    @Test
+    fun syncActions_replacesUriWhenCurrentUriWasNull() {
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L),
+            roomQueueIds = listOf(1L, 2L),
+            currentUris = listOf("uri1", null),
+            targetUris = listOf("uri1", "new_uri2"),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.ReplaceUri(index = 1, episodeId = 2L)), actions)
+    }
+
+    @Test
+    fun syncActions_removesDuplicateOrTailItems() {
+        // Player somehow has duplicate id 1: [1, 2, 1], while room queue is [1, 2]
+        val actions = calculateQueueSyncActions(
+            currentQueueIds = listOf(1L, 2L, 1L),
+            roomQueueIds = listOf(1L, 2L),
+            currentPlayingIndex = 0
+        )
+        assertEquals(listOf(QueueAction.Remove(2)), actions)
     }
 
     private fun queue(vararg entries: Pair<Long, Long>): List<QueueEpisodeState> {

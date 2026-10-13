@@ -178,16 +178,18 @@ class PlaybackService : MediaSessionService() {
             completedEpisodeTracker.reset(target.episodeId)
 
             val roomQueueEpisodeIds = playlistItems.map { it.episode.id }
-            val currentQueueEpisodeIds = (0 until player.mediaItemCount).mapNotNull { index ->
+            val currentQueueRawEpisodeIds = (0 until player.mediaItemCount).map { index ->
                 player.getMediaItemAt(index).mediaId.toLongOrNull()
             }
+            val hasCorruptMediaItems = currentQueueRawEpisodeIds.any { it == null }
+            val currentQueueEpisodeIds = currentQueueRawEpisodeIds.filterNotNull()
 
             val currentMediaUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
             val targetMediaUri = playlistItems.find { it.episode.id == target.episodeId }
                 ?.resolveMediaUri()
                 ?.toString()
 
-            val requiresRebuild = requiresPlayerQueueRebuild(
+            val requiresRebuild = hasCorruptMediaItems || requiresPlayerQueueRebuild(
                 currentQueueEpisodeIds = currentQueueEpisodeIds,
                 roomQueueEpisodeIds = roomQueueEpisodeIds,
                 currentEpisodeId = currentEpisodeId,
@@ -198,16 +200,34 @@ class PlaybackService : MediaSessionService() {
             )
 
             if (!requiresRebuild) {
-                // Update queued items whose media URI changed (e.g. background download completed for upcoming episode)
-                val activeIndex = player.currentMediaItemIndex
-                for (index in 0 until player.mediaItemCount) {
-                    if (index == activeIndex) continue
-                    if (index < playlistItems.size) {
-                        val currentUri = player.getMediaItemAt(index).localConfiguration?.uri?.toString()
-                        val targetUri = playlistItems[index].resolveMediaUri().toString()
-                        if (currentUri != targetUri) {
-                            val targetItem = playlistItems[index].toMediaItem()
-                            player.replaceMediaItem(index, targetItem)
+                // Incrementally synchronize queue changes without resetting ExoPlayer's buffer or streaming session
+                val currentUris = (0 until player.mediaItemCount).map { index ->
+                    player.getMediaItemAt(index).localConfiguration?.uri?.toString()
+                }
+                val targetUris = playlistItems.map { it.resolveMediaUri().toString() }
+
+                val syncActions = calculateQueueSyncActions(
+                    currentQueueIds = currentQueueEpisodeIds,
+                    roomQueueIds = roomQueueEpisodeIds,
+                    currentUris = currentUris,
+                    targetUris = targetUris,
+                    currentPlayingIndex = player.currentMediaItemIndex
+                )
+
+                if (syncActions.isNotEmpty()) {
+                    val playlistItemsById = playlistItems.associateBy { it.episode.id }
+                    for (action in syncActions) {
+                        when (action) {
+                            is QueueAction.Remove -> player.removeMediaItem(action.index)
+                            is QueueAction.Move -> player.moveMediaItem(action.fromIndex, action.toIndex)
+                            is QueueAction.Add -> {
+                                val item = playlistItemsById.getValue(action.episodeId)
+                                player.addMediaItem(action.index, item.toMediaItem())
+                            }
+                            is QueueAction.ReplaceUri -> {
+                                val item = playlistItemsById.getValue(action.episodeId)
+                                player.replaceMediaItem(action.index, item.toMediaItem())
+                            }
                         }
                     }
                 }
