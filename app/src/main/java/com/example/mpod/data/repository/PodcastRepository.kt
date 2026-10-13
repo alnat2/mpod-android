@@ -210,10 +210,23 @@ class PodcastRepository @Inject constructor(
             smartListeningManager.withPodcastDownloadsPaused(podcastId) {
                 val episodes = episodeDao.getEpisodesByPodcastId(podcastId)
                 for (episode in episodes) {
-                    when (smartListeningManager.cleanupEpisodeFile(episode.id)) {
-                        CleanupResult.Success -> Unit
-                        is CleanupResult.DeleteFailed -> throw IllegalStateException(
-                            "Could not delete downloaded audio. Please try unsubscribing again."
+                    try {
+                        when (val result = smartListeningManager.cleanupEpisodeFile(episode.id)) {
+                            CleanupResult.Success -> Unit
+                            is CleanupResult.DeleteFailed -> {
+                                android.util.Log.e(
+                                    "PodcastRepository",
+                                    "Failed to delete file ${result.path} for episode ${episode.id} during unsubscribe"
+                                )
+                            }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "PodcastRepository",
+                            "Error during file cleanup for episode ${episode.id} during unsubscribe: ${e.message}",
+                            e
                         )
                     }
                 }

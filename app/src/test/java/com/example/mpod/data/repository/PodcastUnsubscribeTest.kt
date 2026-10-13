@@ -180,39 +180,29 @@ class PodcastUnsubscribeTest {
         assertFalse(otherOwner.isCancelled)
     }
 
-    @Test fun savedFileDeleteFailure_surfacesInUi_preservesOwnership_andRetrySucceeds() = runBlocking {
+    @Test fun savedFileDeleteFailure_completesUnsubscribe_andCleansRoom() = runBlocking {
         withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce && it.podcasts.any { p -> p.id == 1L } } }
         val file = File(directory, "saved.mp3").apply { writeText("audio") }
         rows[101] = rows.getValue(101).copy(isDownloaded = true, localFilePath = file.absolutePath)
+        active = 101L
         manager.fileOps = object : FileOperations { override fun delete(file: File) = false }
         viewModel.unsubscribePodcastNow(1)
-        withTimeout(5000) { viewModel.state.first { it.actionErrorMessage != null && it.unsubscribingPodcastIds.isEmpty() } }
-        assertEquals(file.absolutePath, rows.getValue(101).localFilePath)
-        assertTrue(file.exists())
-        assertEquals(101L, active)
-        manager.fileOps = DefaultFileOperations
-        // Keep this test source compilable against the baseline for FAIL-before runs.
-        viewModel.javaClass.getDeclaredMethod("retryLastAction").invoke(viewModel)
         withTimeout(5000) { viewModel.state.first { it.unsubscribingPodcastIds.isEmpty() && it.podcasts.isEmpty() } }
-        assertFalse(file.exists())
-        assertNull(active)
         assertNull(viewModel.state.value.actionErrorMessage)
+        assertFalse(rows.containsKey(101))
+        assertFalse(101L in queue)
+        assertNull(active)
         assertGone()
     }
 
-    @Test fun unlinkedFileDeleteFailure_keepsPodcastForRetry_andReleasesSchedulingGuard() = runBlocking {
+    @Test fun unlinkedFileDeleteFailure_continuesUnsubscribe_andCleansRoom() = runBlocking {
         val file = File(directory, "podcasts/ep_101_orphan.mp3.tmp").apply { parentFile!!.mkdirs(); writeText("audio") }
         manager.fileOps = object : FileOperations { override fun delete(file: File) = throw java.io.IOException("locked") }
-        try { repository.unsubscribe(1); fail("Cleanup failure must fail unsubscribe") } catch (_: java.io.IOException) { }
-        assertTrue(rows.containsKey(101))
-        assertTrue(file.exists())
-        manager.debounceMs = 60_000
-        schedule(101)
-        assertNotNull("Guard must be released after failure", manager.getPendingDownloadJob(101))
-        manager.fileOps = DefaultFileOperations
         repository.unsubscribe(1)
-        assertFalse(file.exists())
-        assertGone()
+        assertFalse("Room records must be deleted despite unlinked file failure", rows.containsKey(101))
+        assertFalse(101L in queue)
+        assertNull(manager.getPendingDownloadJob(101))
+        assertTrue(rows.containsKey(201))
     }
 
     @Test fun unsubscribeAfterRoomCommit_cleansSavedFile_andPreservesOtherActiveEpisode() = runBlocking {
