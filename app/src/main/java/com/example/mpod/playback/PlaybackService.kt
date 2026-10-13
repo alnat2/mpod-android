@@ -405,6 +405,7 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    @androidx.annotation.OptIn(UnstableApi::class)
     private fun PlaylistItemWithEpisode.toMediaItem(): MediaItem {
         val ep = this.episode
         val uri = resolveMediaUri()
