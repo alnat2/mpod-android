@@ -235,6 +235,7 @@ class PlaybackService : MediaSessionService() {
             if (target.playWhenReady) {
                 startPeriodicSave()
                 appSettingsDataStore.setActiveEpisodeId(target.episodeId)
+                smartListeningManager.forceDownloadImmediately(target.episodeId)
             } else {
                 savePositionJob?.cancel()
                 savePositionJob = null
@@ -246,6 +247,7 @@ class PlaybackService : MediaSessionService() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) {
                 currentEpisodeId()?.let { episodeId ->
+                    smartListeningManager.forceDownloadImmediately(episodeId)
                     serviceScope.launch {
                         appSettingsDataStore.setActiveEpisodeId(episodeId)
                     }
@@ -256,6 +258,14 @@ class PlaybackService : MediaSessionService() {
                 savePositionJob = null
                 if (player.playbackState != Player.STATE_ENDED) {
                     serviceScope.launch { saveCurrentPosition() }
+                }
+            }
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (playWhenReady) {
+                currentEpisodeId()?.let { episodeId ->
+                    smartListeningManager.forceDownloadImmediately(episodeId)
                 }
             }
         }
@@ -289,6 +299,10 @@ class PlaybackService : MediaSessionService() {
             val nextEpisodeId = mediaItem?.mediaId?.toLongOrNull()
             val finishedEpisodeId = previousEpisodeId
             previousEpisodeId = nextEpisodeId
+
+            if (nextEpisodeId != null && player.playWhenReady) {
+                smartListeningManager.forceDownloadImmediately(nextEpisodeId)
+            }
 
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
                 handleEpisodeCompleted(finishedEpisodeId, nextEpisodeId)

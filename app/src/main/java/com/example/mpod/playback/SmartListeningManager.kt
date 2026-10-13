@@ -25,6 +25,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.Request
@@ -55,6 +56,7 @@ class SmartListeningManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingDownloadJobs = ConcurrentHashMap<Long, Job>()
+    private val debounceTriggers = ConcurrentHashMap<Long, CompletableDeferred<Unit>>()
     private val lifecycleMutex = Mutex()
     private var observationJob: Job? = null
     // Scheduling and suppression share one lock, so even a previously emitted Room snapshot
@@ -134,6 +136,13 @@ class SmartListeningManager @Inject constructor(
         episodeId: Long,
         audioUrl: String,
         expectedGeneration: Long? = null
+    ) = scheduleDebouncedDownload(episodeId, audioUrl, expectedGeneration, debounceMs)
+
+    private fun scheduleDebouncedDownload(
+        episodeId: Long,
+        audioUrl: String,
+        expectedGeneration: Long?,
+        initialDelayMs: Long
     ) = synchronized(ownershipLock) {
         if (stopping || (expectedGeneration != null && expectedGeneration != lifecycleGeneration)) return@synchronized
         val episode = episodeDao.getEpisodeById(episodeId) ?: return@synchronized
@@ -143,10 +152,16 @@ class SmartListeningManager @Inject constructor(
             return@synchronized
         }
         if (episode.isDownloaded || !episode.localFilePath.isNullOrBlank()) return@synchronized
+        val trigger = CompletableDeferred<Unit>()
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                android.util.Log.d("SmartListening", "Scheduling debounced download (${debounceMs}ms) for episode $episodeId ($audioUrl)")
-                delay(debounceMs)
+                if (initialDelayMs > 0L) {
+                    android.util.Log.d("SmartListening", "Scheduling debounced download (${initialDelayMs}ms) for episode $episodeId ($audioUrl)")
+                    withTimeoutOrNull(initialDelayMs) {
+                        trigger.await()
+                    }
+                }
+                debounceTriggers.remove(episodeId)
 
                 val inPlaylist = playlistDao.isEpisodeInPlaylist(episodeId)
                 if (!inPlaylist) {
@@ -154,8 +169,8 @@ class SmartListeningManager @Inject constructor(
                     return@launch
                 }
 
-                val episode = episodeDao.getEpisodeById(episodeId)
-                if (episode == null || episode.isDownloaded || audioUrl.isBlank()) {
+                val ep = episodeDao.getEpisodeById(episodeId)
+                if (ep == null || ep.isDownloaded || audioUrl.isBlank()) {
                     android.util.Log.d("SmartListening", "Episode $episodeId already downloaded or empty URL, skipping")
                     return@launch
                 }
@@ -164,12 +179,41 @@ class SmartListeningManager @Inject constructor(
                 val outcome = downloadAudioFile(episodeId, audioUrl)
                 android.util.Log.d("SmartListening", "Download finished for episode $episodeId, outcome=$outcome")
             } finally {
+                debounceTriggers.remove(episodeId)
                 pendingDownloadJobs.remove(episodeId, coroutineContext.job)
             }
         }
 
+        debounceTriggers[episodeId] = trigger
         val previous = pendingDownloadJobs.putIfAbsent(episodeId, job)
-        if (previous == null) job.start() else job.cancel()
+        if (previous == null) job.start() else {
+            debounceTriggers.remove(episodeId)
+            job.cancel()
+        }
+    }
+
+    fun forceDownloadImmediately(episodeId: Long) = synchronized(ownershipLock) {
+        if (stopping) return@synchronized
+        val trigger = debounceTriggers[episodeId]
+        if (trigger != null && !trigger.isCompleted) {
+            trigger.complete(Unit)
+            debounceTriggers.remove(episodeId)
+            android.util.Log.d("SmartListening", "Bypassed debounce delay for playing episode $episodeId")
+            return@synchronized
+        }
+        if (!pendingDownloadJobs.containsKey(episodeId)) {
+            scope.launch {
+                val ep = episodeDao.getEpisodeById(episodeId)
+                if (ep != null && !ep.isDownloaded && ep.localFilePath.isNullOrBlank() && !ep.audioUrl.isNullOrBlank()) {
+                    scheduleDebouncedDownload(episodeId, ep.audioUrl, expectedGeneration = null, initialDelayMs = 0L)
+                }
+            }
+        }
+    }
+
+    internal fun isDebounceWaiting(episodeId: Long): Boolean {
+        val trigger = debounceTriggers[episodeId]
+        return trigger != null && !trigger.isCompleted
     }
 
     /** Holds suppression through the caller's Room deletion, without a network/filesystem transaction. */

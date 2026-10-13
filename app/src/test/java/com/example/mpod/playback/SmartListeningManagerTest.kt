@@ -823,6 +823,67 @@ class SmartListeningManagerTest {
             fakeEpisodeDao.downloadedStates.none { it.episodeId == 902L && it.isDownloaded })
     }
 
+    @Test
+    fun forceDownloadImmediately_bypassesDebounceTimerAndFinishesEarly() = runBlocking {
+        // Set a long debounce window of 15 seconds
+        manager.debounceMs = 15_000L
+
+        val audioData = "fast track content".toByteArray()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(audioData)))
+
+        val item = createPlaylistItemWithEpisode(1001L, 10L, isDownloaded = false)
+        fakePlaylistDao.playlistFlow.value = listOf(item)
+
+        manager.startObserving()
+
+        // Wait briefly for observer to register debounced job
+        withTimeout(2000) {
+            while (!manager.isDebounceWaiting(1001L)) {
+                delay(20)
+            }
+        }
+        assertTrue("Episode must be waiting in debounce timer", manager.isDebounceWaiting(1001L))
+
+        // Force download immediately (simulating pressing Play)
+        val startTime = System.currentTimeMillis()
+        manager.forceDownloadImmediately(1001L)
+
+        // Wait for download to complete
+        withTimeout(3000) {
+            while (fakeEpisodeDao.downloadedStates.none { it.episodeId == 1001L && it.isDownloaded }) {
+                delay(20)
+            }
+        }
+        val elapsed = System.currentTimeMillis() - startTime
+        assertTrue("Download must finish well before 15s debounce window (took ${elapsed}ms)", elapsed < 5000)
+
+        val updated = fakeEpisodeDao.getEpisodeById(1001L)
+        assertNotNull(updated)
+        assertTrue(updated!!.isDownloaded)
+    }
+
+    @Test
+    fun forceDownloadImmediately_whenEpisodeNotYetScheduled_startsImmediately() = runBlocking {
+        val audioData = "direct forced content".toByteArray()
+        server.enqueue(MockResponse().setResponseCode(200).setBody(Buffer().write(audioData)))
+
+        val item = createPlaylistItemWithEpisode(1002L, 10L, isDownloaded = false)
+        fakePlaylistDao.playlistFlow.value = listOf(item)
+
+        // Force download directly without observation started
+        manager.forceDownloadImmediately(1002L)
+
+        withTimeout(3000) {
+            while (fakeEpisodeDao.downloadedStates.none { it.episodeId == 1002L && it.isDownloaded }) {
+                delay(20)
+            }
+        }
+
+        val updated = fakeEpisodeDao.getEpisodeById(1002L)
+        assertNotNull(updated)
+        assertTrue(updated!!.isDownloaded)
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
 
     private fun createPlaylistItemWithEpisode(
