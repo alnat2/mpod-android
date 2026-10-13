@@ -33,6 +33,7 @@ object RssFeedParser {
     private const val NS_ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
     private const val NS_CONTENT = "http://purl.org/rss/1.0/modules/content/"
     private const val NS_DC = "http://purl.org/dc/elements/1.1/"
+    private const val NS_ATOM = "http://www.w3.org/2005/Atom"
 
     private val parserFactory: XmlPullParserFactory by lazy {
         XmlPullParserFactory.newInstance().apply {
@@ -48,8 +49,13 @@ object RssFeedParser {
         SimpleDateFormat("dd MMM yyyy HH:mm:ss z", Locale.US),
         SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.US),
         SimpleDateFormat("EEE, dd MMM yy HH:mm:ss Z", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US),
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
         SimpleDateFormat("yyyy-MM-dd", Locale.US)
     )
 
@@ -57,24 +63,29 @@ object RssFeedParser {
         val parser = parserFactory.newPullParser()
         parser.setInput(inputStream, null)
         parser.nextTag()
-        return readRss(parser)
+        return readRoot(parser)
     }
 
     fun parse(xmlString: String): ParsedPodcastFeed {
         val parser = parserFactory.newPullParser()
         parser.setInput(StringReader(xmlString))
         parser.nextTag()
-        return readRss(parser)
+        return readRoot(parser)
     }
 
-    private fun readRss(parser: XmlPullParser): ParsedPodcastFeed {
+    private fun readRoot(parser: XmlPullParser): ParsedPodcastFeed {
         val rootName = parser.name?.lowercase(Locale.US)
         if (rootName == "html") {
             throw IllegalArgumentException("Received HTML webpage instead of RSS XML feed (likely bot protection or invalid URL)")
         }
-        if (rootName != "rss") {
-            throw IllegalArgumentException("Unsupported feed root element: <$rootName>, expected <rss>")
+        return when (rootName) {
+            "rss" -> readRss(parser)
+            "feed" -> readAtom(parser)
+            else -> throw IllegalArgumentException("Unsupported feed root element: <$rootName>, expected <rss> or <feed>")
         }
+    }
+
+    private fun readRss(parser: XmlPullParser): ParsedPodcastFeed {
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
             if (parser.name.equals("channel", ignoreCase = true)) {
@@ -84,6 +95,179 @@ object RssFeedParser {
             }
         }
         return ParsedPodcastFeed("", "", "", "", "", "", emptyList())
+    }
+
+    private fun readAtom(parser: XmlPullParser): ParsedPodcastFeed {
+        var title = ""
+        var description = ""
+        var author = ""
+        var artworkUrl = ""
+        var alternateLink = ""
+        var anyLink = ""
+        var lastBuildDate = ""
+        val episodes = mutableListOf<ParsedEpisodeItem>()
+
+        while (parser.next() != XmlPullParser.END_TAG) {
+            if (parser.eventType != XmlPullParser.START_TAG) continue
+            val name = parser.name.lowercase(Locale.US)
+            val ns = parser.namespace ?: ""
+            val isAtomNs = ns.isEmpty() || ns == NS_ATOM
+            when {
+                name == "title" && isAtomNs && title.isEmpty() -> {
+                    title = readText(parser)
+                }
+                (name == "subtitle" && isAtomNs || name == "summary" && (isAtomNs || ns == NS_ITUNES)) && description.isEmpty() -> {
+                    description = readText(parser)
+                }
+                name == "author" && isAtomNs && author.isEmpty() -> {
+                    author = readAtomAuthor(parser)
+                }
+                (name == "author" && ns == NS_ITUNES || name == "creator" && ns == NS_DC) && author.isEmpty() -> {
+                    author = readText(parser)
+                }
+                name == "link" && isAtomNs -> {
+                    val rel = parser.getAttributeValue(null, "rel")
+                    val href = parser.getAttributeValue(null, "href")
+                    if (!href.isNullOrBlank()) {
+                        if (rel == null || rel.equals("alternate", ignoreCase = true)) {
+                            if (alternateLink.isEmpty()) alternateLink = href
+                        } else if (anyLink.isEmpty()) {
+                            anyLink = href
+                        }
+                    }
+                    skip(parser)
+                }
+                (name == "updated" || name == "published") && isAtomNs && lastBuildDate.isEmpty() -> {
+                    lastBuildDate = readText(parser)
+                }
+                name == "image" && ns == NS_ITUNES -> {
+                    val href = parser.getAttributeValue(null, "href")
+                    if (!href.isNullOrBlank() && artworkUrl.isEmpty()) {
+                        artworkUrl = href
+                    }
+                    skip(parser)
+                }
+                (name == "logo" || name == "icon") && isAtomNs && artworkUrl.isEmpty() -> {
+                    artworkUrl = readText(parser)
+                }
+                name == "entry" && isAtomNs -> {
+                    episodes.add(readAtomEntry(parser))
+                }
+                else -> skip(parser)
+            }
+        }
+
+        val effectiveLink = if (alternateLink.isNotBlank()) alternateLink else anyLink
+        return ParsedPodcastFeed(
+            title = title.trim(),
+            description = description.trim(),
+            author = author.trim(),
+            artworkUrl = artworkUrl.trim(),
+            link = effectiveLink.trim(),
+            lastBuildDate = lastBuildDate.trim(),
+            episodes = episodes
+        )
+    }
+
+    private fun readAtomAuthor(parser: XmlPullParser): String {
+        var authorName = ""
+        val textContent = StringBuilder()
+        while (true) {
+            when (parser.next()) {
+                XmlPullParser.START_TAG -> {
+                    val name = parser.name.lowercase(Locale.US)
+                    val ns = parser.namespace ?: ""
+                    val isAtomNs = ns.isEmpty() || ns == NS_ATOM
+                    if (name == "name" && isAtomNs && authorName.isEmpty()) {
+                        authorName = readText(parser)
+                    } else {
+                        skip(parser)
+                    }
+                }
+                XmlPullParser.TEXT, XmlPullParser.CDSECT, XmlPullParser.ENTITY_REF -> {
+                    textContent.append(parser.text.orEmpty())
+                }
+                XmlPullParser.END_TAG -> break
+                XmlPullParser.END_DOCUMENT -> break
+            }
+        }
+        return if (authorName.isNotBlank()) authorName.trim() else textContent.toString().trim()
+    }
+
+    private fun readAtomEntry(parser: XmlPullParser): ParsedEpisodeItem {
+        var guid = ""
+        var title = ""
+        var description = ""
+        var audioUrl = ""
+        var durationSeconds = 0L
+        var publishedDateStr = ""
+        var updatedDateStr = ""
+
+        while (parser.next() != XmlPullParser.END_TAG) {
+            if (parser.eventType != XmlPullParser.START_TAG) continue
+            val name = parser.name.lowercase(Locale.US)
+            val ns = parser.namespace ?: ""
+            val isAtomNs = ns.isEmpty() || ns == NS_ATOM
+            when {
+                name == "id" && isAtomNs -> guid = readText(parser)
+                name == "title" && isAtomNs -> title = readText(parser)
+                (name == "summary" && (isAtomNs || ns == NS_ITUNES) || name == "content" && isAtomNs || name == "encoded" && ns == NS_CONTENT) && description.isEmpty() -> {
+                    description = readText(parser)
+                }
+                name == "link" && isAtomNs -> {
+                    val rel = parser.getAttributeValue(null, "rel")
+                    val href = parser.getAttributeValue(null, "href")
+                    val type = parser.getAttributeValue(null, "type")
+                    if (!href.isNullOrBlank()) {
+                        val isEnclosure = rel.equals("enclosure", ignoreCase = true)
+                        val cleanPath = href.substringBefore('?').substringBefore('#')
+                        if (isEnclosure) {
+                            audioUrl = href
+                        } else if (audioUrl.isEmpty() && type?.contains("audio", ignoreCase = true) == true) {
+                            audioUrl = href
+                        } else if (audioUrl.isEmpty() && (cleanPath.endsWith(".mp3", ignoreCase = true) || cleanPath.endsWith(".m4a", ignoreCase = true) || cleanPath.endsWith(".aac", ignoreCase = true) || cleanPath.endsWith(".ogg", ignoreCase = true))) {
+                            audioUrl = href
+                        }
+                    }
+                    skip(parser)
+                }
+                name == "enclosure" && isAtomNs -> {
+                    val url = parser.getAttributeValue(null, "url")
+                    if (!url.isNullOrBlank()) {
+                        audioUrl = url
+                    }
+                    skip(parser)
+                }
+                name == "duration" && ns == NS_ITUNES -> {
+                    val durStr = readText(parser)
+                    durationSeconds = parseDuration(durStr)
+                }
+                name == "published" && isAtomNs -> {
+                    publishedDateStr = readText(parser)
+                }
+                name == "updated" && isAtomNs -> {
+                    updatedDateStr = readText(parser)
+                }
+                else -> skip(parser)
+            }
+        }
+
+        val effectiveDateStr = if (publishedDateStr.isNotBlank()) publishedDateStr else updatedDateStr
+        val publishedAt = parseDate(effectiveDateStr)
+
+        if (guid.isBlank()) {
+            guid = if (audioUrl.isNotBlank()) audioUrl else title
+        }
+
+        return ParsedEpisodeItem(
+            guid = guid.trim(),
+            title = title.trim(),
+            description = description.trim(),
+            audioUrl = audioUrl.trim(),
+            durationSeconds = durationSeconds,
+            publishedAt = publishedAt,
+            publishedAtString = effectiveDateStr.trim()
+        )
     }
 
     private fun readChannel(parser: XmlPullParser): ParsedPodcastFeed {

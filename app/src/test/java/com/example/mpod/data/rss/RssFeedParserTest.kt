@@ -158,4 +158,131 @@ class RssFeedParserTest {
 
         RssFeedParser.parse(html.byteInputStream())
     }
+
+    @Test
+    fun parseValidAtomFeedWithEnclosures() {
+        val xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+              <title>The Changelog</title>
+              <subtitle>Software's best podcast</subtitle>
+              <link rel="alternate" type="text/html" href="https://changelog.com" />
+              <updated>2026-03-31T15:30:00Z</updated>
+              <author>
+                <name>Jerod &amp; Adam</name>
+                <email>editors@changelog.com</email>
+              </author>
+              <logo>https://changelog.com/logo.png</logo>
+              <entry>
+                <title>Interview with AI Creators</title>
+                <id>tag:changelog.com,2026:podcast/500</id>
+                <published>2026-03-31T12:00:00Z</published>
+                <updated>2026-03-31T14:00:00Z</updated>
+                <summary>Deep dive into modern autonomous coding agents.</summary>
+                <itunes:duration>01:15:30</itunes:duration>
+                <link rel="enclosure" type="audio/mpeg" href="https://changelog.com/mp3/500.mp3" length="50000000" />
+              </entry>
+              <entry>
+                <title>Bonus Episode</title>
+                <id>tag:changelog.com,2026:podcast/bonus</id>
+                <updated>2026-03-25T10:00:00.500Z</updated>
+                <content type="text">Bonus discussion after the show.</content>
+                <itunes:duration>900</itunes:duration>
+                <link rel="alternate" type="text/html" href="https://changelog.com/bonus" />
+                <link type="audio/aac" href="https://changelog.com/audio/bonus.m4a" />
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml.byteInputStream())
+        assertEquals("The Changelog", feed.title)
+        assertEquals("Software's best podcast", feed.description)
+        assertEquals("Jerod & Adam", feed.author)
+        assertEquals("https://changelog.com", feed.link)
+        assertEquals("https://changelog.com/logo.png", feed.artworkUrl)
+        assertEquals("2026-03-31T15:30:00Z", feed.lastBuildDate)
+        assertEquals(2, feed.episodes.size)
+
+        val ep1 = feed.episodes[0]
+        assertEquals("Interview with AI Creators", ep1.title)
+        assertEquals("tag:changelog.com,2026:podcast/500", ep1.guid)
+        assertEquals("Deep dive into modern autonomous coding agents.", ep1.description)
+        assertEquals("https://changelog.com/mp3/500.mp3", ep1.audioUrl)
+        assertEquals(4530L, ep1.durationSeconds)
+        assertEquals("2026-03-31T12:00:00Z", ep1.publishedAtString)
+        assertEquals(RssFeedParser.parseDate("2026-03-31T12:00:00Z"), ep1.publishedAt)
+
+        val ep2 = feed.episodes[1]
+        assertEquals("Bonus Episode", ep2.title)
+        assertEquals("tag:changelog.com,2026:podcast/bonus", ep2.guid)
+        assertEquals("Bonus discussion after the show.", ep2.description)
+        assertEquals("https://changelog.com/audio/bonus.m4a", ep2.audioUrl)
+        assertEquals(900L, ep2.durationSeconds)
+        assertEquals("2026-03-25T10:00:00.500Z", ep2.publishedAtString)
+        assertEquals(RssFeedParser.parseDate("2026-03-25T10:00:00.500Z"), ep2.publishedAt)
+    }
+
+    @Test
+    fun parseAtomFeedWithDirectAuthorTextAndItunesImage() {
+        val xml = """
+            <feed xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+              <title>Simple Atom Pod</title>
+              <author>Sole Creator</author>
+              <itunes:image href="https://example.com/atom-art.jpg" />
+              <entry>
+                <title>Ep 1</title>
+                <enclosure url="https://example.com/ep1.mp3" />
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml)
+        assertEquals("Simple Atom Pod", feed.title)
+        assertEquals("Sole Creator", feed.author)
+        assertEquals("https://example.com/atom-art.jpg", feed.artworkUrl)
+        assertEquals(1, feed.episodes.size)
+        assertEquals("https://example.com/ep1.mp3", feed.episodes[0].audioUrl)
+    }
+
+    @Test
+    fun parseAtomFeedWithDefaultNamespaceAndEnclosureTag() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Namespace Enclosure Pod</title>
+              <entry>
+                <id>ep-1</id>
+                <title>Ep 1</title>
+                <!-- enclosure element inside default Atom namespace -->
+                <enclosure url="https://example.com/audio.mp3?token=secret123" />
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml)
+        assertEquals("https://example.com/audio.mp3?token=secret123", feed.episodes.single().audioUrl)
+    }
+
+    @Test
+    fun parseAtomFeedPrioritizesExplicitEnclosureOverSecondaryAudioLink() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Multi Link Pod</title>
+              <entry>
+                <id>ep-multi</id>
+                <title>Multi Link Episode</title>
+                <link rel="enclosure" type="audio/mpeg" href="https://example.com/podcast.mp3?cdn=fast" />
+                <link rel="alternate" type="audio/x-custom" href="https://example.com/web-player" />
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = RssFeedParser.parse(xml)
+        assertEquals("https://example.com/podcast.mp3?cdn=fast", feed.episodes.single().audioUrl)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun parseUnknownRootElementThrowsException() {
+        val xml = "<unknown><title>Unknown</title></unknown>"
+        RssFeedParser.parse(xml)
+    }
 }
