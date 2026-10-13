@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.home
 
+import androidx.annotation.MainThread
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.EpisodeDao
@@ -8,7 +9,9 @@ import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.playback.CleanupResult
 import com.example.mpod.playback.PlaybackQueueInvalidator
+import com.example.mpod.playback.SmartListeningManager
 import com.example.mpod.ui.util.cleanFeedText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +30,8 @@ class HomeViewModel @Inject constructor(
     private val playlistRepository: PlaylistRepository,
     private val podcastRepository: PodcastRepository,
     private val appSettingsDataStore: AppSettingsStore,
-    private val queueInvalidator: PlaybackQueueInvalidator
+    private val queueInvalidator: PlaybackQueueInvalidator,
+    private val smartListeningManager: SmartListeningManager
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
@@ -66,29 +70,45 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    @MainThread
     fun refresh(invalidatePlaybackQueue: Boolean = true) {
         if (invalidatePlaybackQueue) {
             queueInvalidator.invalidate()
         }
     }
 
+    @MainThread
     fun removeEpisodeFromPlaylist(episodeId: Long) {
         viewModelScope.launch {
             playlistRepository.removeFromPlaylist(episodeId)
-            queueInvalidator.invalidate()
-        }
-    }
-
-    fun setEpisodeListened(episodeId: Long, isListened: Boolean) {
-        viewModelScope.launch {
-            podcastRepository.setEpisodeListened(episodeId, isListened)
-            if (isListened) {
-                playlistRepository.removeFromPlaylist(episodeId)
+            when (val cleanup = smartListeningManager.cleanupEpisodeFile(episodeId)) {
+                is CleanupResult.DeleteFailed -> {
+                    android.util.Log.w("HomeViewModel", "Failed to delete file for episode $episodeId: ${cleanup.path}")
+                }
+                CleanupResult.Success -> Unit
             }
             queueInvalidator.invalidate()
         }
     }
 
+    @MainThread
+    fun setEpisodeListened(episodeId: Long, isListened: Boolean) {
+        viewModelScope.launch {
+            podcastRepository.setEpisodeListened(episodeId, isListened)
+            if (isListened) {
+                playlistRepository.removeFromPlaylist(episodeId)
+                when (val cleanup = smartListeningManager.cleanupEpisodeFile(episodeId)) {
+                    is CleanupResult.DeleteFailed -> {
+                        android.util.Log.w("HomeViewModel", "Failed to delete file for episode $episodeId: ${cleanup.path}")
+                    }
+                    CleanupResult.Success -> Unit
+                }
+            }
+            queueInvalidator.invalidate()
+        }
+    }
+
+    @MainThread
     fun moveEpisode(episodeId: Long, offset: Int) {
         val currentQueue = _state.value.queue
         val nextQueue = reorderEpisodes(currentQueue, episodeId, offset) ?: return

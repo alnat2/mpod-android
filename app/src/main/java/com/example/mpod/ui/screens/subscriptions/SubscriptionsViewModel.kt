@@ -9,6 +9,7 @@ import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.model.SubscriptionRow
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.playback.CleanupResult
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.playback.SmartListeningManager
 import com.example.mpod.ui.util.cleanFeedText
@@ -240,6 +241,12 @@ class SubscriptionsViewModel @Inject constructor(
     fun removeEpisodeFromPlaylist(episodeId: Long) {
         viewModelScope.launch {
             playlistRepository.removeFromPlaylist(episodeId)
+            when (val cleanup = smartListeningManager.cleanupEpisodeFile(episodeId)) {
+                is CleanupResult.DeleteFailed -> {
+                    android.util.Log.w("SubscriptionsViewModel", "Failed to delete file for episode $episodeId: ${cleanup.path}")
+                }
+                CleanupResult.Success -> Unit
+            }
             queueInvalidator.invalidate()
         }
     }
@@ -250,7 +257,12 @@ class SubscriptionsViewModel @Inject constructor(
             podcastRepository.setEpisodeListened(episodeId, isListened)
             if (isListened) {
                 playlistRepository.removeFromPlaylist(episodeId)
-                smartListeningManager.cleanupEpisodeFile(episodeId)
+                when (val cleanup = smartListeningManager.cleanupEpisodeFile(episodeId)) {
+                    is CleanupResult.DeleteFailed -> {
+                        android.util.Log.w("SubscriptionsViewModel", "Failed to delete file for episode $episodeId: ${cleanup.path}")
+                    }
+                    CleanupResult.Success -> Unit
+                }
             }
             queueInvalidator.invalidate()
         }
