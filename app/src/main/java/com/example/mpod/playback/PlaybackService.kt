@@ -59,7 +59,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var savePositionJob: Job? = null
     private var previousEpisodeId: Long? = null
-    private val completedEpisodeIds = HashSet<Long>()
+    internal val completedEpisodeTracker = CompletedEpisodeTracker()
     private var applyingSettingsSpeed = false
     private val queueReconciliationMutex = Mutex()
 
@@ -170,9 +170,12 @@ class PlaybackService : MediaSessionService() {
                 player.stop()
                 player.clearMediaItems()
                 previousEpisodeId = null
+                completedEpisodeTracker.resetAll()
                 player.addListener(playerListener)
                 return@withLock
             }
+
+            completedEpisodeTracker.reset(target.episodeId)
 
             val roomQueueEpisodeIds = playlistItems.map { it.episode.id }
             val currentQueueEpisodeIds = (0 until player.mediaItemCount).mapNotNull { index ->
@@ -265,6 +268,7 @@ class PlaybackService : MediaSessionService() {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             if (playWhenReady) {
                 currentEpisodeId()?.let { episodeId ->
+                    completedEpisodeTracker.reset(episodeId)
                     smartListeningManager.forceDownloadImmediately(episodeId)
                 }
             }
@@ -278,6 +282,9 @@ class PlaybackService : MediaSessionService() {
             if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                 if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex) {
                     serviceScope.launch { saveCurrentPosition() }
+                    currentEpisodeId()?.let { episodeId ->
+                        completedEpisodeTracker.reset(episodeId)
+                    }
                 } else {
                     val oldEpisodeId = oldPosition.mediaItemIndex
                         .takeIf { it in 0 until player.mediaItemCount }
@@ -299,6 +306,10 @@ class PlaybackService : MediaSessionService() {
             val nextEpisodeId = mediaItem?.mediaId?.toLongOrNull()
             val finishedEpisodeId = previousEpisodeId
             previousEpisodeId = nextEpisodeId
+
+            if (nextEpisodeId != null) {
+                completedEpisodeTracker.reset(nextEpisodeId)
+            }
 
             if (nextEpisodeId != null && player.playWhenReady) {
                 smartListeningManager.forceDownloadImmediately(nextEpisodeId)
@@ -359,7 +370,7 @@ class PlaybackService : MediaSessionService() {
         preferFirstEpisode: Boolean = false,
         forcePlayPreferred: Boolean = false
     ) {
-        if (!completedEpisodeIds.add(episodeId)) return
+        if (!completedEpisodeTracker.markCompleted(episodeId)) return
         serviceScope.launch {
             if (nextEpisodeId != null) appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
             completeEpisode(episodeId)
