@@ -8,6 +8,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -21,7 +22,6 @@ import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.NetworkModule
-import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.google.common.collect.ImmutableList
 import dagger.hilt.android.AndroidEntryPoint
@@ -50,9 +50,9 @@ class PlaybackService : MediaSessionService() {
     @Inject lateinit var playlistRepository: PlaylistRepository
     @Inject lateinit var episodeDao: EpisodeDao
     @Inject lateinit var appSettingsDataStore: AppSettingsStore
-    @Inject lateinit var proxyHttpClientFactory: ProxyHttpClientFactory
     @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var queueInvalidator: PlaybackQueueInvalidator
+    @Inject @MediaCacheDataSourceFactory lateinit var cacheDataSourceFactory: DataSource.Factory
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
@@ -68,18 +68,13 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         setMediaNotificationProvider(PlayPauseOnlyMediaNotificationProvider(this))
 
-        val okHttpClient = proxyHttpClientFactory.createClient()
-        val okHttpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent(NetworkModule.USER_AGENT)
-        val defaultDataSourceFactory = DefaultDataSource.Factory(this, okHttpDataSourceFactory)
-
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
             .build()
 
         player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(defaultDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .build()
@@ -420,6 +415,7 @@ class PlaybackService : MediaSessionService() {
 
         return MediaItem.Builder()
             .setMediaId(ep.id.toString())
+            .setCustomCacheKey(buildEpisodeCustomCacheKey(ep.id))
             .setUri(uri)
             .setMediaMetadata(
                 MediaMetadata.Builder()
@@ -436,6 +432,8 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
     }
 }
+
+internal fun buildEpisodeCustomCacheKey(episodeId: Long): String = "episode_$episodeId"
 
 @UnstableApi
 private class PlayPauseOnlyMediaNotificationProvider(
