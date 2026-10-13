@@ -16,7 +16,7 @@ open class IpGeoService @Inject constructor(
         runCatching {
             val request = Request.Builder()
                 .url("https://api.country.is")
-                .header("User-Agent", "mpoddy/1.0")
+                .header("User-Agent", NetworkModule.USER_AGENT)
                 .build()
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("HTTP ${response.code}")
@@ -26,7 +26,7 @@ open class IpGeoService @Inject constructor(
         }.recoverCatching {
             val fallbackRequest = Request.Builder()
                 .url("http://ip-api.com/json/?fields=query,countryCode,status")
-                .header("User-Agent", "mpoddy/1.0")
+                .header("User-Agent", NetworkModule.USER_AGENT)
                 .build()
             httpClient.newCall(fallbackRequest).execute().use { response ->
                 if (!response.isSuccessful) error("HTTP ${response.code}")

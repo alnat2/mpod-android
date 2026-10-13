@@ -1,5 +1,6 @@
 package com.example.mpod.data.network
 
+import com.example.mpod.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -10,6 +11,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    const val USER_AGENT =
+        "mpoddy/${BuildConfig.VERSION_NAME} (Android; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
     @Provides
     @Singleton

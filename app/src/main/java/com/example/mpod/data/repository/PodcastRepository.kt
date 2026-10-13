@@ -7,6 +7,7 @@ import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
 import com.example.mpod.data.local.preferences.AppSettingsStore
+import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.rss.OpmlParser
 import com.example.mpod.data.rss.ParsedPodcastFeed
@@ -313,10 +314,7 @@ class PodcastRepository @Inject constructor(
         val client = proxyHttpClientFactory.createClient()
         val requestBuilder = Request.Builder()
             .url(url)
-            .header(
-                "User-Agent",
-                "mpoddy/${BuildConfig.VERSION_NAME} (Android; Linux) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-            )
+            .header("User-Agent", NetworkModule.USER_AGENT)
             .header("Accept", "application/rss+xml, application/xml, application/atom+xml, text/xml, */*")
 
         if (!lastBuildDate.isNullOrBlank()) {

@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
+import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -207,7 +208,7 @@ class SmartListeningManager @Inject constructor(
                 val client = proxyHttpClientFactory.createClient()
                 val request = Request.Builder()
                     .url(audioUrl)
-                    .header("User-Agent", "mpoddy/${BuildConfig.VERSION_NAME} (Android Podcast Player)")
+                    .header("User-Agent", NetworkModule.USER_AGENT)
                     .build()
 
                 val call = client.newCall(request)

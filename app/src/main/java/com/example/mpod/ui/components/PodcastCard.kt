@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
+import com.example.mpod.data.network.NetworkModule
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -183,7 +184,7 @@ private fun PodcastArtwork(
             ImageRequest.Builder(context)
                 .data(url)
                 .size(artworkSizePx, artworkSizePx)
-                .setHeader("User-Agent", "Mozilla/5.0 mpod-android")
+                .setHeader("User-Agent", NetworkModule.USER_AGENT)
                 .crossfade(false)
                 .build()
         }
