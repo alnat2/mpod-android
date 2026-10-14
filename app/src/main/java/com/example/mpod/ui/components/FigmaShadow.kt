@@ -12,6 +12,34 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+enum class FigmaShadowStyle(
+    val elevation: Dp,
+    val color: Color
+) {
+    TwoXs(elevation = 1.dp, color = Color(0x0D000000)),
+    Xs(elevation = 2.dp, color = Color(0x1A000000)),
+    Sm(elevation = 3.dp, color = Color(0x1A000000)),
+    Md(elevation = 6.dp, color = Color(0x1F000000)),
+    Lg(elevation = 12.dp, color = Color(0x26000000)),
+    Xl(elevation = 20.dp, color = Color(0x2E000000)),
+    TwoXl(elevation = 28.dp, color = Color(0x40000000));
+
+    companion object {
+        val Default = Sm
+    }
+}
+
+fun Modifier.figmaDropShadow(
+    style: FigmaShadowStyle,
+    radius: Dp
+): Modifier = shadow(
+    elevation = style.elevation,
+    shape = RoundedCornerShape(radius),
+    clip = false,
+    ambientColor = style.color,
+    spotColor = style.color
+)
+
 fun Modifier.figmaDropShadow(
     radius: Dp,
     offsetY: Dp = 1.dp,
