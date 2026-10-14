@@ -27,7 +27,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = Muted,
     onSurfaceVariant = MutedForeground,
     outline = Border,
-    tertiary = Chart5
+    tertiary = Chart5,
+    surfaceContainerHigh = Accent
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -42,8 +43,12 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkMuted,
     onSurfaceVariant = DarkMutedForeground,
     outline = DarkBorder,
-    tertiary = DarkPrimary
+    tertiary = DarkPrimary,
+    surfaceContainerHigh = DarkAccent
 )
+
+val androidx.compose.material3.ColorScheme.accent: androidx.compose.ui.graphics.Color
+    get() = surfaceContainerHigh
 
 enum class ThemeMode(val storageValue: String) {
     System("system"),

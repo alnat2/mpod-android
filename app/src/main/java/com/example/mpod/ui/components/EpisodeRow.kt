@@ -2,7 +2,9 @@ package com.example.mpod.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.example.mpod.ui.theme.accent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,20 +53,27 @@ fun PlayerPlaylistItem(
     duration: String,
     isCurrent: Boolean,
     isPlaying: Boolean,
-    downloaded: Boolean,
+    downloaded: Boolean = false,
     actionsEnabled: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onRemoveFromPlaylist: () -> Unit = {},
     onPlayToggle: () -> Unit = {}
 ) {
+    val backgroundColor = if (isCurrent) MaterialTheme.colorScheme.accent else MaterialTheme.colorScheme.surface
+    val border = if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
+    val shadowStyle = if (isCurrent) FigmaShadowStyle.Sm else FigmaShadowStyle.Xs
+
     EpisodeItemSurface(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 112.dp)
+            .heightIn(min = 116.dp)
             .clickable(enabled = actionsEnabled, onClick = onClick),
-        radius = 8,
-        horizontalPaddingEnd = 12
+        radius = 16,
+        horizontalPaddingEnd = 12,
+        backgroundColor = backgroundColor,
+        border = border,
+        shadowStyle = shadowStyle
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_huge_menu_09),
@@ -83,9 +92,9 @@ fun PlayerPlaylistItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 EpisodeMetaLine(
-                    text = if (isCurrent) "Now playing" else podcastName,
-                    downloaded = downloaded,
-                    highlight = true,
+                    text = podcastName,
+                    downloaded = false,
+                    highlight = false,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -287,16 +296,20 @@ fun EpisodeRow(
 @Composable
 private fun EpisodeItemSurface(
     modifier: Modifier,
-    radius: Int,
+    radius: Int = 16,
     horizontalPaddingStart: Int = 8,
     horizontalPaddingEnd: Int = 8,
     leadingOverlayIconRes: Int? = null,
+    backgroundColor: Color = MaterialTheme.colorScheme.surface,
+    border: BorderStroke? = null,
+    shadowStyle: FigmaShadowStyle = FigmaShadowStyle.Xs,
     content: @Composable RowScope.() -> Unit
 ) {
     Box(
         modifier = modifier
-            .figmaDropShadow(radius = 2.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(radius.dp))
+            .figmaDropShadow(style = shadowStyle, radius = radius.dp)
+            .background(backgroundColor, RoundedCornerShape(radius.dp))
+            .then(if (border != null) Modifier.border(border, RoundedCornerShape(radius.dp)) else Modifier)
     ) {
         if (leadingOverlayIconRes != null) {
             Icon(
@@ -341,7 +354,7 @@ private fun EpisodeTitle(text: String) {
 @Composable
 private fun EpisodeMetaLine(
     text: String,
-    downloaded: Boolean,
+    downloaded: Boolean = false,
     highlight: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -350,14 +363,6 @@ private fun EpisodeMetaLine(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (downloaded) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_episode_status_downloaded),
-                contentDescription = "Downloaded",
-                modifier = Modifier.size(20.dp),
-                tint = Color.Unspecified
-            )
-        }
         Text(
             text = text,
             fontSize = 12.sp,
