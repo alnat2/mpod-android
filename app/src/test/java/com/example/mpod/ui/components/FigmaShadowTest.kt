@@ -38,4 +38,10 @@ class FigmaShadowTest {
             assertEquals(Color.Black.blue, style.color.blue, 0.01f)
         }
     }
+
+    @Test
+    fun figmaShadowAmbientAndSpotColorsHaveHighContrastAlphasForDarkTheme() {
+        assertTrue(FigmaAmbientShadowColor.alpha >= 0.35f)
+        assertTrue(FigmaSpotShadowColor.alpha >= 0.65f)
+    }
 }

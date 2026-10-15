@@ -401,8 +401,9 @@ private fun EpisodeInlineActionButton(
         size = 44.dp,
         iconSize = 24.dp,
         radius = 10.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = 1.dp,
+        border = null,
+        elevation = 0.dp,
+        shadowStyle = FigmaShadowStyle.Sm,
         onClick = if (enabled) onClick else null
     )
 }

@@ -107,7 +107,7 @@ fun PlayerView(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier
             .fillMaxWidth()
-            .figmaDropShadow(radius = 16.dp)
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp)
     ) {
         Column(
             modifier = Modifier

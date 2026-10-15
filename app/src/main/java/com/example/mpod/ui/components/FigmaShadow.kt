@@ -29,6 +29,9 @@ enum class FigmaShadowStyle(
     }
 }
 
+val FigmaAmbientShadowColor = Color(0x66000000)
+val FigmaSpotShadowColor = Color(0xB3000000)
+
 fun Modifier.figmaDropShadow(
     style: FigmaShadowStyle,
     radius: Dp
@@ -36,8 +39,8 @@ fun Modifier.figmaDropShadow(
     elevation = style.elevation,
     shape = RoundedCornerShape(radius),
     clip = false,
-    ambientColor = style.color,
-    spotColor = style.color
+    ambientColor = FigmaAmbientShadowColor,
+    spotColor = FigmaSpotShadowColor
 )
 
 fun Modifier.figmaDropShadow(
@@ -47,14 +50,13 @@ fun Modifier.figmaDropShadow(
     color: Color = Color(0x1A000000)
 ): Modifier {
     val elevation = if (blur.value + offsetY.value > 0f) blur + offsetY else 0.dp
-    val shadowColor = color.copy(alpha = (color.alpha * 2.4f).coerceAtMost(1f))
 
     return shadow(
         elevation = elevation,
         shape = RoundedCornerShape(radius),
         clip = false,
-        ambientColor = shadowColor,
-        spotColor = shadowColor
+        ambientColor = FigmaAmbientShadowColor,
+        spotColor = FigmaSpotShadowColor
     )
 }
 

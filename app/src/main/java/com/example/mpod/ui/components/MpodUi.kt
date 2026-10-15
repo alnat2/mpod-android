@@ -141,6 +141,7 @@ fun SquareIconButton(
     radius: Dp = 8.dp,
     border: BorderStroke? = null,
     elevation: Dp = 1.dp,
+    shadowStyle: FigmaShadowStyle? = null,
     onClick: (() -> Unit)? = null
 ) {
     val iconRotation = rotatingIconDegrees(iconRotating)
@@ -154,11 +155,16 @@ fun SquareIconButton(
             onClick = onClick
         )
     }
+    val shadowModifier = when {
+        shadowStyle != null -> Modifier.figmaDropShadow(style = shadowStyle, radius = radius)
+        elevation > 0.dp -> Modifier.figmaDropShadow(radius = radius)
+        else -> Modifier
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(size)
-            .then(if (elevation > 0.dp) Modifier.figmaDropShadow(radius = radius) else Modifier)
+            .then(shadowModifier)
             .clip(RoundedCornerShape(radius))
             .background(containerColor)
             .then(if (border == null) Modifier else Modifier.border(border, RoundedCornerShape(radius)))
