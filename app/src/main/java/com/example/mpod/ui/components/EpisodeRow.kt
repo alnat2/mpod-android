@@ -67,7 +67,7 @@ fun PlayerPlaylistItem(
     EpisodeItemSurface(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 116.dp)
+            .heightIn(min = 68.dp)
             .clickable(enabled = actionsEnabled, onClick = onClick),
         radius = 16,
         horizontalPaddingEnd = 12,
