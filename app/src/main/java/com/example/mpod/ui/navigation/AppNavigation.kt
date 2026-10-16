@@ -2,9 +2,14 @@ package com.example.mpod.ui.navigation
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,10 +55,22 @@ fun AppNavigation(
             navController = navController,
             startDestination = Screen.Subscriptions.route,
             modifier = Modifier.weight(1f),
-            enterTransition = { fadeIn(animationSpec = tween(200)) },
-            exitTransition = { fadeOut(animationSpec = tween(180)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(200)) },
-            popExitTransition = { fadeOut(animationSpec = tween(180)) }
+            enterTransition = {
+                fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
+                    scaleIn(initialScale = 0.92f, animationSpec = tween(220, easing = FastOutSlowInEasing))
+            },
+            exitTransition = {
+                fadeOut(animationSpec = tween(180, easing = FastOutLinearInEasing)) +
+                    scaleOut(targetScale = 1.05f, animationSpec = tween(180, easing = FastOutSlowInEasing))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
+                    scaleIn(initialScale = 1.05f, animationSpec = tween(220, easing = FastOutSlowInEasing))
+            },
+            popExitTransition = {
+                fadeOut(animationSpec = tween(180, easing = FastOutLinearInEasing)) +
+                    scaleOut(targetScale = 0.92f, animationSpec = tween(180, easing = FastOutSlowInEasing))
+            }
         ) {
             composable(Screen.Home.route) {
                 HomeRoute(
