@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -35,9 +36,17 @@ val FigmaSpotShadowColor = Color(0xB3000000)
 fun Modifier.figmaDropShadow(
     style: FigmaShadowStyle,
     radius: Dp
+): Modifier = figmaDropShadow(
+    style = style,
+    shape = RoundedCornerShape(radius)
+)
+
+fun Modifier.figmaDropShadow(
+    style: FigmaShadowStyle,
+    shape: Shape
 ): Modifier = shadow(
     elevation = style.elevation,
-    shape = RoundedCornerShape(radius),
+    shape = shape,
     clip = false,
     ambientColor = FigmaAmbientShadowColor,
     spotColor = FigmaSpotShadowColor
