@@ -94,7 +94,7 @@ fun PlayerPlaylistItem(
                 EpisodeMetaLine(
                     text = podcastName,
                     downloaded = false,
-                    highlight = false,
+                    highlight = true,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -368,7 +368,7 @@ private fun EpisodeMetaLine(
             fontSize = 12.sp,
             lineHeight = 16.sp,
             color = if (highlight) {
-                MaterialTheme.colorScheme.tertiary
+                MaterialTheme.colorScheme.onSurface
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
