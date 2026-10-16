@@ -5,8 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.example.mpod.data.local.preferences.AppSettingsStore
 
@@ -33,14 +37,19 @@ class MainActivity : ComponentActivity() {
             }.collectAsStateWithLifecycle(initialValue = ThemeMode.System)
 
             MpodTheme(themeMode = themeMode) {
-                AppNavigation(
-                    themeMode = themeMode,
-                    onThemeModeChange = { nextMode ->
-                        lifecycleScope.launch {
-                            appSettingsDataStore.setThemeMode(nextMode.storageValue)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavigation(
+                        themeMode = themeMode,
+                        onThemeModeChange = { nextMode ->
+                            lifecycleScope.launch {
+                                appSettingsDataStore.setThemeMode(nextMode.storageValue)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
