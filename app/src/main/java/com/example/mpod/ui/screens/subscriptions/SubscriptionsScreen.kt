@@ -2,7 +2,6 @@ package com.example.mpod.ui.screens.subscriptions
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,23 +19,29 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,7 +99,6 @@ fun SubscriptionsRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionsScreen(
     hasRefreshError: Boolean = false,
@@ -205,41 +209,69 @@ fun SubscriptionsScreen(
                         onViewClick = toggleVisibility
                     )
 
-                    val carouselState = rememberCarouselState { podcasts.size }
-                    var selectedPodcastId by rememberSaveable(podcasts.map { it.id }) {
-                        mutableStateOf(podcasts.firstOrNull()?.id)
+                    val loopsContinuously = podcasts.size > 1
+                    val pagerState = rememberPagerState(
+                        initialPage = if (loopsContinuously) 1 else 0,
+                        pageCount = { if (loopsContinuously) podcasts.size + 2 else 1 }
+                    )
+                    LaunchedEffect(pagerState, podcasts.size) {
+                        if (loopsContinuously) {
+                            snapshotFlow { pagerState.settledPage }
+                                .collect { settledPage ->
+                                    when (settledPage) {
+                                        0 -> pagerState.scrollToPage(podcasts.size)
+                                        podcasts.size + 1 -> pagerState.scrollToPage(1)
+                                    }
+                                }
+                        }
                     }
-                    if (podcasts.none { it.id == selectedPodcastId }) {
-                        selectedPodcastId = podcasts.firstOrNull()?.id
-                    }
-                    val selectedPodcast = podcasts.firstOrNull { it.id == selectedPodcastId }
-                        ?: podcasts.first()
+                    val selectedPodcast = podcasts[
+                        podcastIndexForCarouselPage(pagerState.currentPage, podcasts.size)
+                    ]
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(160.dp)
                     ) {
                         val carouselWidth = maxWidth + 40.dp
-                        val itemWidth = (maxWidth - 16.dp).coerceAtLeast(280.dp)
-                        HorizontalMultiBrowseCarousel(
-                            state = carouselState,
-                            preferredItemWidth = itemWidth,
-                            itemSpacing = 12.dp,
+                        HorizontalPager(
+                            state = pagerState,
+                            key = { page ->
+                                val podcast = podcasts[podcastIndexForCarouselPage(page, podcasts.size)]
+                                if (loopsContinuously) {
+                                    when (page) {
+                                        0 -> "wrap_left_${podcast.id}"
+                                        podcasts.size + 1 -> "wrap_right_${podcast.id}"
+                                        else -> podcast.id
+                                    }
+                                } else {
+                                    podcast.id
+                                }
+                            },
                             contentPadding = PaddingValues(horizontal = 20.dp),
+                            pageSize = PageSize.Fixed(maxWidth),
+                            pageSpacing = 12.dp,
+                            flingBehavior = PagerDefaults.flingBehavior(
+                                state = pagerState,
+                                pagerSnapDistance = PagerSnapDistance.atMost(1)
+                            ),
                             modifier = Modifier
                                 .requiredWidth(carouselWidth)
                                 .height(160.dp)
                                 .testTag("subscriptions_podcast_pager")
-                        ) { index ->
-                            val podcast = podcasts[index]
-                            val isSelected = podcast.id == selectedPodcastId
-                            val cardPosition = if (isSelected) "selected" else "page_$index"
+                        ) {
+                            val podcast = podcasts[podcastIndexForCarouselPage(it, podcasts.size)]
+                            val isSelected = it == pagerState.currentPage
+                            val cardPosition = when (it) {
+                                pagerState.currentPage -> "selected"
+                                pagerState.currentPage - 1 -> "previous"
+                                pagerState.currentPage + 1 -> "next"
+                                else -> "page_$it"
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .maskClip(RoundedCornerShape(16.dp))
                                     .testTag("subscription_podcast_card_$cardPosition")
-                                    .clickable { selectedPodcastId = podcast.id }
                             ) {
                                 PodcastCard(
                                     title = podcast.title,
