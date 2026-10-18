@@ -25,9 +25,14 @@ fun formatTotalDuration(seconds: Int): String {
 
 fun formatProgressTime(seconds: Int): String {
     val safeSeconds = seconds.coerceAtLeast(0)
-    val minutes = safeSeconds / 60
+    val hours = safeSeconds / 3600
+    val minutes = (safeSeconds % 3600) / 60
     val remainingSeconds = safeSeconds % 60
-    return "$minutes:${remainingSeconds.toString().padStart(2, '0')}"
+    return if (hours > 0) {
+        "$hours:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}"
+    } else {
+        "$minutes:${remainingSeconds.toString().padStart(2, '0')}"
+    }
 }
 
 fun formatRemainingTime(durationSeconds: Int, positionSeconds: Int): String =

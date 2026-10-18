@@ -5,12 +5,26 @@ import org.junit.Test
 
 class UiFormattersTest {
     @Test
+    fun progressTimeFormatsHoursWhenOverAnHour() {
+        assertEquals("1:25:39", formatProgressTime(85 * 60 + 39))
+        assertEquals("23:14", formatProgressTime(23 * 60 + 14))
+        assertEquals("0:00", formatProgressTime(0))
+    }
+
+    @Test
     fun remainingTimeSubtractsElapsedPositionAndClampsAtZero() {
         assertEquals(
             "30:49",
             formatRemainingTime(
                 durationSeconds = 54 * 60 + 3,
                 positionSeconds = 23 * 60 + 14
+            )
+        )
+        assertEquals(
+            "1:03:00",
+            formatRemainingTime(
+                durationSeconds = 148 * 60 + 39,
+                positionSeconds = 85 * 60 + 39
             )
         )
         assertEquals("0:00", formatRemainingTime(durationSeconds = 60, positionSeconds = 75))
