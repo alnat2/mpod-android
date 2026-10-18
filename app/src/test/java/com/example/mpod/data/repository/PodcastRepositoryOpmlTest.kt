@@ -162,6 +162,7 @@ class PodcastRepositoryOpmlTest {
         override fun setEpisodesListened(episodeIds: List<Long>): Int = error("OPML does not mark listened")
         override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("OPML does not delete playlist")
         override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {}
+        override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) {}
         override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {}
         override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int = 0
         override fun getDownloadedEpisodes(): List<EpisodeEntity> = episodes.filter { it.isDownloaded }

@@ -348,6 +348,10 @@ class PodcastRepositoryRefreshAllTest {
             mutate(episodeId) { it.copy(playbackPositionMs = positionMs) }
         }
 
+        override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) {
+            mutate(episodeId) { if (it.durationSeconds <= 0) it.copy(durationSeconds = durationSeconds) else it }
+        }
+
         override fun getPlaylistEpisodeIdsForPodcast(podcastId: Long): List<Long> = emptyList()
         override fun setEpisodesListened(episodeIds: List<Long>): Int = error("Refresh does not mark listened")
         override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("Refresh does not delete playlist")

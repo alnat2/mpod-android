@@ -962,6 +962,7 @@ class SmartListeningManagerTest {
         override fun setEpisodesListened(episodeIds: List<Long>): Int = error("Manager does not mark listened")
         override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("Manager does not delete playlist")
         override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {}
+        override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) {}
         override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
             if (throwOnUpdateDownloadState) {
                 throw java.sql.SQLException("Simulated Room constraint failure")

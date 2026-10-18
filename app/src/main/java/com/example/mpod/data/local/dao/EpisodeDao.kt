@@ -90,6 +90,9 @@ interface EpisodeDao {
     @Query("UPDATE episodes SET playbackPositionMs = :positionMs WHERE id = :episodeId")
     fun updatePlaybackPosition(episodeId: Long, positionMs: Long)
 
+    @Query("UPDATE episodes SET durationSeconds = :durationSeconds WHERE id = :episodeId AND durationSeconds <= 0")
+    fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long)
+
     @Query("UPDATE episodes SET isDownloaded = :isDownloaded, localFilePath = :localFilePath WHERE id = :episodeId")
     fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?)
 

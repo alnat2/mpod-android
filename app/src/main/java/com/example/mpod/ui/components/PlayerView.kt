@@ -227,7 +227,7 @@ fun PlayerView(
                                         onSeekTo(targetProgress)
                                     }
                                 }
-                                .figmaDropShadow(style = FigmaShadowStyle.Sm, shape = CircleShape)
+                                .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
                                 .clip(CircleShape)
                                 .drawBehind {
                                     val corner = CornerRadius(size.height / 2f, size.height / 2f)
@@ -265,7 +265,7 @@ fun PlayerView(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(56.dp)
-                                .figmaDropShadow(style = FigmaShadowStyle.Md, shape = CircleShape)
+                                .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
                                 .background(MaterialTheme.colorScheme.primary, CircleShape)
                                 .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
                                 .clickable(role = Role.Button, onClick = onPlayClick)

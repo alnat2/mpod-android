@@ -747,6 +747,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
                 return snapshot
             }
             override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) = synchronized(lock) { rows[episodeId]?.let { rows[episodeId] = it.copy(playbackPositionMs = positionMs) }; emit() }
+            override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) = synchronized(lock) { rows[episodeId]?.let { if (it.durationSeconds <= 0) rows[episodeId] = it.copy(durationSeconds = durationSeconds) }; emit() }
             override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
                 if (isDownloaded) downloadGate?.park()
                 synchronized(lock) { downloadWrites.add(episodeId); rows[episodeId]?.let { rows[episodeId] = it.copy(isDownloaded = isDownloaded, localFilePath = localFilePath) }; emit() }

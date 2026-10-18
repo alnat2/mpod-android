@@ -13,25 +13,42 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+val FigmaAmbientShadowColor = Color(0x66000000)
+val FigmaSpotShadowColor = Color(0xB3000000)
+
 enum class FigmaShadowStyle(
     val elevation: Dp,
-    val color: Color
+    val color: Color,
+    val ambientColor: Color = FigmaAmbientShadowColor,
+    val spotColor: Color = FigmaSpotShadowColor
 ) {
     TwoXs(elevation = 1.dp, color = Color(0x0D000000)),
     Xs(elevation = 2.dp, color = Color(0x1A000000)),
     Sm(elevation = 3.dp, color = Color(0x1A000000)),
-    Md(elevation = 6.dp, color = Color(0x1F000000)),
-    Lg(elevation = 12.dp, color = Color(0x26000000)),
-    Xl(elevation = 20.dp, color = Color(0x2E000000)),
+    Md(
+        elevation = 6.dp,
+        color = Color(0x1F000000),
+        ambientColor = Color(0x80000000),
+        spotColor = Color(0xCC000000)
+    ),
+    Lg(
+        elevation = 12.dp,
+        color = Color(0x26000000),
+        ambientColor = Color(0x80000000),
+        spotColor = Color(0xE6000000)
+    ),
+    Xl(
+        elevation = 20.dp,
+        color = Color(0x2E000000),
+        ambientColor = Color(0x99000000),
+        spotColor = Color(0xF2000000)
+    ),
     TwoXl(elevation = 28.dp, color = Color(0x40000000));
 
     companion object {
         val Default = Sm
     }
 }
-
-val FigmaAmbientShadowColor = Color(0x66000000)
-val FigmaSpotShadowColor = Color(0xB3000000)
 
 fun Modifier.figmaDropShadow(
     style: FigmaShadowStyle,
@@ -48,8 +65,8 @@ fun Modifier.figmaDropShadow(
     elevation = style.elevation,
     shape = shape,
     clip = false,
-    ambientColor = FigmaAmbientShadowColor,
-    spotColor = FigmaSpotShadowColor
+    ambientColor = style.ambientColor,
+    spotColor = style.spotColor
 )
 
 fun Modifier.figmaDropShadow(

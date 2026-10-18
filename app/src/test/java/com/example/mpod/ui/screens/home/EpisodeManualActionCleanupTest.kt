@@ -353,6 +353,7 @@ class EpisodeManualActionCleanupTest {
             override fun setEpisodesListened(episodeIds: List<Long>): Int = 0
             override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = 0
             override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {}
+            override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) {}
             override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
                 episodes[episodeId]?.let {
                     episodes[episodeId] = it.copy(isDownloaded = isDownloaded, localFilePath = localFilePath)

@@ -2,18 +2,23 @@ package com.example.mpod.ui.util
 
 fun formatEpisodeDuration(seconds: Int?): String {
     val safeSeconds = seconds?.coerceAtLeast(0) ?: return ""
-    val minutes = (safeSeconds / 60).coerceAtLeast(1)
+    if (safeSeconds <= 0) return ""
+    val minutes = safeSeconds / 60
     return if (minutes >= 60) {
         val hours = minutes / 60
         val remainingMinutes = minutes % 60
         if (remainingMinutes == 0) "${hours}h" else "${hours}h ${remainingMinutes}m"
-    } else {
+    } else if (minutes > 0) {
         "${minutes}m"
+    } else {
+        "< 1m"
     }
 }
 
 fun formatTotalDuration(seconds: Int): String {
-    val minutes = (seconds / 60).coerceAtLeast(0)
+    val safeSeconds = seconds.coerceAtLeast(0)
+    if (safeSeconds <= 0) return ""
+    val minutes = safeSeconds / 60
     val hours = minutes / 60
     val remainingMinutes = minutes % 60
     return when {

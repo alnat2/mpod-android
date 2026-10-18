@@ -12,6 +12,24 @@ class UiFormattersTest {
     }
 
     @Test
+    fun episodeDurationHandlesZeroAndVariousDurations() {
+        assertEquals("", formatEpisodeDuration(null))
+        assertEquals("", formatEpisodeDuration(0))
+        assertEquals("< 1m", formatEpisodeDuration(45))
+        assertEquals("1m", formatEpisodeDuration(60))
+        assertEquals("45m", formatEpisodeDuration(45 * 60))
+        assertEquals("1h 30m", formatEpisodeDuration(90 * 60))
+        assertEquals("2h", formatEpisodeDuration(120 * 60))
+    }
+
+    @Test
+    fun totalDurationOmitsEmptyWhenZero() {
+        assertEquals("", formatTotalDuration(0))
+        assertEquals("45m", formatTotalDuration(45 * 60))
+        assertEquals("2h 13m", formatTotalDuration(2 * 3600 + 13 * 60))
+    }
+
+    @Test
     fun remainingTimeSubtractsElapsedPositionAndClampsAtZero() {
         assertEquals(
             "30:49",

@@ -379,10 +379,15 @@ fun HomeScreen(
                         val removeClick = remember(episode.id) {
                             { latestOnRemoveEpisodeFromPlaylist.value(episode.id) }
                         }
+                        val effectiveDuration = if (episode.id == currentEpisode.id && (episode.durationSeconds ?: 0) <= 0) {
+                            playbackStateProvider().durationSeconds.takeIf { it > 0 }
+                        } else {
+                            episode.durationSeconds
+                        }
                         PlayerPlaylistItem(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
-                            duration = formatEpisodeDuration(episode.durationSeconds),
+                            duration = formatEpisodeDuration(effectiveDuration),
                             isCurrent = episode.id == currentEpisode.id,
                             isPlaying = episode.id == currentEpisode.id && playbackSummary.isPlaying,
                             downloaded = episode.downloaded,
@@ -581,7 +586,12 @@ private fun StatusCard(
 private fun queueSummary(episodes: List<HomeEpisodeUi>): String {
     val totalSeconds = episodes.sumOf { it.durationSeconds ?: 0 }
     val episodeLabel = if (episodes.size == 1) "episode" else "episodes"
-    return "${episodes.size} $episodeLabel · ${formatTotalDuration(totalSeconds)}"
+    val durationText = formatTotalDuration(totalSeconds)
+    return if (durationText.isNotBlank()) {
+        "${episodes.size} $episodeLabel · $durationText"
+    } else {
+        "${episodes.size} $episodeLabel"
+    }
 }
 
 data class HomePlaybackSummaryUiState(

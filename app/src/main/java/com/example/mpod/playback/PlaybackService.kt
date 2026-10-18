@@ -340,6 +340,9 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == Player.STATE_READY) {
+                serviceScope.launch { saveCurrentPosition() }
+            }
             if (playbackState != Player.STATE_ENDED) return
             val episodeId = currentEpisodeId() ?: return
             handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
@@ -366,8 +369,13 @@ class PlaybackService : MediaSessionService() {
     private suspend fun saveCurrentPosition() {
         val episodeId = currentEpisodeId() ?: return
         val pos = player.currentPosition.coerceAtLeast(0L)
+        val durMs = player.duration
+        val durSec = if (durMs > 0L) durMs / 1000L else 0L
         withContext(Dispatchers.IO) {
             episodeDao.updatePlaybackPosition(episodeId, pos)
+            if (durSec > 0L) {
+                episodeDao.updateDurationIfMissing(episodeId, durSec)
+            }
         }
     }
 
