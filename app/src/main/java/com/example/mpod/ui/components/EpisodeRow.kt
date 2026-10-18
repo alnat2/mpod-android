@@ -4,6 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.ripple
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
 import com.example.mpod.ui.theme.accent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,11 +68,18 @@ fun PlayerPlaylistItem(
     val border = if (isCurrent) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null
     val shadowStyle = if (isCurrent) FigmaShadowStyle.Sm else FigmaShadowStyle.Xs
 
+    val shape = RoundedCornerShape(16.dp)
     EpisodeItemSurface(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 68.dp)
-            .clickable(enabled = actionsEnabled, onClick = onClick),
+            .clip(shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                enabled = actionsEnabled,
+                onClick = onClick
+            ),
         radius = 16,
         horizontalPaddingEnd = 12,
         backgroundColor = backgroundColor,
@@ -293,11 +304,13 @@ private fun EpisodeItemSurface(
     shadowStyle: FigmaShadowStyle = FigmaShadowStyle.Xs,
     content: @Composable RowScope.() -> Unit
 ) {
+    val shape = RoundedCornerShape(radius.dp)
     Box(
         modifier = modifier
             .figmaDropShadow(style = shadowStyle, radius = radius.dp)
-            .background(backgroundColor, RoundedCornerShape(radius.dp))
-            .then(if (border != null) Modifier.border(border, RoundedCornerShape(radius.dp)) else Modifier)
+            .clip(shape)
+            .background(backgroundColor, shape)
+            .then(if (border != null) Modifier.border(border, shape) else Modifier)
     ) {
         if (leadingOverlayIconRes != null) {
             Icon(

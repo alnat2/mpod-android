@@ -37,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -145,12 +146,13 @@ fun SquareIconButton(
     onClick: (() -> Unit)? = null
 ) {
     val iconRotation = rotatingIconDegrees(iconRotating)
+    val shape = RoundedCornerShape(radius)
     val clickModifier = if (onClick == null) {
         Modifier
     } else {
         Modifier.clickable(
             interactionSource = remember { MutableInteractionSource() },
-            indication = null,
+            indication = ripple(bounded = true),
             role = Role.Button,
             onClick = onClick
         )
@@ -165,11 +167,11 @@ fun SquareIconButton(
         modifier = modifier
             .size(size)
             .then(shadowModifier)
-            .clip(RoundedCornerShape(radius))
+            .clip(shape)
             .background(containerColor)
-            .then(if (border == null) Modifier else Modifier.border(border, RoundedCornerShape(radius)))
-            .semantics { this.contentDescription = contentDescription }
+            .then(if (border == null) Modifier else Modifier.border(border, shape))
             .then(clickModifier)
+            .semantics { this.contentDescription = contentDescription }
     ) {
         Icon(
             painter = painterResource(id = iconRes),
@@ -201,15 +203,22 @@ fun MpodButton(
     val iconRotation = rotatingIconDegrees(iconRotating)
     val background = containerColor ?: if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val foreground = contentColor ?: if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+    val shape = RoundedCornerShape(radius)
     Box(
         modifier = modifier
             .height(height)
             .then(if (elevation > 0.dp) Modifier.figmaDropShadow(radius = radius) else Modifier)
-            .clip(RoundedCornerShape(radius))
+            .clip(shape)
             .background(background)
-            .then(if (outlined) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(radius)) else Modifier)
+            .then(if (outlined) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, shape) else Modifier)
             .alpha(if (enabled) 1f else 0.65f)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -457,11 +466,15 @@ fun MpodBottomNav(
                 Column(
                     modifier = Modifier
                         .height(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .selectable(
                             selected = selected,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true),
                             role = Role.Tab,
                             onClick = { onNavigate(screen) }
-                        ),
+                        )
+                        .padding(horizontal = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {

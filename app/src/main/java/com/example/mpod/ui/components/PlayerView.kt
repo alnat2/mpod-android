@@ -3,6 +3,7 @@ package com.example.mpod.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.rememberScrollState
@@ -266,9 +267,15 @@ fun PlayerView(
                             modifier = Modifier
                                 .size(56.dp)
                                 .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
+                                .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    role = Role.Button,
+                                    onClick = onPlayClick
+                                )
                                 .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
-                                .clickable(role = Role.Button, onClick = onPlayClick)
                         ) {
                             Icon(
                                 painter = painterResource(
@@ -303,11 +310,18 @@ fun PlayerView(
 
                 Row(
                     modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(bounded = true),
+                            role = Role.Button,
+                            onClick = onNotesClick
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                         .semantics {
                             contentDescription = "Show notes"
                             role = Role.Button
-                        }
-                        .clickable(role = Role.Button, onClick = onNotesClick),
+                        },
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -342,11 +356,17 @@ private fun PlayerLabelControl(
     Column(
         modifier = Modifier
             .size(56.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                role = Role.Button,
+                onClick = onClick
+            )
             .semantics {
                 this.contentDescription = contentDescription
                 role = Role.Button
-            }
-            .clickable(role = Role.Button, onClick = onClick),
+            },
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

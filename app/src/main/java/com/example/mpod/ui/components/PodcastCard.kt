@@ -3,8 +3,11 @@ package com.example.mpod.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.Image
+import androidx.compose.material3.ripple
 import com.example.mpod.data.network.NetworkModule
+import com.example.mpod.ui.theme.accent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,19 +53,18 @@ fun PodcastCard(
     errorMessage: String? = null,
     onRefresh: () -> Unit = {}
 ) {
-    val background = if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
+    val background = if (selected) MaterialTheme.colorScheme.accent else MaterialTheme.colorScheme.surface
     val cardBorder = when {
         errorMessage != null -> Modifier.border(
             1.dp,
             MaterialTheme.colorScheme.error,
             RoundedCornerShape(16.dp)
         )
-        !selected -> Modifier.border(
+        else -> Modifier.border(
             1.dp,
             MaterialTheme.colorScheme.outline,
             RoundedCornerShape(16.dp)
         )
-        else -> Modifier
     }
     Column(
         modifier = modifier
@@ -241,10 +243,6 @@ fun MarkAllListenedHeader(
         modifier = modifier
             .fillMaxWidth()
             .height(50.dp)
-            .figmaDropShadow(radius = 4.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -269,7 +267,13 @@ fun MarkAllListenedHeader(
                 },
                 modifier = Modifier.then(
                     if (enabled && !isLoading) {
-                        Modifier.clickable(onClick = onMarkAllListened)
+                        Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true),
+                                onClick = onMarkAllListened
+                            )
                     } else {
                         Modifier
                     }
