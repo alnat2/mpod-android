@@ -49,7 +49,7 @@ enum class EpisodeRowAction {
 @Composable
 fun PlayerPlaylistItem(
     title: String,
-    podcastName: String,
+    podcastName: String = "",
     duration: String,
     isCurrent: Boolean,
     isPlaying: Boolean,
@@ -83,7 +83,7 @@ fun PlayerPlaylistItem(
         )
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             EpisodeTitle(text = title)
             Row(
@@ -91,18 +91,13 @@ fun PlayerPlaylistItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                EpisodeMetaLine(
-                    text = podcastName,
-                    downloaded = false,
-                    highlight = true,
-                    modifier = Modifier.weight(1f)
-                )
                 Text(
                     text = duration,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     EpisodeInlineActionButton(
@@ -132,12 +127,12 @@ fun PlayerPlaylistItem(
 @Composable
 fun SubscriptionEpisodeItem(
     title: String,
-    podcastName: String,
+    podcastName: String = "",
     duration: String,
     date: String?,
     inPlaylist: Boolean,
     isListened: Boolean,
-    downloaded: Boolean,
+    downloaded: Boolean = false,
     actionsEnabled: Boolean,
     modifier: Modifier = Modifier,
     onAddToPlaylist: () -> Unit = {},
@@ -149,7 +144,7 @@ fun SubscriptionEpisodeItem(
     EpisodeItemSurface(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 116.dp),
+            .heightIn(min = 68.dp),
         radius = 16,
         horizontalPaddingStart = 12,
         horizontalPaddingEnd = 12
@@ -164,32 +159,26 @@ fun SubscriptionEpisodeItem(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
+                Row(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    EpisodeMetaLine(
-                        text = podcastName,
-                        downloaded = downloaded,
-                        highlight = true
+                    Text(
+                        text = duration,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    date?.let {
                         Text(
-                            text = duration,
+                            text = it,
                             fontSize = 12.sp,
                             lineHeight = 16.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
                         )
-                        date?.let {
-                            Text(
-                                text = it,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -239,7 +228,7 @@ fun SubscriptionEpisodeItem(
 @Composable
 fun EpisodeRow(
     title: String,
-    podcastName: String,
+    podcastName: String = "",
     duration: String,
     date: String? = null,
     isPlaying: Boolean = false,
@@ -258,11 +247,10 @@ fun EpisodeRow(
     onClick: (() -> Unit)? = null,
     onAction: ((EpisodeRowAction) -> Unit)? = null
 ) {
-    val metaText = statusTextOverride ?: podcastName
     if (compactPlaybackMenu) {
         PlayerPlaylistItem(
             title = title,
-            podcastName = metaText,
+            podcastName = podcastName,
             duration = duration,
             isCurrent = isPlaying,
             isPlaying = compactPlaybackActionLabel == "Pause",
@@ -276,7 +264,7 @@ fun EpisodeRow(
     } else {
         SubscriptionEpisodeItem(
             title = title,
-            podcastName = metaText,
+            podcastName = podcastName,
             duration = duration,
             date = date,
             inPlaylist = inPlaylist,
@@ -351,32 +339,6 @@ private fun EpisodeTitle(text: String) {
     )
 }
 
-@Composable
-private fun EpisodeMetaLine(
-    text: String,
-    downloaded: Boolean = false,
-    highlight: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.heightIn(min = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            color = if (highlight) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
 
 @Composable
 private fun EpisodeInlineActionButton(

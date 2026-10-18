@@ -148,13 +148,12 @@ private fun MobileComponentCatalog() {
     PreviewLabel("EpisodeRow Mobile")
     EpisodeRow(
         title = "Why store loyalty cards became a UX minefield",
-        podcastName = "Decoder Ring",
         duration = "54m",
-        isPlaying = true
+        isPlaying = true,
+        compactPlaybackMenu = true
     )
     EpisodeRow(
         title = "How public transit maps teach invisible habits",
-        podcastName = "Decoder Ring",
         duration = "36m",
         date = "31.03.26",
         inPlaylist = true,
