@@ -1,5 +1,6 @@
 package com.example.mpod.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -211,13 +212,18 @@ fun AddPodcastMobile(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Icon(
-                painter = painterResource(id = R.drawable.ic_huge_multiplication_sign),
+            SquareIconButton(
+                iconRes = R.drawable.ic_huge_multiplication_sign,
                 contentDescription = "Close",
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .size(24.dp)
-                    .clickable(enabled = !isSubmitting, onClick = onDismiss)
+                size = 36.dp,
+                iconSize = 16.dp,
+                radius = 10.dp,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline
+                ),
+                contentColor = MaterialTheme.colorScheme.primary,
+                onClick = if (!isSubmitting) onDismiss else null
             )
         }
 
