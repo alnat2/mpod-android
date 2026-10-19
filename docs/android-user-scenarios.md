@@ -218,7 +218,7 @@ The following decisions define the standalone `mpoddy` product:
 10. Links in Show notes open through the Android system browser.
 11. Media notification and lock-screen controls expose Play/Pause only, together with episode and podcast metadata.
 12. Playback completion is explicit. Ordinary progress, including pause or seek inside the final 15 seconds, never marks an episode listened. Only a Media3 natural-completion event performs completion cleanup and next-item behavior.
-13. Player time labels show elapsed time on the left and `max(duration - position, 0)` remaining time on the right.
+13. Time and duration formatting throughout the app (Player elapsed and remaining time labels, episode card durations, and playlist queue summary) follows a unified standard: `mm:ss` (e.g., `23:14`, `05:03`) when duration is under 1 hour, and `h:mm:ss` (e.g., `1:25:39`) when duration is 1 hour or more. Player labels show elapsed time on the left and `max(duration - position, 0)` remaining time on the right.
 14. Settings displays only `Current app build: <versionName>` for build identity. New handoff APKs increment both patch `versionName` and monotonically increasing `versionCode`.
 15. Release acceptance uses the minified `com.prod.mpod` APK and validates local persistence, real feeds, Smart Listening, proxy modes, Media3 lifecycle, and process recreation without any production-server switch.
 

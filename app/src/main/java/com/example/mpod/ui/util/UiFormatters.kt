@@ -1,34 +1,11 @@
 package com.example.mpod.ui.util
 
-fun formatEpisodeDuration(seconds: Int?): String {
-    val safeSeconds = seconds?.coerceAtLeast(0) ?: return ""
-    if (safeSeconds <= 0) return ""
-    val minutes = safeSeconds / 60
-    return if (minutes >= 60) {
-        val hours = minutes / 60
-        val remainingMinutes = minutes % 60
-        if (remainingMinutes == 0) "${hours}h" else "${hours}h ${remainingMinutes}m"
-    } else if (minutes > 0) {
-        "${minutes}m"
-    } else {
-        "< 1m"
-    }
-}
-
-fun formatTotalDuration(seconds: Int): String {
-    val safeSeconds = seconds.coerceAtLeast(0)
-    if (safeSeconds <= 0) return ""
-    val minutes = safeSeconds / 60
-    val hours = minutes / 60
-    val remainingMinutes = minutes % 60
-    return when {
-        hours > 0 && remainingMinutes > 0 -> "${hours}h ${remainingMinutes}m"
-        hours > 0 -> "${hours}h"
-        else -> "${remainingMinutes}m"
-    }
-}
-
-fun formatProgressTime(seconds: Int): String {
+/**
+ * Standard unified duration and progress time formatting:
+ * - If duration is less than 1 hour: "mm:ss" (e.g. "23:14", "05:03", "00:45")
+ * - If duration is 1 hour or more: "h:mm:ss" (e.g. "1:25:39", "2:00:00")
+ */
+fun formatTime(seconds: Int): String {
     val safeSeconds = seconds.coerceAtLeast(0)
     val hours = safeSeconds / 3600
     val minutes = (safeSeconds % 3600) / 60
@@ -36,12 +13,26 @@ fun formatProgressTime(seconds: Int): String {
     return if (hours > 0) {
         "$hours:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}"
     } else {
-        "$minutes:${remainingSeconds.toString().padStart(2, '0')}"
+        "${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}"
     }
 }
 
+fun formatEpisodeDuration(seconds: Int?): String {
+    val safeSeconds = seconds?.coerceAtLeast(0) ?: return ""
+    if (safeSeconds <= 0) return ""
+    return formatTime(safeSeconds)
+}
+
+fun formatTotalDuration(seconds: Int): String {
+    val safeSeconds = seconds.coerceAtLeast(0)
+    if (safeSeconds <= 0) return ""
+    return formatTime(safeSeconds)
+}
+
+fun formatProgressTime(seconds: Int): String = formatTime(seconds)
+
 fun formatRemainingTime(durationSeconds: Int, positionSeconds: Int): String =
-    formatProgressTime((durationSeconds - positionSeconds).coerceAtLeast(0))
+    formatTime((durationSeconds - positionSeconds).coerceAtLeast(0))
 
 fun formatPublishedDate(value: String?): String? {
     if (value.isNullOrBlank()) return null

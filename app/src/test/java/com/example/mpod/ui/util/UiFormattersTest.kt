@@ -8,25 +8,25 @@ class UiFormattersTest {
     fun progressTimeFormatsHoursWhenOverAnHour() {
         assertEquals("1:25:39", formatProgressTime(85 * 60 + 39))
         assertEquals("23:14", formatProgressTime(23 * 60 + 14))
-        assertEquals("0:00", formatProgressTime(0))
+        assertEquals("00:00", formatProgressTime(0))
     }
 
     @Test
     fun episodeDurationHandlesZeroAndVariousDurations() {
         assertEquals("", formatEpisodeDuration(null))
         assertEquals("", formatEpisodeDuration(0))
-        assertEquals("< 1m", formatEpisodeDuration(45))
-        assertEquals("1m", formatEpisodeDuration(60))
-        assertEquals("45m", formatEpisodeDuration(45 * 60))
-        assertEquals("1h 30m", formatEpisodeDuration(90 * 60))
-        assertEquals("2h", formatEpisodeDuration(120 * 60))
+        assertEquals("00:45", formatEpisodeDuration(45))
+        assertEquals("01:00", formatEpisodeDuration(60))
+        assertEquals("45:00", formatEpisodeDuration(45 * 60))
+        assertEquals("1:30:00", formatEpisodeDuration(90 * 60))
+        assertEquals("2:00:00", formatEpisodeDuration(120 * 60))
     }
 
     @Test
     fun totalDurationOmitsEmptyWhenZero() {
         assertEquals("", formatTotalDuration(0))
-        assertEquals("45m", formatTotalDuration(45 * 60))
-        assertEquals("2h 13m", formatTotalDuration(2 * 3600 + 13 * 60))
+        assertEquals("45:00", formatTotalDuration(45 * 60))
+        assertEquals("2:13:00", formatTotalDuration(2 * 3600 + 13 * 60))
     }
 
     @Test
@@ -45,7 +45,7 @@ class UiFormattersTest {
                 positionSeconds = 85 * 60 + 39
             )
         )
-        assertEquals("0:00", formatRemainingTime(durationSeconds = 60, positionSeconds = 75))
+        assertEquals("00:00", formatRemainingTime(durationSeconds = 60, positionSeconds = 75))
     }
 
     @Test
