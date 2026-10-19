@@ -294,7 +294,7 @@ fun MpodInput(
         ),
         modifier = modifier
             .height(36.dp)
-            .figmaDropShadow(radius = 8.dp, blur = 2.dp)
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.background)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))

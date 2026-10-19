@@ -122,7 +122,7 @@ private fun OpmlImportResultMobile(
         modifier = Modifier
             .widthIn(max = 320.dp)
             .fillMaxWidth()
-            .figmaDropShadow(radius = 8.dp, offsetY = 8.dp, blur = 9.dp)
+            .figmaDropShadow(style = FigmaShadowStyle.Xl, radius = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
@@ -184,11 +184,7 @@ fun AddPodcastMobile(
         modifier = modifier
             .widthIn(max = 320.dp)
             .fillMaxWidth()
-            .figmaDropShadow(
-                radius = 8.dp,
-                offsetY = 8.dp,
-                blur = 9.dp
-            )
+            .figmaDropShadow(style = FigmaShadowStyle.Xl, radius = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
@@ -470,7 +466,7 @@ private fun ModalTab(
             .then(
                 if (selected) {
                     Modifier
-                        .figmaDropShadow(radius = 8.dp)
+                        .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 8.dp)
                         .background(MaterialTheme.colorScheme.background)
                         .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                 } else {

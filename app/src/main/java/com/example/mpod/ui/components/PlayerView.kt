@@ -228,7 +228,7 @@ fun PlayerView(
                                         onSeekTo(targetProgress)
                                     }
                                 }
-                                .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
+                                .figmaDropShadow(style = FigmaShadowStyle.Md, radius = 8.dp)
                                 .clip(CircleShape)
                                 .drawBehind {
                                     val corner = CornerRadius(size.height / 2f, size.height / 2f)

@@ -82,8 +82,7 @@ fun ShowNotesMobile(
         modifier = modifier
             .widthIn(max = 320.dp)
             .fillMaxWidth()
-            .figmaDropShadow(radius = 20.dp, offsetY = 2.dp, blur = 4.dp)
-            .figmaDropShadow(radius = 20.dp, offsetY = 4.dp, blur = 6.dp)
+            .figmaDropShadow(style = FigmaShadowStyle.Lg, radius = 20.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))

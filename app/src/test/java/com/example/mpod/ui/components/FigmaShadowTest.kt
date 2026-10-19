@@ -44,4 +44,19 @@ class FigmaShadowTest {
         assertTrue(FigmaAmbientShadowColor.alpha >= 0.35f)
         assertTrue(FigmaSpotShadowColor.alpha >= 0.65f)
     }
+
+    @Test
+    fun figmaShadowTokensMatchAndroidBlurAndOffsetSpec() {
+        assertEquals(2.dp, FigmaShadowStyle.Md.offsetY)
+        assertEquals(4.dp, FigmaShadowStyle.Md.blur)
+        assertEquals(0.6f, FigmaShadowStyle.Md.color.alpha, 0.01f)
+
+        assertEquals(4.dp, FigmaShadowStyle.Lg.offsetY)
+        assertEquals(8.dp, FigmaShadowStyle.Lg.blur)
+
+        for (style in FigmaShadowStyle.entries) {
+            assertTrue(style.offsetY >= 1.dp)
+            assertTrue(style.blur >= 2.dp)
+        }
+    }
 }
