@@ -151,6 +151,7 @@ class EpisodeManualActionCleanupTest {
         assertFalse("Episode isDownloaded should be reset to false", updated.isDownloaded)
         assertNull("Episode localFilePath should be cleared", updated.localFilePath)
         assertFalse("Episode should be removed from playlist", fakeStorage.playlist.containsKey(episodeId))
+        assertTrue("Episode isListened should be set to true on removal from playlist", updated.isListened)
     }
 
     @Test
@@ -246,6 +247,7 @@ class EpisodeManualActionCleanupTest {
         assertFalse("isDownloaded should be false", updated.isDownloaded)
         assertNull("localFilePath should be null", updated.localFilePath)
         assertFalse("Episode should be removed from playlist", fakeStorage.playlist.containsKey(episodeId))
+        assertTrue("isListened should be true on removal from playlist", updated.isListened)
     }
 
     @Test

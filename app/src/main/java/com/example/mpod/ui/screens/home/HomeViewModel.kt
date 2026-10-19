@@ -80,6 +80,7 @@ class HomeViewModel @Inject constructor(
     @MainThread
     fun removeEpisodeFromPlaylist(episodeId: Long) {
         viewModelScope.launch {
+            podcastRepository.setEpisodeListened(episodeId, true)
             playlistRepository.removeFromPlaylist(episodeId)
             when (val cleanup = smartListeningManager.cleanupEpisodeFile(episodeId)) {
                 is CleanupResult.DeleteFailed -> {

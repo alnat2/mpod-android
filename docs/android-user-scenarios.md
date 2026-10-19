@@ -111,8 +111,8 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | EPS-01 | Use an episode action in Subscriptions | Allowed actions are shown inline on the episode card (Add/Remove from playlist, Mark listened/unlistened, Show notes) | U | Verified |
 | EPS-02 | Add an episode to playlist | Room DB `playlist_items` table is updated; row/count/menu update to In playlist / Remove | C,U,E | Verified |
 | EPS-03 | Add to playlist fails | Optimistic UI rolls back target episode and error is surfaced | C,U,E | Verified |
-| EPS-04 | Remove a non-active episode from playlist | Room DB removes item; unrelated playback is uninterrupted | C,U,E | Verified |
-| EPS-05 | Remove the active episode from playlist | Room active state and Player reconcile without stale playback or unintended autoplay | C,U,E | Verified |
+| EPS-04 | Remove a non-active episode from playlist | Room DB removes item, marks episode listened (`is_listened = true`), cleans up downloaded audio file; unrelated playback is uninterrupted | C,U,E | Verified |
+| EPS-05 | Remove the active episode from playlist | Room DB removes item, marks episode listened (`is_listened = true`), cleans up audio file; Room active state and Player reconcile without stale playback or unintended autoplay | C,U,E | Verified |
 | EPS-06 | Mark an episode listened | Room DB marks it listened, removes it from playlist, triggers Smart Listening audio file cleanup, UI reconciles | C,U,E | Verified |
 | EPS-07 | Mark a listened episode unlistened | Room DB changes episode to unlistened; not silently re-added to playlist; deleted media is not restored | C,U,E | Verified |
 | EPS-08 | Mark listened/unlistened database error | Target state rolls back and Room DB state remains consistent | C,U,E | Verified |
