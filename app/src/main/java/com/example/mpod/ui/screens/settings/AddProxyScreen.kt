@@ -87,10 +87,9 @@ fun AddProxyScreen(
         }
 
         // Form Card (SettingItem card in Figma)
-        OutlinedCard(
+        androidx.compose.material3.Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
                 .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp)

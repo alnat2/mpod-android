@@ -22,6 +22,8 @@ fun SettingItem(
     title: String,
     description: String? = null,
     modifier: Modifier = Modifier,
+    descriptionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    border: BorderStroke? = null,
     showAction: Boolean = true,
     action: (@Composable () -> Unit)? = null,
     content: (@Composable () -> Unit)? = null
@@ -40,16 +42,16 @@ fun SettingItem(
         }
     }
 
-    OutlinedCard(
+    androidx.compose.material3.Card(
         modifier = modifier
             .fillMaxWidth()
             .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(
+        colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
+        border = border,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
@@ -71,7 +73,7 @@ fun SettingItem(
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             fontWeight = FontWeight.Normal,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = descriptionColor
                         )
                     }
                 } else null,

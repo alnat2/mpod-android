@@ -480,14 +480,14 @@ private fun SettingsStatusCard(
     modifier: Modifier = Modifier,
     isError: Boolean = false
 ) {
-    OutlinedCard(
+    androidx.compose.material3.Card(
         modifier = modifier
             .fillMaxWidth()
             .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = if (isError) BorderStroke(1.dp, MaterialTheme.colorScheme.error) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Text(
             text = message,
