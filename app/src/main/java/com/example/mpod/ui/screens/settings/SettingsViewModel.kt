@@ -182,6 +182,11 @@ class SettingsViewModel @Inject constructor(
             _state.value = _state.value.copy(proxyMessage = msg)
             return Result.failure(IllegalArgumentException(msg))
         }
+        val credsError = validateProxyCredentials(username, password)
+        if (credsError != null) {
+            _state.value = _state.value.copy(proxyMessage = credsError)
+            return Result.failure(IllegalArgumentException(credsError))
+        }
         val newServer = ProxyServerConfig(
             name = trimmedName,
             host = trimmedHost,
@@ -232,6 +237,11 @@ class SettingsViewModel @Inject constructor(
             val msg = "Invalid proxy port (1-65535)."
             _state.value = _state.value.copy(proxyMessage = msg)
             return Result.failure(IllegalArgumentException(msg))
+        }
+        val credsError = validateProxyCredentials(username, password)
+        if (credsError != null) {
+            _state.value = _state.value.copy(proxyMessage = credsError)
+            return Result.failure(IllegalArgumentException(credsError))
         }
         val updatedServer = ProxyServerConfig(
             id = id,

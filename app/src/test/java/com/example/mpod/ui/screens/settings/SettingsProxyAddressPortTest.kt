@@ -36,4 +36,32 @@ class SettingsProxyAddressPortTest {
         assertEquals("", formatProxyAddressPort("", 1080))
         assertEquals("", formatProxyAddressPort("   ", 1080))
     }
+
+    @Test
+    fun validateProxyCredentials_returnsErrorWhenOneFieldMissing() {
+        assertEquals(
+            "Password is required when username is provided.",
+            validateProxyCredentials("user", "")
+        )
+        assertEquals(
+            "Password is required when username is provided.",
+            validateProxyCredentials("  user  ", "   ")
+        )
+        assertEquals(
+            "Username is required when password is provided.",
+            validateProxyCredentials("", "secret")
+        )
+        assertEquals(
+            "Username is required when password is provided.",
+            validateProxyCredentials("   ", "secret")
+        )
+    }
+
+    @Test
+    fun validateProxyCredentials_returnsNullWhenBothOrNeitherProvided() {
+        assertNull(validateProxyCredentials("", ""))
+        assertNull(validateProxyCredentials("   ", ""))
+        assertNull(validateProxyCredentials("admin", "secret123"))
+        assertNull(validateProxyCredentials("  admin  ", "secret123"))
+    }
 }

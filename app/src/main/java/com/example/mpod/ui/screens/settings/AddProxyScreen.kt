@@ -175,7 +175,10 @@ fun AddProxyScreen(
                         )
                         MpodInput(
                             value = username,
-                            onValueChange = { username = it },
+                            onValueChange = {
+                                username = it
+                                errorMessage = null
+                            },
                             placeholder = "Enter username",
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -192,7 +195,10 @@ fun AddProxyScreen(
                         )
                         MpodInput(
                             value = password,
-                            onValueChange = { password = it },
+                            onValueChange = {
+                                password = it
+                                errorMessage = null
+                            },
                             placeholder = "Enter password",
                             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIconRes = if (passwordVisible) R.drawable.ic_huge_view_off else R.drawable.ic_huge_view,
@@ -226,6 +232,11 @@ fun AddProxyScreen(
                             }
                             if (parsed == null) {
                                 errorMessage = "Use address:port (example: 127.0.0.1:1080)."
+                                return@MpodButton
+                            }
+                            val credsError = validateProxyCredentials(username, password)
+                            if (credsError != null) {
+                                errorMessage = credsError
                                 return@MpodButton
                             }
                             val result = onSaveServer(

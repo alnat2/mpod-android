@@ -611,6 +611,17 @@ internal fun formatProxyAddressPort(host: String, port: Int): String {
     return if (host.isNotBlank()) "$host:$port" else ""
 }
 
+internal fun validateProxyCredentials(username: String, password: String): String? {
+    val trimmedUser = username.trim()
+    if (trimmedUser.isNotBlank() && password.isBlank()) {
+        return "Password is required when username is provided."
+    }
+    if (password.isNotBlank() && trimmedUser.isBlank()) {
+        return "Username is required when password is provided."
+    }
+    return null
+}
+
 @Composable
 private fun ProxyErrorTopBanner(
     notification: ProxyErrorNotification,
