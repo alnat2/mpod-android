@@ -8,9 +8,11 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,24 +28,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -56,10 +65,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.LabeledInput
-import com.example.mpod.ui.components.MpodOutlinedSurface
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
+import com.example.mpod.ui.components.SettingItem
+import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.theme.ThemeMode
 
 @Composable
@@ -160,8 +172,8 @@ fun SettingsScreen(
             )
         }
 
-        // Card 1: Auto refresh toggle
-        SettingCard(
+        // Card 1: Auto refresh toggle + Feed daily refresh (combined in one card per Figma 1562:13260)
+        SettingItem(
             title = "Auto refresh",
             description = "Turn on for a scheduled update.",
             action = {
@@ -170,46 +182,70 @@ fun SettingsScreen(
                     onCheckedChange = onAutoRefreshToggle,
                     contentDescription = "Auto refresh"
                 )
+            },
+            content = {
+                AnimatedVisibility(
+                    visible = state.isAutoRefreshEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = "Feed daily refresh",
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = "Feeds are refreshed once per day at a single global time.",
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent
+                            )
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DailyRefreshTimeField(
+                                value = feedRefreshTime,
+                                enabled = true,
+                                onClick = { showTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                            SettingsPrimaryButton(
+                                text = "Save time",
+                                width = 116.dp,
+                                radius = 8.dp,
+                                enabled = feedRefreshTime != state.dailyRefreshTime,
+                                onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
+                            )
+                        }
+                    }
+                }
             }
         )
 
-        // Card 1b: Feed daily refresh (separate card, shown when Auto refresh is ON, matching Figma 1264:6472)
-        AnimatedVisibility(
-            visible = state.isAutoRefreshEnabled,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            SettingCard(
-                title = "Feed daily refresh",
-                description = "Feeds are refreshed once per day at a single global time.",
-                content = {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        DailyRefreshTimeField(
-                            value = feedRefreshTime,
-                            enabled = true,
-                            onClick = { showTimePicker = true },
-                            modifier = Modifier.weight(1f)
-                        )
-                        SettingsPrimaryButton(
-                            text = "Save time",
-                            width = 116.dp,
-                            radius = 8.dp,
-                            enabled = feedRefreshTime != state.dailyRefreshTime,
-                            onClick = { onSaveDailyRefreshTime(feedRefreshTime) }
-                        )
-                    }
-                }
-            )
-        }
-
-        // Card 2: SOCKS5 Proxy toggle
-        SettingCard(
+        // Card 2: SOCKS5 Proxy toggle & settings (interim card until multi-proxy redesign)
+        SettingItem(
             title = "Use SOCKS5 proxy",
             description = "Turn on if direct connection update fails.",
             action = {
@@ -218,83 +254,106 @@ fun SettingsScreen(
                     onCheckedChange = onProxyToggle,
                     contentDescription = "Use SOCKS5 proxy"
                 )
+            },
+            content = {
+                AnimatedVisibility(
+                    visible = state.isProxyEnabled,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    val parsed = parseProxyAddressPort(proxyAddressPortInput)
+                    val isSaveEnabled = parsed != null
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = "Proxy settings",
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    text = "Fill out to connect to the server",
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent
+                            )
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            LabeledInput(
+                                label = "Proxy address:port",
+                                value = proxyAddressPortInput,
+                                onValueChange = { proxyAddressPortInput = it },
+                                placeholder = "E.g. 192.168.1.1:1080"
+                            )
+
+                            LabeledInput(
+                                label = "User login",
+                                value = proxyUserInput,
+                                onValueChange = { proxyUserInput = it },
+                                placeholder = "Enter username"
+                            )
+
+                            LabeledInput(
+                                label = "Password",
+                                value = proxyPasswordInput,
+                                onValueChange = { proxyPasswordInput = it },
+                                placeholder = "Enter password",
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+
+                            if (state.proxyMessage != null) {
+                                Text(
+                                    text = state.proxyMessage,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            SettingsPrimaryButton(
+                                text = "Save settings",
+                                width = null,
+                                modifier = Modifier.fillMaxWidth(),
+                                height = 36.dp,
+                                radius = 10.dp,
+                                enabled = isSaveEnabled,
+                                onClick = {
+                                    if (parsed != null) {
+                                        onSaveProxySettings(
+                                            parsed.first,
+                                            parsed.second,
+                                            proxyUserInput,
+                                            proxyPasswordInput
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
             }
         )
 
-        // Card 2b: Proxy settings (separate card matching Figma 1264:7739)
-        AnimatedVisibility(
-            visible = state.isProxyEnabled,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            val parsed = parseProxyAddressPort(proxyAddressPortInput)
-            val isSaveEnabled = parsed != null
-
-            SettingCard(
-                title = "Proxy settings",
-                description = "Fill out to connect to the server",
-                content = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        LabeledInput(
-                            label = "Proxy address:port",
-                            value = proxyAddressPortInput,
-                            onValueChange = { proxyAddressPortInput = it },
-                            placeholder = "E.g. 192.168.1.1:1080"
-                        )
-
-                        LabeledInput(
-                            label = "User login",
-                            value = proxyUserInput,
-                            onValueChange = { proxyUserInput = it },
-                            placeholder = "Enter username"
-                        )
-
-                        LabeledInput(
-                            label = "Password",
-                            value = proxyPasswordInput,
-                            onValueChange = { proxyPasswordInput = it },
-                            placeholder = "Enter password",
-                            visualTransformation = PasswordVisualTransformation()
-                        )
-
-                        if (state.proxyMessage != null) {
-                            Text(
-                                text = state.proxyMessage,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        SettingsPrimaryButton(
-                            text = "Save settings",
-                            width = null,
-                            modifier = Modifier.fillMaxWidth(),
-                            height = 36.dp,
-                            radius = 10.dp,
-                            enabled = isSaveEnabled,
-                            onClick = {
-                                if (parsed != null) {
-                                    onSaveProxySettings(
-                                        parsed.first,
-                                        parsed.second,
-                                        proxyUserInput,
-                                        proxyPasswordInput
-                                    )
-                                }
-                            }
-                        )
-                    }
-                }
-            )
-        }
-
-        // Card 3: Use dark theme (matching Figma 1264:7739)
-        SettingCard(
+        // Card 3: Use dark theme
+        SettingItem(
             title = "Use dark theme",
             description = "Use this option if it feels more comfortable for you.",
             action = {
@@ -309,14 +368,14 @@ fun SettingsScreen(
         )
 
         // Card 4: Export OPML
-        SettingCard(
+        SettingItem(
             title = "Export OPML",
             description = "Download the current subscription list as an OPML file.",
             action = {
                 SettingsPrimaryButton(
                     text = if (state.isExportingOpml) "Exporting" else "Export OPML",
                     width = 113.dp,
-                    height = 32.dp,
+                    height = 36.dp,
                     radius = 6.dp,
                     enabled = !state.isExportingOpml,
                     onClick = onExportOpml
@@ -419,7 +478,15 @@ private fun SettingsStatusCard(
     modifier: Modifier = Modifier,
     isError: Boolean = false
 ) {
-    MpodOutlinedSurface(modifier = modifier.fillMaxWidth()) {
+    OutlinedCard(
+        modifier = modifier
+            .fillMaxWidth()
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline),
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
+    ) {
         Text(
             text = message,
             fontSize = 14.sp,
@@ -445,16 +512,23 @@ private fun SettingsPrimaryButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
+    val shape = RoundedCornerShape(radius)
     Box(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .height(height)
-            .clip(RoundedCornerShape(radius))
+            .clip(shape)
             .background(
                 if (enabled) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.secondaryContainer
             )
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -467,61 +541,6 @@ private fun SettingsPrimaryButton(
             else MaterialTheme.colorScheme.onSecondaryContainer,
             maxLines = 1
         )
-    }
-}
-
-@Composable
-private fun SettingCard(
-    title: String,
-    description: String? = null,
-    action: (@Composable () -> Unit)? = null,
-    content: (@Composable () -> Unit)? = null
-) {
-    MpodOutlinedSurface(
-        modifier = Modifier.fillMaxWidth(),
-        radius = 8.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 16.sp,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (description != null) {
-                        Text(
-                            text = description,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                if (action != null) {
-                    Box(contentAlignment = Alignment.CenterEnd) {
-                        action()
-                    }
-                }
-            }
-            if (content != null) {
-                content()
-            }
-        }
     }
 }
 
