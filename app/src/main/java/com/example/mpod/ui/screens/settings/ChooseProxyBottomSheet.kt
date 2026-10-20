@@ -1,8 +1,10 @@
 package com.example.mpod.ui.screens.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,8 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 import com.example.mpod.data.local.preferences.ProxyServerConfig
+import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.SquareIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,79 +53,67 @@ fun ChooseProxyBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         dragHandle = null
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(vertical = 16.dp)
+                .padding(vertical = 20.dp)
         ) {
-            // Drag handle
-            Row(
+            // Drag handle (HandleArea: 32x4 dp rounded pill)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.Center
+                    .padding(bottom = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                HorizontalDivider(
-                    modifier = Modifier.fillMaxWidth(0.12f),
-                    thickness = 4.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                Box(
+                    modifier = Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant)
                 )
             }
 
-            // Header
-            Row(
+            // Header (18sp SemiBold, line-height 28sp)
+            Text(
+                text = "Choose proxy server",
+                fontSize = 18.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Choose proxy server",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (proxyServers.isNotEmpty()) {
-                    val targetEditId = activeServerId ?: proxyServers.first().id
-                    Text(
-                        text = "Edit",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(bounded = false),
-                                role = Role.Button,
-                                onClick = {
-                                    onDismiss()
-                                    onNavigateToEditProxy(targetEditId)
-                                }
-                            )
-                            .padding(4.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 12.dp)
             )
 
-            // Server list
+            // Divider
+            HorizontalDivider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Proxy servers list (each item: 44dp height, 16sp regular, edit button 44dp)
             LazyColumn(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 items(proxyServers, key = { it.id }) { server ->
                     val isActive = server.id == activeServerId || (activeServerId == null && server == proxyServers.firstOrNull())
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(44.dp)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true),
@@ -127,42 +122,32 @@ fun ChooseProxyBottomSheet(
                                     onSelectServer(server.id)
                                     onDismiss()
                                 }
-                            )
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                            ),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = server.name,
-                                fontSize = 16.sp,
-                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (server.addressPortDisplay.isNotBlank()) {
-                                Text(
-                                    text = server.addressPortDisplay,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                        Text(
+                            text = server.name,
+                            fontSize = 16.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
+                        )
 
                         SquareIconButton(
                             iconRes = R.drawable.ic_huge_edit_03,
                             contentDescription = "Edit ${server.name}",
                             containerColor = MaterialTheme.colorScheme.background,
                             contentColor = MaterialTheme.colorScheme.primary,
-                            size = 40.dp,
-                            iconSize = 18.dp,
-                            radius = 8.dp,
+                            size = 44.dp,
+                            iconSize = 24.dp,
+                            radius = 10.dp,
+                            shadowStyle = FigmaShadowStyle.Xs,
                             onClick = {
                                 onDismiss()
                                 onNavigateToEditProxy(server.id)
@@ -171,8 +156,7 @@ fun ChooseProxyBottomSheet(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
+

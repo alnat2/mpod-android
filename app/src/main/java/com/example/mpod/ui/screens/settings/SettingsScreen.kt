@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -31,12 +32,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -54,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -69,7 +74,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mpod.R
 import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.LabeledInput
-import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.SettingItem
 import com.example.mpod.ui.components.SquareIconButton
@@ -176,10 +180,10 @@ fun SettingsScreen(
             title = "Auto refresh",
             description = "Turn on for a scheduled update.",
             action = {
-                MpodSwitch(
+                Switch(
                     checked = state.isAutoRefreshEnabled,
                     onCheckedChange = onAutoRefreshToggle,
-                    contentDescription = "Auto refresh"
+                    colors = settingsSwitchColors()
                 )
             },
             content = {
@@ -248,10 +252,10 @@ fun SettingsScreen(
             title = "Use SOCKS5 proxy",
             description = "Turn on if direct connection update fails.",
             action = {
-                MpodSwitch(
+                Switch(
                     checked = state.isProxyEnabled,
                     onCheckedChange = onProxyToggle,
-                    contentDescription = "Use SOCKS5 proxy"
+                    colors = settingsSwitchColors()
                 )
             },
             content = {
@@ -265,18 +269,23 @@ fun SettingsScreen(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outline
                         )
-                        if (state.proxyServers.isEmpty()) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = "Choose proxy server",
-                                        fontSize = 16.sp,
-                                        lineHeight = 24.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                supportingContent = {
+                        val isNoProxy = state.proxyServers.isEmpty()
+                        val activeServerName = state.activeProxyServer?.name
+                            ?: state.activeProxyServer?.host
+                            ?: "None"
+
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = "Choose proxy server",
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            supportingContent = {
+                                if (isNoProxy) {
                                     Text(
                                         text = "No proxy set up. Add at least one",
                                         fontSize = 14.sp,
@@ -284,44 +293,7 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Normal,
                                         color = MaterialTheme.colorScheme.error
                                     )
-                                },
-                                trailingContent = {
-                                    SquareIconButton(
-                                        iconRes = R.drawable.ic_huge_arrow_right_01,
-                                        contentDescription = "Add proxy",
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                        size = 40.dp,
-                                        iconSize = 16.dp,
-                                        radius = 8.dp,
-                                        onClick = onNavigateToAddProxy
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(
-                                    containerColor = Color.Transparent
-                                ),
-                                modifier = Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true),
-                                    role = Role.Button,
-                                    onClick = onNavigateToAddProxy
-                                )
-                            )
-                        } else {
-                            val activeServerName = state.activeProxyServer?.name
-                                ?: state.activeProxyServer?.host
-                                ?: "None"
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        text = "Choose proxy server",
-                                        fontSize = 16.sp,
-                                        lineHeight = 24.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                supportingContent = {
+                                } else {
                                     Text(
                                         text = "Current - $activeServerName",
                                         fontSize = 14.sp,
@@ -329,30 +301,32 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Normal,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                },
-                                trailingContent = {
-                                    SquareIconButton(
-                                        iconRes = R.drawable.ic_huge_arrow_right_01,
-                                        contentDescription = "Choose proxy server",
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                        size = 40.dp,
-                                        iconSize = 16.dp,
-                                        radius = 8.dp,
-                                        onClick = { showChooseProxySheet = true }
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(
-                                    containerColor = Color.Transparent
-                                ),
-                                modifier = Modifier.clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = ripple(bounded = true),
-                                    role = Role.Button,
-                                    onClick = { showChooseProxySheet = true }
+                                }
+                            },
+                            trailingContent = {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_huge_arrow_down_01),
+                                    contentDescription = "Choose proxy server",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
                                 )
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent
+                            ),
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true),
+                                role = Role.Button,
+                                onClick = {
+                                    if (isNoProxy) {
+                                        onNavigateToAddProxy()
+                                    } else {
+                                        showChooseProxySheet = true
+                                    }
+                                }
                             )
-                        }
+                        )
 
                         SettingsPrimaryButton(
                             text = "Add new proxy",
@@ -361,7 +335,7 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .padding(bottom = 16.dp),
-                            height = 36.dp,
+                            height = 32.dp,
                             radius = 8.dp,
                             onClick = onNavigateToAddProxy
                         )
@@ -385,12 +359,12 @@ fun SettingsScreen(
             title = "Use dark theme",
             description = "Use this option if it feels more comfortable for you.",
             action = {
-                MpodSwitch(
+                Switch(
                     checked = themeMode == ThemeMode.Dark,
                     onCheckedChange = { checked ->
                         onThemeModeChange(if (checked) ThemeMode.Dark else ThemeMode.Light)
                     },
-                    contentDescription = "Use dark theme"
+                    colors = settingsSwitchColors()
                 )
             }
         )
@@ -531,6 +505,16 @@ private fun SettingsStatusCard(
 }
 
 @Composable
+internal fun settingsSwitchColors() = SwitchDefaults.colors(
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+    checkedTrackColor = MaterialTheme.colorScheme.primary,
+    checkedBorderColor = Color.Transparent,
+    uncheckedThumbColor = Color(0xFFF7FBFF),
+    uncheckedTrackColor = Color(0xFF353A3F),
+    uncheckedBorderColor = Color.Transparent
+)
+
+@Composable
 private fun SettingsPrimaryButton(
     text: String,
     modifier: Modifier = Modifier,
@@ -545,6 +529,7 @@ private fun SettingsPrimaryButton(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
             .height(height)
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = radius)
             .clip(shape)
             .background(
                 if (enabled) MaterialTheme.colorScheme.primary

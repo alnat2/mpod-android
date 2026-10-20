@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,11 +60,12 @@ fun EditProxyScreen(
             SquareIconButton(
                 iconRes = R.drawable.ic_huge_arrow_left_02,
                 contentDescription = "Back",
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.primary,
                 size = 44.dp,
-                iconSize = 20.dp,
+                iconSize = 24.dp,
                 radius = 10.dp,
+                shadowStyle = FigmaShadowStyle.Xs,
                 onClick = onBack
             )
             Text(
@@ -88,7 +90,7 @@ fun EditProxyScreen(
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Top App Bar
         Row(
@@ -99,26 +101,28 @@ fun EditProxyScreen(
             SquareIconButton(
                 iconRes = R.drawable.ic_huge_arrow_left_02,
                 contentDescription = "Back",
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.primary,
                 size = 44.dp,
-                iconSize = 20.dp,
+                iconSize = 24.dp,
                 radius = 10.dp,
+                shadowStyle = FigmaShadowStyle.Xs,
                 onClick = onBack
             )
             Text(
                 text = "Edit proxy",
-                style = MaterialTheme.typography.headlineLarge,
+                fontSize = 30.sp,
+                lineHeight = 36.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
 
-        // Form Card
+        // Form Card (SettingItem card in Figma without subheader)
         OutlinedCard(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = CardDefaults.outlinedCardBorder(),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp)
@@ -126,14 +130,15 @@ fun EditProxyScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Server name
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Server name",
                         fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -149,10 +154,11 @@ fun EditProxyScreen(
                 }
 
                 // Proxy address:port
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Proxy address:port",
                         fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -169,10 +175,11 @@ fun EditProxyScreen(
                 }
 
                 // Username
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Username",
                         fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -185,10 +192,11 @@ fun EditProxyScreen(
                 }
 
                 // Password
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Password",
                         fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -213,13 +221,12 @@ fun EditProxyScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Save changes button
+                // Save changes button (height 36dp, radius 10dp, primary orange)
                 MpodButton(
                     text = "Save changes",
                     primary = true,
-                    height = 44.dp,
+                    height = 36.dp,
+                    radius = 10.dp,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         val parsed = parseProxyAddressPort(addressPort)
@@ -247,13 +254,14 @@ fun EditProxyScreen(
                     }
                 )
 
-                // Delete server button
+                // Delete server button (height 36dp, radius 10dp, secondaryContainer #353a3f, error #f83d41)
                 MpodButton(
                     text = "Delete server",
                     primary = false,
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.error,
-                    height = 44.dp,
+                    height = 36.dp,
+                    radius = 10.dp,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         onDeleteServer(server.id)
@@ -264,3 +272,4 @@ fun EditProxyScreen(
         }
     }
 }
+

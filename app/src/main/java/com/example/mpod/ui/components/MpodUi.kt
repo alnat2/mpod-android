@@ -390,47 +390,28 @@ fun MpodSwitch(
     enabled: Boolean = true,
     contentDescription: String? = null
 ) {
-    val track = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-    val thumb = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.background
-    Box(
-        modifier = modifier
-            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-            .then(
-                if (contentDescription == null) {
-                    Modifier
-                } else {
-                    Modifier.semantics {
-                        this.contentDescription = contentDescription
-                        this.stateDescription = if (checked) "On" else "Off"
-                        role = Role.Switch
-                    }
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        modifier = modifier.then(
+            if (contentDescription != null) {
+                Modifier.semantics {
+                    this.contentDescription = contentDescription
                 }
-            )
-            .alpha(if (enabled) 1f else 0.65f)
-            .toggleable(
-                value = checked,
-                enabled = enabled,
-                role = Role.Switch,
-                onValueChange = onCheckedChange
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(width = 44.dp, height = 24.dp)
-                .clip(CircleShape)
-                .background(track)
-                .padding(2.dp),
-            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(thumb)
-            )
-        }
-    }
+            } else {
+                Modifier
+            }
+        ),
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            checkedBorderColor = Color.Transparent,
+            uncheckedThumbColor = Color(0xFFF7FBFF),
+            uncheckedTrackColor = Color(0xFF353A3F),
+            uncheckedBorderColor = Color.Transparent
+        )
+    )
 }
 
 @Composable

@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,7 +58,7 @@ fun AddProxyScreen(
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Top App Bar
         Row(
@@ -68,26 +69,28 @@ fun AddProxyScreen(
             SquareIconButton(
                 iconRes = R.drawable.ic_huge_arrow_left_02,
                 contentDescription = "Back",
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.primary,
                 size = 44.dp,
-                iconSize = 20.dp,
+                iconSize = 24.dp,
                 radius = 10.dp,
+                shadowStyle = FigmaShadowStyle.Xs,
                 onClick = onBack
             )
             Text(
                 text = "Add proxy",
-                style = MaterialTheme.typography.headlineLarge,
+                fontSize = 30.sp,
+                lineHeight = 36.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
 
-        // Form Card
+        // Form Card (SettingItem card in Figma)
         OutlinedCard(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = CardDefaults.outlinedCardBorder(),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier
                 .fillMaxWidth()
                 .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp)
@@ -95,141 +98,154 @@ fun AddProxyScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Header
+                // Subheader (settings-top)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Proxy settings",
-                        style = MaterialTheme.typography.titleMedium,
+                        fontSize = 16.sp,
+                        lineHeight = 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Fill out to connect to the server",
-                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Server name
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Server name",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    MpodInput(
-                        value = name,
-                        onValueChange = {
-                            name = it
-                            errorMessage = null
-                        },
-                        placeholder = "E.g. my proxy",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Proxy address:port
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Proxy address:port",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    MpodInput(
-                        value = addressPort,
-                        onValueChange = {
-                            addressPort = it
-                            errorMessage = null
-                        },
-                        placeholder = "E.g. 192.168.1.1:1080",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Username
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Username",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    MpodInput(
-                        value = username,
-                        onValueChange = { username = it },
-                        placeholder = "Enter username",
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // Password
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Password",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    MpodInput(
-                        value = password,
-                        onValueChange = { password = it },
-                        placeholder = "Enter password",
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        trailingIconRes = if (passwordVisible) R.drawable.ic_huge_view_off else R.drawable.ic_huge_view,
-                        trailingIconContentDescription = if (passwordVisible) "Hide password" else "Show password",
-                        onTrailingIconClick = { passwordVisible = !passwordVisible },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 13.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Save button
-                MpodButton(
-                    text = "Save",
-                    primary = true,
-                    height = 44.dp,
+                // Inputs Column (gap-y-4 = 16dp)
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        val parsed = parseProxyAddressPort(addressPort)
-                        if (name.trim().isBlank()) {
-                            errorMessage = "Server name cannot be empty."
-                            return@MpodButton
-                        }
-                        if (parsed == null) {
-                            errorMessage = "Use address:port (example: 127.0.0.1:1080)."
-                            return@MpodButton
-                        }
-                        val result = onSaveServer(
-                            name.trim(),
-                            parsed.first,
-                            parsed.second,
-                            username.trim(),
-                            password
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Server name
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Server name",
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (result.isSuccess) {
-                            onSaveSuccess()
-                        } else {
-                            errorMessage = result.exceptionOrNull()?.message ?: "Failed to save proxy."
-                        }
+                        MpodInput(
+                            value = name,
+                            onValueChange = {
+                                name = it
+                                errorMessage = null
+                            },
+                            placeholder = "E.g. my proxy",
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
-                )
+
+                    // Proxy address:port
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Proxy address:port",
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        MpodInput(
+                            value = addressPort,
+                            onValueChange = {
+                                addressPort = it
+                                errorMessage = null
+                            },
+                            placeholder = "E.g. 192.168.1.1:1080",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Username
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Username",
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        MpodInput(
+                            value = username,
+                            onValueChange = { username = it },
+                            placeholder = "Enter username",
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Password
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Password",
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        MpodInput(
+                            value = password,
+                            onValueChange = { password = it },
+                            placeholder = "Enter password",
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIconRes = if (passwordVisible) R.drawable.ic_huge_view_off else R.drawable.ic_huge_view,
+                            trailingIconContentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            onTrailingIconClick = { passwordVisible = !passwordVisible },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    // Save button (height 36dp, radius 10dp, primary orange)
+                    MpodButton(
+                        text = "Save",
+                        primary = true,
+                        height = 36.dp,
+                        radius = 10.dp,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            val parsed = parseProxyAddressPort(addressPort)
+                            if (name.trim().isBlank()) {
+                                errorMessage = "Server name cannot be empty."
+                                return@MpodButton
+                            }
+                            if (parsed == null) {
+                                errorMessage = "Use address:port (example: 127.0.0.1:1080)."
+                                return@MpodButton
+                            }
+                            val result = onSaveServer(
+                                name.trim(),
+                                parsed.first,
+                                parsed.second,
+                                username.trim(),
+                                password
+                            )
+                            if (result.isSuccess) {
+                                onSaveSuccess()
+                            } else {
+                                errorMessage = result.exceptionOrNull()?.message ?: "Failed to save proxy."
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
+

@@ -29,7 +29,8 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = MutedForeground,
     outline = Border,
     tertiary = Chart5,
-    surfaceContainerHigh = Accent
+    surfaceContainerHigh = Accent,
+    error = Destructive
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -45,7 +46,8 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkMutedForeground,
     outline = DarkBorder,
     tertiary = DarkPrimary,
-    surfaceContainerHigh = DarkAccent
+    surfaceContainerHigh = DarkAccent,
+    error = DarkDestructive
 )
 
 val androidx.compose.material3.ColorScheme.accent: androidx.compose.ui.graphics.Color
