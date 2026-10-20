@@ -24,9 +24,14 @@ class ProxyHttpClientFactory @Inject constructor() {
     init {
         Authenticator.setDefault(object : Authenticator() {
             override fun getPasswordAuthentication(): PasswordAuthentication? {
-                val s = currentSettings.get()
-                if (s != null && s.isProxyEnabled && s.proxyUsername.isNotBlank()) {
-                    return PasswordAuthentication(s.proxyUsername, s.proxyPassword.toCharArray())
+                val s = currentSettings.get() ?: return null
+                if (s.isProxyEnabled) {
+                    val active = s.activeProxyServer
+                    val user = active?.username ?: s.proxyUsername
+                    val pass = active?.password ?: s.proxyPassword
+                    if (user.isNotBlank()) {
+                        return PasswordAuthentication(user, pass.toCharArray())
+                    }
                 }
                 return null
             }
@@ -37,11 +42,16 @@ class ProxyHttpClientFactory @Inject constructor() {
         .proxySelector(dynamicProxySelector)
         .proxyAuthenticator { _, response ->
             val s = currentSettings.get()
-            if (s != null && s.isProxyEnabled && s.proxyUsername.isNotBlank()) {
-                val credential = Credentials.basic(s.proxyUsername, s.proxyPassword)
-                response.request.newBuilder()
-                    .header("Proxy-Authorization", credential)
-                    .build()
+            if (s != null && s.isProxyEnabled) {
+                val active = s.activeProxyServer
+                val user = active?.username ?: s.proxyUsername
+                val pass = active?.password ?: s.proxyPassword
+                if (user.isNotBlank()) {
+                    val credential = Credentials.basic(user, pass)
+                    response.request.newBuilder()
+                        .header("Proxy-Authorization", credential)
+                        .build()
+                } else null
             } else null
         }
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -54,13 +64,14 @@ class ProxyHttpClientFactory @Inject constructor() {
         scope.launch {
             dataStore.settingsFlow
                 .map {
+                    val active = it.activeProxyServer
                     listOf(
                         it.isProxyEnabled,
                         it.proxyType,
-                        it.proxyHost,
-                        it.proxyPort,
-                        it.proxyUsername,
-                        it.proxyPassword
+                        active?.host ?: it.proxyHost,
+                        active?.port ?: it.proxyPort,
+                        active?.username ?: it.proxyUsername,
+                        active?.password ?: it.proxyPassword
                     ) to it
                 }
                 .distinctUntilChanged { old, new -> old.first == new.first }

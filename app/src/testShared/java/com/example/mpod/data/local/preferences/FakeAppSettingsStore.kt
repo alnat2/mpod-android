@@ -37,6 +37,40 @@ open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSetti
         )
     }
 
+    override suspend fun addProxyServer(server: ProxyServerConfig): ProxyServerConfig {
+        val current = stateFlow.value.proxyServers.toMutableList()
+        current.add(server)
+        stateFlow.value = stateFlow.value.copy(
+            proxyServers = current,
+            selectedProxyServerId = if (stateFlow.value.selectedProxyServerId.isNullOrBlank()) server.id else stateFlow.value.selectedProxyServerId
+        )
+        return server
+    }
+
+    override suspend fun updateProxyServer(server: ProxyServerConfig) {
+        val current = stateFlow.value.proxyServers.map {
+            if (it.id == server.id) server else it
+        }
+        stateFlow.value = stateFlow.value.copy(proxyServers = current)
+    }
+
+    override suspend fun deleteProxyServer(serverId: String) {
+        val current = stateFlow.value.proxyServers.filter { it.id != serverId }
+        val newSelected = if (stateFlow.value.selectedProxyServerId == serverId) {
+            current.firstOrNull()?.id
+        } else {
+            stateFlow.value.selectedProxyServerId
+        }
+        stateFlow.value = stateFlow.value.copy(
+            proxyServers = current,
+            selectedProxyServerId = newSelected
+        )
+    }
+
+    override suspend fun selectProxyServer(serverId: String) {
+        stateFlow.value = stateFlow.value.copy(selectedProxyServerId = serverId)
+    }
+
     override suspend fun setThemeMode(theme: String) {
         stateFlow.value = stateFlow.value.copy(themeMode = theme)
     }

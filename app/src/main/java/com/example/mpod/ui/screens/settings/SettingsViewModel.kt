@@ -11,6 +11,7 @@ import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.AutoRefreshScheduler
 import com.example.mpod.data.network.IpGeoService
+import com.example.mpod.data.local.preferences.ProxyServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,9 @@ class SettingsViewModel @Inject constructor(
                     isAutoRefreshEnabled = prefs.isAutoRefreshEnabled,
                     dailyRefreshTime = prefs.dailyRefreshTime,
                     isProxyEnabled = prefs.isProxyEnabled,
+                    proxyServers = prefs.proxyServers,
+                    selectedProxyServerId = prefs.selectedProxyServerId,
+                    activeProxyServer = prefs.activeProxyServer,
                     proxyType = prefs.proxyType,
                     proxyHost = prefs.proxyHost,
                     proxyPort = prefs.proxyPort,
@@ -92,11 +96,114 @@ class SettingsViewModel @Inject constructor(
             appSettingsDataStore.setProxyEnabled(enabled)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
-            if (enabled && current.proxyHost.isBlank()) {
+            if (enabled && current.activeProxyServer == null && current.proxyHost.isBlank()) {
                 _state.value = _state.value.copy(proxyMessage = "Enter proxy address and port below.")
             } else {
                 loadCurrentIpGeo()
             }
+        }
+    }
+
+    fun selectProxyServer(serverId: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.selectProxyServer(serverId)
+            val current = appSettingsDataStore.settingsFlow.first()
+            proxyHttpClientFactory.updateProxy(current)
+            loadCurrentIpGeo()
+        }
+    }
+
+    fun addProxyServer(
+        name: String,
+        host: String,
+        port: Int,
+        username: String = "",
+        password: String = ""
+    ): Result<ProxyServerConfig> {
+        val trimmedName = name.trim()
+        val trimmedHost = host.trim()
+        if (trimmedName.isBlank()) {
+            val msg = "Server name cannot be empty."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        if (trimmedHost.isBlank()) {
+            val msg = "Proxy address cannot be empty."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        if (port !in 1..65535) {
+            val msg = "Invalid proxy port (1-65535)."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        val newServer = ProxyServerConfig(
+            name = trimmedName,
+            host = trimmedHost,
+            port = port,
+            username = username.trim(),
+            password = password
+        )
+        viewModelScope.launch {
+            appSettingsDataStore.addProxyServer(newServer)
+            val current = appSettingsDataStore.settingsFlow.first()
+            proxyHttpClientFactory.updateProxy(current)
+            _state.value = _state.value.copy(proxyMessage = "Proxy server saved.")
+            loadCurrentIpGeo()
+        }
+        return Result.success(newServer)
+    }
+
+    fun updateProxyServer(
+        id: String,
+        name: String,
+        host: String,
+        port: Int,
+        username: String = "",
+        password: String = ""
+    ): Result<Unit> {
+        val trimmedName = name.trim()
+        val trimmedHost = host.trim()
+        if (trimmedName.isBlank()) {
+            val msg = "Server name cannot be empty."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        if (trimmedHost.isBlank()) {
+            val msg = "Proxy address cannot be empty."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        if (port !in 1..65535) {
+            val msg = "Invalid proxy port (1-65535)."
+            _state.value = _state.value.copy(proxyMessage = msg)
+            return Result.failure(IllegalArgumentException(msg))
+        }
+        val updatedServer = ProxyServerConfig(
+            id = id,
+            name = trimmedName,
+            host = trimmedHost,
+            port = port,
+            username = username.trim(),
+            password = password
+        )
+        viewModelScope.launch {
+            appSettingsDataStore.updateProxyServer(updatedServer)
+            val current = appSettingsDataStore.settingsFlow.first()
+            proxyHttpClientFactory.updateProxy(current)
+            _state.value = _state.value.copy(proxyMessage = "Proxy server updated.")
+            loadCurrentIpGeo()
+        }
+        return Result.success(Unit)
+    }
+
+    fun deleteProxyServer(serverId: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.deleteProxyServer(serverId)
+            val current = appSettingsDataStore.settingsFlow.first()
+            proxyHttpClientFactory.updateProxy(current)
+            _state.value = _state.value.copy(proxyMessage = "Proxy server deleted.")
+            loadCurrentIpGeo()
         }
     }
 
@@ -162,6 +269,9 @@ data class SettingsUiState(
     val isAutoRefreshEnabled: Boolean = false,
     val dailyRefreshTime: String = "03:00",
     val isProxyEnabled: Boolean = false,
+    val proxyServers: List<ProxyServerConfig> = emptyList(),
+    val selectedProxyServerId: String? = null,
+    val activeProxyServer: ProxyServerConfig? = null,
     val proxyType: String = "SOCKS5",
     val proxyHost: String = "",
     val proxyPort: Int = 1080,

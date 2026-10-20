@@ -77,11 +77,14 @@ class DynamicProxySelector : ProxySelector() {
             if (!settings.isProxyEnabled) {
                 return Proxy.NO_PROXY
             }
-            if (settings.proxyHost.isBlank()) {
+            val active = settings.activeProxyServer
+            val host = active?.host ?: settings.proxyHost
+            val port = active?.port ?: settings.proxyPort
+            if (host.isBlank()) {
                 throw IllegalArgumentException("Proxy host cannot be blank when proxy is enabled")
             }
-            if (settings.proxyPort !in 1..65535) {
-                throw IllegalArgumentException("Invalid proxy port: ${settings.proxyPort}")
+            if (port !in 1..65535) {
+                throw IllegalArgumentException("Invalid proxy port: $port")
             }
             val type = when (settings.proxyType.trim().uppercase()) {
                 "SOCKS", "SOCKS5" -> Proxy.Type.SOCKS
@@ -89,7 +92,7 @@ class DynamicProxySelector : ProxySelector() {
                 else -> throw IllegalArgumentException("Unsupported proxy type: ${settings.proxyType}")
             }
             // Use createUnresolved to prevent synchronous DNS resolution on the calling thread.
-            val address = InetSocketAddress.createUnresolved(settings.proxyHost.trim(), settings.proxyPort)
+            val address = InetSocketAddress.createUnresolved(host.trim(), port)
             return Proxy(type, address)
         }
     }
