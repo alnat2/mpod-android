@@ -48,9 +48,9 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | UI language | English |
 | Release package | One release APK with package `com.prod.mpod`; debug package `com.prod.mpod.test` |
 | Local Database | Room database (`MpodDatabase`) storing `podcasts`, `episodes`, and `playlist_items` |
-| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, playback speed, Auto refresh, and Proxy settings |
+| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, playback speed, Auto refresh, and SOCKS5 proxy profiles |
 | Feed & OPML Engines | Direct RSS 2.0 / Atom parser (`RssFeedParser`) and OPML import/export (`OpmlParser`) |
-| Network & Proxy | OkHttp with HTTP/HTTPS cleartext support (e.g. for Radio-T) and configurable Direct/HTTP/SOCKS5 proxy (`ProxyHttpClientFactory`) |
+| Network & Proxy | OkHttp with HTTP/HTTPS cleartext support (e.g. for Radio-T) and configurable Direct/SOCKS5 proxy (`ProxyHttpClientFactory`) supporting multiple saved profiles and credentials |
 | Smart Listening | Fully automatic background downloading and cleanup through `SmartListeningManager`; no user-facing toggle, limit, network, or cleanup settings |
 | Default start route | Subscriptions |
 | Primary navigation | Player (Home/Now playing), Subscriptions, Settings, Add podcast modal |
@@ -101,8 +101,8 @@ The backend-client product was retired when the application became the standalon
 | Subscriptions | Room Flow drives the library; refresh fetches feeds directly | Partial refresh failure, offline retention, large libraries, and artwork fallback |
 | Playlist and player | Room owns queue order and active state; Media3 owns playback | Atomic reorder, lifecycle restoration, audio focus, noisy route, and error recovery |
 | Smart Listening | Android automatically downloads eligible playlist episodes and owns their cleanup | Local playback, cleanup, interruption, and storage failures; no user configuration |
-| Preferences | DataStore stores theme, playback speed, Auto refresh, and proxy configuration | Immediate application, persistence, validation, and migration |
-| Networking | OkHttp uses Direct, HTTP, or SOCKS5 mode for feeds, artwork, and media | HTTP/HTTPS feeds, proxy validation, timeouts, and recoverable network errors |
+| Preferences | DataStore stores theme, playback speed, Auto refresh, and SOCKS5 proxy profiles | Immediate application, persistence, validation, and migration |
+| Networking | OkHttp uses Direct or SOCKS5 mode (with saved profiles) for feeds, artwork, and media | HTTP/HTTPS feeds, proxy validation, timeouts, and recoverable network errors |
 | UI | Compose/Material 3 using the approved Figma components and Hugeicons | Core usability first; visual and accessibility polish remain risk-based |
 
 ## Test baseline

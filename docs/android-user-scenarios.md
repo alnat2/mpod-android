@@ -182,8 +182,11 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SET-02 | First install follows system theme | App respects Android system night mode by default | C,U,E,D | Verified |
 | SET-03 | Toggle Theme (System / Light / Dark) | Theme updates immediately across all screens and persists to DataStore | C,U,E,D | Verified |
 | SET-04 | Look for Smart Listening configuration | No enable/disable, per-podcast limit, Wi-Fi-only, or cleanup setting exists because the feature is fully automatic | C,U,E | Specified |
-| SET-05 | Configure Proxy (Direct / HTTP / SOCKS5) | Proxy type, host, and port persist to DataStore and configure OkHttp client factory | C,U,E | Verified |
-| SET-06 | Proxy validation | Invalid host or port inputs are validated locally before saving | C,U,E | Verified |
+| SET-05 | SOCKS5 proxy card & master switch | Grouped card with "Use SOCKS5 proxy" switch; when off, configuration is collapsed; when on without servers, displays setup warning prompt and "Add new proxy" button; when on with servers, displays active server and "Add new proxy" button | C,U,E | Specified |
+| SET-06 | Choose proxy server bottom sheet | Opens bottom sheet with saved proxy profiles; active server is highlighted by accent text color (no radio buttons); each item has an edit icon; selecting a server sets it as active and closes the sheet | C,U,E | Specified |
+| SET-06a | Add proxy server screen | Standalone screen with back button, Server name, Proxy address:port, optional Username, optional Password (masked with toggle), and "Save" button; validates and persists new profile | C,U,E | Specified |
+| SET-06b | Edit & delete proxy server screen | Standalone screen with back button, pre-filled inputs, "Save changes" button, and "Delete server" action (removes profile; updates or clears active selection) | C,U,E | Specified |
+| SET-06c | Proxy validation & network routing | Empty name or malformed host:port (invalid port outside 1-65535) is rejected locally with inline validation; when SOCKS5 is enabled with an active profile, OkHttp routes podcast feeds, artwork, and media streaming through the SOCKS5 proxy (with credentials if provided) | C,U,E | Specified |
 | SET-07 | Export OPML to file | Opens Android document picker and writes valid OPML XML with all subscriptions | C,U,E | Verified |
 | SET-08 | Cancel OPML export picker | Cancellation is a no-op without false error | U,E | Verified |
 | SET-09 | Export file write failure | Specific recoverable error is displayed | C,U,E,L | Verified |
@@ -211,7 +214,13 @@ The following decisions define the standalone `mpoddy` product:
 3. Android fetches and parses RSS 2.0/Atom directly. A refresh failure never erases the previously stored local library.
 4. OPML import/export is local. Partial import is shown inside the existing modal as `Import completed` with exact imported/skipped counts and `Done`; files over 5,000,000 bytes are rejected before parsing.
 5. Smart Listening is a fully automatic background function. The user cannot enable or disable it, set an episode limit, select Wi-Fi-only behavior, or configure cleanup. There is no manual Download action on subscription episode cards.
-6. Direct, HTTP, and SOCKS5 proxy modes apply to feed fetching, artwork, and media streaming. Invalid proxy host/port values are rejected locally.
+6. SOCKS5 proxy configuration supports multiple saved profiles (name, `host:port`, optional username and password) managed through Settings:
+   - Settings renders a grouped card with a master switch ("Use SOCKS5 proxy"), active server selection ("Choose proxy server" / "Current - <Name>"), and an "Add new proxy" button. If enabled with no servers configured, an inline prompt "No proxy set up. Add at least one to enable proxy routing" is shown.
+   - Server selection opens a "Choose proxy server" bottom sheet listing all saved profiles. The active server is indicated by accent text color without radio buttons; each row contains an edit icon (pencil) to navigate to edit mode.
+   - Adding a profile uses a dedicated "Add proxy server" screen with back navigation, inputs for `Server name`, `Proxy address:port`, optional `Username`, optional masked `Password` (with visibility toggle), and a `Save` button.
+   - Editing uses a dedicated "Edit proxy server" screen with "Save changes" and a red "Delete server" action.
+   - Validation requires a non-empty server name and valid `host:port` (1–65535) before saving.
+   - When enabled and an active profile is selected, SOCKS5 proxy routing (including credentials if specified) applies to podcast feed fetching, artwork, and media streaming. When disabled or unconfigured, direct connection is used.
 7. The first bottom-navigation destination is `Player`; it opens the single Player/Now playing screen. The default launch destination is Subscriptions.
 8. Episode actions are inline on Player and Subscriptions cards. Bottom sheets remain for playback speed; Add podcast remains a modal overlay/card flow.
 9. Subscription episodes cannot be played before they are added to the local playlist. Podcast artwork has no separate detail-screen navigation in the current MVP.
