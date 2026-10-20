@@ -53,6 +53,7 @@ fun AppNavigation(
     var libraryRefreshKey by remember { mutableIntStateOf(0) }
     val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
     val addPodcastState by addPodcastViewModel.state.collectAsStateWithLifecycle()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
@@ -116,11 +117,11 @@ fun AppNavigation(
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
                     onNavigateToAddProxy = { navController.navigate(Screen.AddProxy.route) },
-                    onNavigateToEditProxy = { serverId -> navController.navigate(Screen.EditProxy.createRoute(serverId)) }
+                    onNavigateToEditProxy = { serverId -> navController.navigate(Screen.EditProxy.createRoute(serverId)) },
+                    viewModel = settingsViewModel
                 )
             }
             composable(Screen.AddProxy.route) {
-                val settingsViewModel: SettingsViewModel = hiltViewModel()
                 AddProxyScreen(
                     onBack = { navController.popBackStack() },
                     onSaveServer = { name, host, port, username, password ->
@@ -134,7 +135,6 @@ fun AppNavigation(
                 arguments = listOf(navArgument("serverId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val serverId = backStackEntry.arguments?.getString("serverId") ?: ""
-                val settingsViewModel: SettingsViewModel = hiltViewModel()
                 val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
                 val server = settingsState.proxyServers.firstOrNull { it.id == serverId }
                 EditProxyScreen(

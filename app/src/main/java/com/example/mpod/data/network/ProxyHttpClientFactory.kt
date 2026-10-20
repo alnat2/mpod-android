@@ -88,6 +88,10 @@ class ProxyHttpClientFactory @Inject constructor() {
 
     fun getProxySelector(): DynamicProxySelector = dynamicProxySelector
 
+    fun setProxyConnectFailedListener(listener: ((java.net.Proxy, java.io.IOException?) -> Unit)?) {
+        dynamicProxySelector.onProxyConnectFailed = listener
+    }
+
     fun createClient(settings: AppSettings? = null): OkHttpClient {
         if (settings != null) {
             updateProxy(settings)

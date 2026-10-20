@@ -7,11 +7,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsStore
+import com.example.mpod.data.local.preferences.ProxyServerConfig
+import com.example.mpod.data.network.IpGeoService
+import com.example.mpod.data.network.ProxyCheckResult
+import com.example.mpod.data.network.ProxyHealthService
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.AutoRefreshScheduler
-import com.example.mpod.data.network.IpGeoService
-import com.example.mpod.data.local.preferences.ProxyServerConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +33,8 @@ class SettingsViewModel @Inject constructor(
     private val podcastRepository: PodcastRepository,
     private val autoRefreshScheduler: AutoRefreshScheduler,
     private val proxyHttpClientFactory: ProxyHttpClientFactory,
-    private val ipGeoService: IpGeoService
+    private val ipGeoService: IpGeoService,
+    private val proxyHealthService: ProxyHealthService
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -63,6 +66,23 @@ class SettingsViewModel @Inject constructor(
                 autoRefreshScheduler.schedule(prefs)
             }
         }
+
+        proxyHttpClientFactory.setProxyConnectFailedListener { _, _ ->
+            viewModelScope.launch {
+                val current = _state.value
+                if (current.isProxyEnabled && current.activeProxyServer != null) {
+                    val server = current.activeProxyServer
+                    val isOnline = proxyHealthService.isDeviceOnline()
+                    val errorText = if (!isOnline) {
+                        "No internet connection"
+                    } else {
+                        "${server.name} cant connect to proxy"
+                    }
+                    _state.value = _state.value.copy(activeProxyError = errorText)
+                }
+            }
+        }
+
         loadCurrentIpGeo()
     }
 
@@ -96,10 +116,26 @@ class SettingsViewModel @Inject constructor(
             appSettingsDataStore.setProxyEnabled(enabled)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
-            if (enabled && current.activeProxyServer == null && current.proxyHost.isBlank()) {
-                _state.value = _state.value.copy(proxyMessage = "Enter proxy address and port below.")
-            } else {
+            if (!enabled) {
+                _state.value = _state.value.copy(
+                    isProxyChecking = false,
+                    activeProxyError = null,
+                    topProxyNotification = null
+                )
                 loadCurrentIpGeo()
+            } else {
+                val server = current.activeProxyServer
+                if (server == null && current.proxyHost.isBlank()) {
+                    _state.value = _state.value.copy(proxyMessage = "Enter proxy address and port below.")
+                } else if (server != null) {
+                    _state.value = _state.value.copy(
+                        isProxyChecking = true,
+                        activeProxyError = null
+                    )
+                    verifyProxyConnection(server, isBackgroundAddOrEdit = false)
+                } else {
+                    loadCurrentIpGeo()
+                }
             }
         }
     }
@@ -109,7 +145,16 @@ class SettingsViewModel @Inject constructor(
             appSettingsDataStore.selectProxyServer(serverId)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
-            loadCurrentIpGeo()
+            val server = current.activeProxyServer
+            if (server != null) {
+                _state.value = _state.value.copy(
+                    isProxyChecking = true,
+                    activeProxyError = null
+                )
+                verifyProxyConnection(server, isBackgroundAddOrEdit = false)
+            } else {
+                loadCurrentIpGeo()
+            }
         }
     }
 
@@ -145,11 +190,20 @@ class SettingsViewModel @Inject constructor(
             password = password
         )
         viewModelScope.launch {
+            val wasEmpty = _state.value.proxyServers.isEmpty()
             appSettingsDataStore.addProxyServer(newServer)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
             _state.value = _state.value.copy(proxyMessage = "Proxy server saved.")
-            loadCurrentIpGeo()
+
+            val isActive = current.activeProxyServer?.id == newServer.id || wasEmpty
+            if (isActive) {
+                _state.value = _state.value.copy(
+                    isProxyChecking = true,
+                    activeProxyError = null
+                )
+            }
+            verifyProxyConnection(newServer, isBackgroundAddOrEdit = true)
         }
         return Result.success(newServer)
     }
@@ -192,13 +246,77 @@ class SettingsViewModel @Inject constructor(
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
             _state.value = _state.value.copy(proxyMessage = "Proxy server updated.")
-            loadCurrentIpGeo()
+
+            val isActive = current.activeProxyServer?.id == updatedServer.id
+            if (isActive) {
+                _state.value = _state.value.copy(
+                    isProxyChecking = true,
+                    activeProxyError = null
+                )
+            }
+            verifyProxyConnection(updatedServer, isBackgroundAddOrEdit = true)
         }
         return Result.success(Unit)
     }
 
+    private suspend fun verifyProxyConnection(server: ProxyServerConfig, isBackgroundAddOrEdit: Boolean) {
+        val checkResult = proxyHealthService.checkProxy(server)
+        val current = _state.value
+        val isActive = current.activeProxyServer?.id == server.id
+
+        when (checkResult) {
+            is ProxyCheckResult.Success -> {
+                if (isActive) {
+                    _state.value = _state.value.copy(
+                        isProxyChecking = false,
+                        activeProxyError = null,
+                        currentIpGeoText = "Current IP: ${checkResult.ip} • Geo: ${checkResult.geo}"
+                    )
+                }
+                if (current.topProxyNotification?.serverId == server.id) {
+                    _state.value = _state.value.copy(topProxyNotification = null)
+                }
+            }
+            is ProxyCheckResult.ProxyFailed -> {
+                val errorText = "${server.name} cant connect to proxy"
+                _state.value = _state.value.copy(
+                    isProxyChecking = false,
+                    activeProxyError = if (isActive) errorText else current.activeProxyError,
+                    topProxyNotification = if (isBackgroundAddOrEdit) {
+                        ProxyErrorNotification(
+                            serverId = server.id,
+                            serverName = server.name,
+                            message = errorText
+                        )
+                    } else current.topProxyNotification
+                )
+            }
+            is ProxyCheckResult.NoInternet -> {
+                val errorText = "No internet connection"
+                _state.value = _state.value.copy(
+                    isProxyChecking = false,
+                    activeProxyError = if (isActive) errorText else current.activeProxyError,
+                    topProxyNotification = if (isBackgroundAddOrEdit) {
+                        ProxyErrorNotification(
+                            serverId = server.id,
+                            serverName = server.name,
+                            message = errorText
+                        )
+                    } else current.topProxyNotification
+                )
+            }
+        }
+    }
+
+    fun dismissTopProxyNotification() {
+        _state.value = _state.value.copy(topProxyNotification = null)
+    }
+
     fun deleteProxyServer(serverId: String) {
         viewModelScope.launch {
+            if (_state.value.topProxyNotification?.serverId == serverId) {
+                _state.value = _state.value.copy(topProxyNotification = null)
+            }
             appSettingsDataStore.deleteProxyServer(serverId)
             val current = appSettingsDataStore.settingsFlow.first()
             proxyHttpClientFactory.updateProxy(current)
@@ -265,6 +383,12 @@ class SettingsViewModel @Inject constructor(
     }
 }
 
+data class ProxyErrorNotification(
+    val serverId: String,
+    val serverName: String,
+    val message: String
+)
+
 data class SettingsUiState(
     val isAutoRefreshEnabled: Boolean = false,
     val dailyRefreshTime: String = "03:00",
@@ -284,5 +408,8 @@ data class SettingsUiState(
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,
     val errorMessage: String? = null,
-    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}"
+    val appBuild: String = "mpoddy v${BuildConfig.VERSION_NAME}",
+    val isProxyChecking: Boolean = false,
+    val activeProxyError: String? = null,
+    val topProxyNotification: ProxyErrorNotification? = null
 )

@@ -62,8 +62,13 @@ class DynamicProxySelector : ProxySelector() {
         }
     }
 
+    var onProxyConnectFailed: ((Proxy, IOException?) -> Unit)? = null
+
     override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
-        // OkHttp handles connection failures by attempting the next route in the list (Proxy.NO_PROXY)
+        val proxy = currentProxy.get()
+        if (proxy != null && proxy != Proxy.NO_PROXY) {
+            onProxyConnectFailed?.invoke(proxy, ioe)
+        }
     }
 
     companion object {

@@ -106,6 +106,7 @@ fun SettingsRoute(
         onNavigateToAddProxy = onNavigateToAddProxy,
         onNavigateToEditProxy = onNavigateToEditProxy,
         onSelectProxyServer = viewModel::selectProxyServer,
+        onDismissProxyNotification = viewModel::dismissTopProxyNotification,
         onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
@@ -123,6 +124,7 @@ fun SettingsScreen(
     onNavigateToAddProxy: () -> Unit = {},
     onNavigateToEditProxy: (String) -> Unit = {},
     onSelectProxyServer: (String) -> Unit = {},
+    onDismissProxyNotification: () -> Unit = {},
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
@@ -145,6 +147,23 @@ fun SettingsScreen(
             .padding(top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        AnimatedVisibility(
+            visible = state.topProxyNotification != null,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            state.topProxyNotification?.let { notification ->
+                ProxyErrorTopBanner(
+                    notification = notification,
+                    onEdit = { serverId ->
+                        onDismissProxyNotification()
+                        onNavigateToEditProxy(serverId)
+                    },
+                    onDismiss = onDismissProxyNotification
+                )
+            }
+        }
+
         val headerSubtitle = buildString {
             append(state.lastRefreshHeaderText)
             if (!state.currentIpGeoText.isNullOrBlank()) {
@@ -288,6 +307,22 @@ fun SettingsScreen(
                                 if (isNoProxy) {
                                     Text(
                                         text = "No proxy set up. Add at least one",
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                } else if (state.isProxyChecking) {
+                                    Text(
+                                        text = "Connecting...",
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else if (state.activeProxyError != null) {
+                                    Text(
+                                        text = state.activeProxyError,
                                         fontSize = 14.sp,
                                         lineHeight = 20.sp,
                                         fontWeight = FontWeight.Normal,
@@ -574,5 +609,65 @@ internal fun parseProxyAddressPort(input: String): Pair<String, Int>? {
 
 internal fun formatProxyAddressPort(host: String, port: Int): String {
     return if (host.isNotBlank()) "$host:$port" else ""
+}
+
+@Composable
+private fun ProxyErrorTopBanner(
+    notification: ProxyErrorNotification,
+    onEdit: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.material3.Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 12.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_huge_alert_circle),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = notification.message,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            SettingsPrimaryButton(
+                text = "Edit",
+                width = 54.dp,
+                height = 30.dp,
+                radius = 6.dp,
+                onClick = { onEdit(notification.serverId) }
+            )
+            SquareIconButton(
+                iconRes = R.drawable.ic_huge_multiplication_sign,
+                contentDescription = "Dismiss",
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                size = 28.dp,
+                iconSize = 14.dp,
+                elevation = 0.dp,
+                onClick = onDismiss
+            )
+        }
+    }
 }
 
