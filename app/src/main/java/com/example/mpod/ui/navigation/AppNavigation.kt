@@ -30,12 +30,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.mpod.ui.components.AddPodcastModal
 import com.example.mpod.ui.components.AddPodcastMode
 import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.screens.home.HomeRoute
+import com.example.mpod.ui.screens.settings.AddProxyScreen
+import com.example.mpod.ui.screens.settings.EditProxyScreen
 import com.example.mpod.ui.screens.settings.SettingsRoute
+import com.example.mpod.ui.screens.settings.SettingsViewModel
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 import com.example.mpod.ui.theme.ThemeMode
 
@@ -109,7 +114,40 @@ fun AppNavigation(
             composable(Screen.Settings.route) {
                 SettingsRoute(
                     themeMode = themeMode,
-                    onThemeModeChange = onThemeModeChange
+                    onThemeModeChange = onThemeModeChange,
+                    onNavigateToAddProxy = { navController.navigate(Screen.AddProxy.route) },
+                    onNavigateToEditProxy = { serverId -> navController.navigate(Screen.EditProxy.createRoute(serverId)) }
+                )
+            }
+            composable(Screen.AddProxy.route) {
+                val settingsViewModel: SettingsViewModel = hiltViewModel()
+                AddProxyScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaveServer = { name, host, port, username, password ->
+                        settingsViewModel.addProxyServer(name, host, port, username, password)
+                    },
+                    onSaveSuccess = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = Screen.EditProxy.route,
+                arguments = listOf(navArgument("serverId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val serverId = backStackEntry.arguments?.getString("serverId") ?: ""
+                val settingsViewModel: SettingsViewModel = hiltViewModel()
+                val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+                val server = settingsState.proxyServers.firstOrNull { it.id == serverId }
+                EditProxyScreen(
+                    server = server,
+                    onBack = { navController.popBackStack() },
+                    onUpdateServer = { id, name, host, port, username, password ->
+                        settingsViewModel.updateProxyServer(id, name, host, port, username, password)
+                    },
+                    onDeleteServer = { id ->
+                        settingsViewModel.deleteProxyServer(id)
+                    },
+                    onSaveSuccess = { navController.popBackStack() },
+                    onDeleteSuccess = { navController.popBackStack() }
                 )
             }
             dialog(

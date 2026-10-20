@@ -66,11 +66,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.mpod.R
 import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.LabeledInput
 import com.example.mpod.ui.components.MpodSwitch
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.SettingItem
+import com.example.mpod.ui.components.SquareIconButton
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.theme.ThemeMode
 
@@ -78,6 +80,8 @@ import com.example.mpod.ui.theme.ThemeMode
 fun SettingsRoute(
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
+    onNavigateToAddProxy: () -> Unit = {},
+    onNavigateToEditProxy: (String) -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -95,6 +99,9 @@ fun SettingsRoute(
         onSaveDailyRefreshTime = viewModel::saveDailyRefreshTime,
         onProxyToggle = viewModel::setProxyEnabled,
         onSaveProxySettings = viewModel::saveProxySettings,
+        onNavigateToAddProxy = onNavigateToAddProxy,
+        onNavigateToEditProxy = onNavigateToEditProxy,
+        onSelectProxyServer = viewModel::selectProxyServer,
         onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
@@ -109,27 +116,19 @@ fun SettingsScreen(
     onSaveDailyRefreshTime: (String) -> Unit = {},
     onProxyToggle: (Boolean) -> Unit = {},
     onSaveProxySettings: (String, Int, String, String) -> Unit = { _, _, _, _ -> },
+    onNavigateToAddProxy: () -> Unit = {},
+    onNavigateToEditProxy: (String) -> Unit = {},
+    onSelectProxyServer: (String) -> Unit = {},
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    var showChooseProxySheet by rememberSaveable { mutableStateOf(false) }
 
-    var proxyAddressPortInput by rememberSaveable {
-        mutableStateOf(formatProxyAddressPort(state.proxyHost, state.proxyPort))
-    }
-    var proxyUserInput by rememberSaveable { mutableStateOf(state.proxyUsername) }
-    var proxyPasswordInput by rememberSaveable { mutableStateOf(state.proxyPassword) }
     val context = LocalContext.current
 
     LaunchedEffect(state.dailyRefreshTime) {
         feedRefreshTime = state.dailyRefreshTime
-    }
-    LaunchedEffect(state.proxyHost, state.proxyPort) {
-        proxyAddressPortInput = formatProxyAddressPort(state.proxyHost, state.proxyPort)
-    }
-    LaunchedEffect(state.proxyUsername, state.proxyPassword) {
-        proxyUserInput = state.proxyUsername
-        proxyPasswordInput = state.proxyPassword
     }
 
     Column(
@@ -244,7 +243,7 @@ fun SettingsScreen(
             }
         )
 
-        // Card 2: SOCKS5 Proxy toggle & settings (interim card until multi-proxy redesign)
+        // Card 2: SOCKS5 Proxy toggle & multi-proxy management
         SettingItem(
             title = "Use SOCKS5 proxy",
             description = "Turn on if direct connection update fails.",
@@ -261,96 +260,125 @@ fun SettingsScreen(
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
-                    val parsed = parseProxyAddressPort(proxyAddressPortInput)
-                    val isSaveEnabled = parsed != null
-
                     Column(modifier = Modifier.fillMaxWidth()) {
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             color = MaterialTheme.colorScheme.outline
                         )
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    text = "Proxy settings",
-                                    fontSize = 16.sp,
-                                    lineHeight = 24.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                        if (state.proxyServers.isEmpty()) {
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = "Choose proxy server",
+                                        fontSize = 16.sp,
+                                        lineHeight = 24.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = "No proxy set up. Add at least one",
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                trailingContent = {
+                                    SquareIconButton(
+                                        iconRes = R.drawable.ic_huge_arrow_right_01,
+                                        contentDescription = "Add proxy",
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.primary,
+                                        size = 40.dp,
+                                        iconSize = 16.dp,
+                                        radius = 8.dp,
+                                        onClick = onNavigateToAddProxy
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
+                                ),
+                                modifier = Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    role = Role.Button,
+                                    onClick = onNavigateToAddProxy
                                 )
-                            },
-                            supportingContent = {
-                                Text(
-                                    text = "Fill out to connect to the server",
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = Color.Transparent
                             )
-                        )
-                        Column(
+                        } else {
+                            val activeServerName = state.activeProxyServer?.name
+                                ?: state.activeProxyServer?.host
+                                ?: "None"
+                            ListItem(
+                                headlineContent = {
+                                    Text(
+                                        text = "Choose proxy server",
+                                        fontSize = 16.sp,
+                                        lineHeight = 24.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = "Current - $activeServerName",
+                                        fontSize = 14.sp,
+                                        lineHeight = 20.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                trailingContent = {
+                                    SquareIconButton(
+                                        iconRes = R.drawable.ic_huge_arrow_right_01,
+                                        contentDescription = "Choose proxy server",
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.primary,
+                                        size = 40.dp,
+                                        iconSize = 16.dp,
+                                        radius = 8.dp,
+                                        onClick = { showChooseProxySheet = true }
+                                    )
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
+                                ),
+                                modifier = Modifier.clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    role = Role.Button,
+                                    onClick = { showChooseProxySheet = true }
+                                )
+                            )
+                        }
+
+                        SettingsPrimaryButton(
+                            text = "Add new proxy",
+                            width = null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .padding(bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            LabeledInput(
-                                label = "Proxy address:port",
-                                value = proxyAddressPortInput,
-                                onValueChange = { proxyAddressPortInput = it },
-                                placeholder = "E.g. 192.168.1.1:1080"
-                            )
-
-                            LabeledInput(
-                                label = "User login",
-                                value = proxyUserInput,
-                                onValueChange = { proxyUserInput = it },
-                                placeholder = "Enter username"
-                            )
-
-                            LabeledInput(
-                                label = "Password",
-                                value = proxyPasswordInput,
-                                onValueChange = { proxyPasswordInput = it },
-                                placeholder = "Enter password",
-                                visualTransformation = PasswordVisualTransformation()
-                            )
-
-                            if (state.proxyMessage != null) {
-                                Text(
-                                    text = state.proxyMessage,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            SettingsPrimaryButton(
-                                text = "Save settings",
-                                width = null,
-                                modifier = Modifier.fillMaxWidth(),
-                                height = 36.dp,
-                                radius = 10.dp,
-                                enabled = isSaveEnabled,
-                                onClick = {
-                                    if (parsed != null) {
-                                        onSaveProxySettings(
-                                            parsed.first,
-                                            parsed.second,
-                                            proxyUserInput,
-                                            proxyPasswordInput
-                                        )
-                                    }
-                                }
-                            )
-                        }
+                            height = 36.dp,
+                            radius = 8.dp,
+                            onClick = onNavigateToAddProxy
+                        )
                     }
                 }
             }
         )
+
+        if (showChooseProxySheet) {
+            ChooseProxyBottomSheet(
+                proxyServers = state.proxyServers,
+                activeServerId = state.selectedProxyServerId,
+                onSelectServer = onSelectProxyServer,
+                onNavigateToEditProxy = onNavigateToEditProxy,
+                onDismiss = { showChooseProxySheet = false }
+            )
+        }
 
         // Card 3: Use dark theme
         SettingItem(
@@ -509,7 +537,7 @@ private fun SettingsPrimaryButton(
     width: Dp? = 100.dp,
     height: Dp = 36.dp,
     radius: Dp = 10.dp,
-    enabled: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(radius)
