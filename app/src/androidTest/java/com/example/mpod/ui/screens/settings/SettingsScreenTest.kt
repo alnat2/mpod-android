@@ -38,7 +38,8 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
         composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
         composeRule.onNodeWithText("Use this option if it feels more comfortable for you.").assertIsDisplayed()
-        composeRule.onAllNodesWithText("Export OPML").get(0).assertIsDisplayed()
+        composeRule.onNodeWithText("Export OPML").assertIsDisplayed()
+        composeRule.onNodeWithText("Export").assertIsDisplayed()
     }
 
     @Test
@@ -110,7 +111,7 @@ class SettingsScreenTest {
             }
         }
 
-        composeRule.onNode(hasText("Export OPML") and hasClickAction()).performClick()
+        composeRule.onNode(hasText("Export") and hasClickAction()).performClick()
         composeRule.runOnIdle { assertEquals(1, exports) }
     }
 

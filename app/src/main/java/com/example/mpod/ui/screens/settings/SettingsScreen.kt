@@ -408,12 +408,17 @@ fun SettingsScreen(
         SettingItem(
             title = "Export OPML",
             description = "Download the current subscription list as an OPML file.",
-            action = {
+            showAction = false,
+            content = {
                 SettingsPrimaryButton(
-                    text = if (state.isExportingOpml) "Exporting" else "Export OPML",
-                    width = 113.dp,
-                    height = 36.dp,
-                    radius = 6.dp,
+                    text = if (state.isExportingOpml) "Exporting" else "Export",
+                    width = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp),
+                    height = 32.dp,
+                    radius = 8.dp,
                     enabled = !state.isExportingOpml,
                     onClick = onExportOpml
                 )
