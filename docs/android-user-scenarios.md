@@ -19,7 +19,9 @@ Expected behavior is taken from these sources, in order:
 
 When a required behavior is absent or the sources disagree, the scenario is marked `Open`. It must not be implemented from an assumption.
 
-Explicit chat decisions override stale Figma states. In particular, the first bottom navigation destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen; subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation dialog, and the start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
+Explicit chat decisions override stale Figma states. In particular, the first bottom navigation destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen (there is no mini-player in mpoddy; Player is a dedicated full tab destination); subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation dialog, and the start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
+
+Notification and alert banners are rendered at the top of the screen (with status-bar padding and 10dp top offset) so that they never obstruct bottom navigation or gesture insets. A strict "Single Active Banner" policy (Variant B — Last-in wins) is enforced: triggering a new pending action immediately commits any prior pending action to the Room DB and resets the 15-second undo countdown for the latest action. Dismissing via `[✕]` immediately commits the action. Banners use a unified dark-surface card layout (`RoundedCornerShape(16.dp)`, `FigmaShadowStyle.Sm`), high-contrast white text (`onSurface`), filled primary green action buttons (`height = 36.dp, radius = 8.dp`), and green dismiss icons. Error banners specifically apply a `1.5.dp` solid border in `MaterialTheme.colorScheme.error` (`#F83D41`), while undo banners have no border.
 
 ## Scenario status
 
@@ -100,6 +102,8 @@ Explicit chat decisions override stale Figma states. In particular, the first bo
 | SUB-13 | Network drops during feed refresh | Network failure is caught gracefully; previous Room DB state remains intact | C,E,L | Verified |
 | SUB-14 | Episode list for one podcast fails parsing while others load | Failure stays scoped to that podcast; other podcasts remain usable | U,E | Verified |
 | SUB-15 | Tap Unsubscribe, then Undo within 15 seconds | Unsubscribe job is cancelled and podcast remains in Room DB and UI | C,U,E,L | Verified |
+| SUB-15b | Unsubscribe from another podcast while an undo countdown is active (Variant B) | Prior pending unsubscribe is committed immediately to Room DB; countdown resets to 15s for the newly unsubscribed podcast | C,U | Verified |
+| SUB-15c | Tap dismiss ([✕]) on Unsubscribe Undo banner | Pending unsubscribe is committed immediately to Room DB and banner is dismissed without waiting for the timer | C,U | Verified |
 | SUB-16 | Let the 15-second unsubscribe countdown expire | Podcast and its episodes are deleted from Room DB; active episode cleared if belonging to this podcast | C,U,E,L | Verified |
 | SUB-17 | Database error during delete | Error is surfaced and podcast remains visible in Room DB | C,U,E,L | Verified |
 | SUB-18 | Re-enter or recreate Subscriptions after a successful load | Room Flow delivers cached state immediately without empty-library flicker | C,U,E,L | Verified |

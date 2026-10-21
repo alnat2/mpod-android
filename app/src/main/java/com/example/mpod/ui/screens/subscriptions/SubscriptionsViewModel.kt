@@ -132,7 +132,13 @@ class SubscriptionsViewModel @Inject constructor(
 
     @MainThread
     fun schedulePodcastUnsubscribe(podcastId: Long) {
-        if (_state.value.pendingUnsubscribe != null) return
+        val previous = _state.value.pendingUnsubscribe
+        if (previous != null) {
+            if (previous.podcastId == podcastId) return
+            pendingUnsubscribeJob?.cancel()
+            pendingUnsubscribeJob = null
+            unsubscribePodcastNow(previous.podcastId)
+        }
         val podcast = _state.value.podcasts.firstOrNull { it.id == podcastId } ?: return
         val countdown = unsubscribeCountdownSeconds()
         _state.update { current ->
@@ -170,6 +176,14 @@ class SubscriptionsViewModel @Inject constructor(
         pendingUnsubscribeJob?.cancel()
         pendingUnsubscribeJob = null
         _state.update { current -> current.copy(pendingUnsubscribe = null) }
+    }
+
+    @MainThread
+    fun dismissPendingUnsubscribe(podcastId: Long) {
+        if (_state.value.pendingUnsubscribe?.podcastId != podcastId) return
+        pendingUnsubscribeJob?.cancel()
+        pendingUnsubscribeJob = null
+        unsubscribePodcastNow(podcastId)
     }
 
     @MainThread

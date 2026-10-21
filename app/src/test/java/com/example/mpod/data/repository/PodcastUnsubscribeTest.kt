@@ -256,6 +256,41 @@ class PodcastUnsubscribeTest {
         assertFalse(owner.isCancelled)
     }
 
+    @Test fun consecutiveUnsubscribe_commitsFirstImmediately_andStartsSecondCountdown() = runBlocking {
+        podcastFlow.value = listOf(
+            PodcastEntity(id = 1, title = "Podcast 1", feedUrl = "https://example.com/feed1"),
+            PodcastEntity(id = 2, title = "Podcast 2", feedUrl = "https://example.com/feed2")
+        )
+        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce && it.podcasts.size == 2 } }
+
+        viewModel.schedulePodcastUnsubscribe(1)
+        val pending1 = withTimeout(5000) { viewModel.state.first { it.pendingUnsubscribe?.podcastId == 1L } }.pendingUnsubscribe
+        assertNotNull(pending1)
+        assertEquals(1L, pending1!!.podcastId)
+
+        // Now trigger unsubscribe on podcast 2 (Variant B)
+        viewModel.schedulePodcastUnsubscribe(2)
+
+        // Podcast 1 must be committed and deleted immediately
+        withTimeout(5000) { viewModel.state.first { it.pendingUnsubscribe?.podcastId == 2L && it.podcasts.none { p -> p.id == 1L } } }
+        val pending2 = viewModel.state.value.pendingUnsubscribe
+        assertNotNull(pending2)
+        assertEquals(2L, pending2!!.podcastId)
+        assertFalse("Podcast 1 must be deleted from Room", rows.containsKey(101))
+        assertTrue("Podcast 2 must still exist", rows.containsKey(201))
+    }
+
+    @Test fun dismissPendingUnsubscribe_commitsImmediately() = runBlocking {
+        withTimeout(5000) { viewModel.state.first { it.hasLoadedOnce && it.podcasts.any { p -> p.id == 1L } } }
+        viewModel.schedulePodcastUnsubscribe(1)
+        withTimeout(5000) { viewModel.state.first { it.pendingUnsubscribe != null } }
+
+        viewModel.dismissPendingUnsubscribe(1)
+        withTimeout(5000) { viewModel.state.first { it.pendingUnsubscribe == null && it.podcasts.none { p -> p.id == 1L } } }
+        assertNull(viewModel.state.value.pendingUnsubscribe)
+        assertFalse("Podcast 1 must be deleted from Room", rows.containsKey(101))
+    }
+
     private fun startDownload(id: Long) {
         server.enqueue(MockResponse().setBody("audio body"))
         schedule(id)

@@ -637,18 +637,18 @@ private fun ProxyErrorTopBanner(
     androidx.compose.material3.Card(
         modifier = modifier
             .fillMaxWidth()
-            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 12.dp),
-        shape = RoundedCornerShape(12.dp),
+            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 16.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_huge_alert_circle),
@@ -661,25 +661,26 @@ private fun ProxyErrorTopBanner(
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             SettingsPrimaryButton(
                 text = "Edit",
-                width = 54.dp,
-                height = 30.dp,
-                radius = 6.dp,
+                width = 58.dp,
+                height = 36.dp,
+                radius = 8.dp,
                 onClick = { onEdit(notification.serverId) }
             )
             SquareIconButton(
                 iconRes = R.drawable.ic_huge_multiplication_sign,
                 contentDescription = "Dismiss",
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                size = 28.dp,
-                iconSize = 14.dp,
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = MaterialTheme.colorScheme.primary,
+                size = 36.dp,
+                iconSize = 16.dp,
+                radius = 8.dp,
                 elevation = 0.dp,
                 onClick = onDismiss
             )

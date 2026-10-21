@@ -1,5 +1,6 @@
 package com.example.mpod.ui.screens.subscriptions
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -61,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.mpod.R
 import com.example.mpod.ui.components.SubscriptionEpisodeItem
 import com.example.mpod.ui.components.UnsubscribeUndoBanner
+import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodBottomNav
@@ -88,6 +90,7 @@ fun SubscriptionsRoute(
         onRefreshPodcast = viewModel::refreshPodcast,
         onUnsubscribePodcast = viewModel::schedulePodcastUnsubscribe,
         onUndoPodcastUnsubscribe = viewModel::undoPodcastUnsubscribe,
+        onDismissPendingUnsubscribe = viewModel::dismissPendingUnsubscribe,
         onMarkAllListened = viewModel::markAllListened,
         onAddEpisodeToPlaylist = viewModel::addEpisodeToPlaylist,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
@@ -107,6 +110,7 @@ fun SubscriptionsScreen(
     onRefreshPodcast: (Long) -> Unit = {},
     onUnsubscribePodcast: (Long) -> Unit = {},
     onUndoPodcastUnsubscribe: (Long) -> Unit = {},
+    onDismissPendingUnsubscribe: (Long) -> Unit = {},
     onMarkAllListened: (Long) -> Unit = {},
     onAddEpisodeToPlaylist: (Long) -> Unit = {},
     onRemoveEpisodeFromPlaylist: (Long) -> Unit = {},
@@ -283,7 +287,8 @@ fun SubscriptionsScreen(
                                     refreshEnabled = !state.isRefreshingAll && podcast.id !in state.refreshingPodcastIds,
                                     isUnsubscribing = podcast.id in state.unsubscribingPodcastIds,
                                     isUnsubscribePending = state.pendingUnsubscribe?.podcastId == podcast.id,
-                                    unsubscribeEnabled = state.pendingUnsubscribe == null,
+                                    unsubscribeEnabled = podcast.id !in state.unsubscribingPodcastIds &&
+                                        state.pendingUnsubscribe?.podcastId != podcast.id,
                                     errorMessage = podcast.errorMessage,
                                     onRefresh = { onRefreshPodcast(podcast.id) },
                                     modifier = if (isSelected) {
@@ -366,6 +371,7 @@ fun SubscriptionsScreen(
                 podcastTitle = pending.podcastTitle,
                 secondsRemaining = pending.secondsRemaining,
                 onUndo = { onUndoPodcastUnsubscribe(pending.podcastId) },
+                onDismiss = { onDismissPendingUnsubscribe(pending.podcastId) },
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp)
@@ -573,37 +579,38 @@ private fun RefreshErrorBanner(
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val destructive = Color(0xFFE7000B)
-    Row(
+    Card(
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .border(1.dp, destructive, RoundedCornerShape(8.dp))
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Text(
-            text = message,
-            fontSize = MaterialTheme.typography.bodySmall.fontSize,
-            lineHeight = MaterialTheme.typography.bodySmall.lineHeight,
-            fontWeight = FontWeight.Medium,
-            color = destructive,
-            modifier = Modifier.weight(1f)
-        )
-        MpodButton(
-            text = "Try again",
-            primary = false,
-            outlined = true,
-            height = 32.dp,
-            radius = 6.dp,
-            containerColor = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.width(86.dp),
-            onClick = onRetry
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            MpodButton(
+                text = "Try again",
+                primary = true,
+                height = 36.dp,
+                radius = 8.dp,
+                onClick = onRetry
+            )
+        }
     }
 }
 
