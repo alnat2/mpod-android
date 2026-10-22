@@ -251,6 +251,12 @@ class SettingsViewModel @Inject constructor(
             username = username.trim(),
             password = password
         )
+        // Optimistically update the in-memory list so the new name is immediately
+        // visible in ChooseProxyBottomSheet after popBackStack, before DataStore emits.
+        val optimisticServers = _state.value.proxyServers.map { s ->
+            if (s.id == updatedServer.id) updatedServer else s
+        }
+        _state.value = _state.value.copy(proxyServers = optimisticServers)
         viewModelScope.launch {
             appSettingsDataStore.updateProxyServer(updatedServer)
             val current = appSettingsDataStore.settingsFlow.first()
