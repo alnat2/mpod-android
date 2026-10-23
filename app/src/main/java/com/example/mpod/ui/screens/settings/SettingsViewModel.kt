@@ -251,26 +251,45 @@ class SettingsViewModel @Inject constructor(
             username = username.trim(),
             password = password
         )
-        // Optimistically update the in-memory list so the new name is immediately
-        // visible in ChooseProxyBottomSheet after popBackStack, before DataStore emits.
-        val optimisticServers = _state.value.proxyServers.map { s ->
+        // Optimistically update in-memory state so the new name is immediately
+        // visible in ChooseProxyBottomSheet and SettingsScreen after popBackStack,
+        // before DataStore emits.
+        val previousState = _state.value
+        val optimisticServers = previousState.proxyServers.map { s ->
             if (s.id == updatedServer.id) updatedServer else s
         }
-        _state.value = _state.value.copy(proxyServers = optimisticServers)
+        val optimisticActive = if (previousState.activeProxyServer?.id == updatedServer.id) {
+            updatedServer
+        } else {
+            previousState.activeProxyServer
+        }
+        _state.value = previousState.copy(
+            proxyServers = optimisticServers,
+            activeProxyServer = optimisticActive
+        )
         viewModelScope.launch {
-            appSettingsDataStore.updateProxyServer(updatedServer)
-            val current = appSettingsDataStore.settingsFlow.first()
-            proxyHttpClientFactory.updateProxy(current)
-            _state.value = _state.value.copy(proxyMessage = "Proxy server updated.")
+            try {
+                appSettingsDataStore.updateProxyServer(updatedServer)
+                val current = appSettingsDataStore.settingsFlow.first()
+                proxyHttpClientFactory.updateProxy(current)
+                _state.value = _state.value.copy(proxyMessage = "Proxy server updated.")
 
-            val isActive = current.activeProxyServer?.id == updatedServer.id
-            if (isActive) {
+                val isActive = current.activeProxyServer?.id == updatedServer.id
+                if (isActive) {
+                    _state.value = _state.value.copy(
+                        isProxyChecking = true,
+                        activeProxyError = null
+                    )
+                }
+                verifyProxyConnection(updatedServer, isBackgroundAddOrEdit = true)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _state.value = _state.value.copy(
-                    isProxyChecking = true,
-                    activeProxyError = null
+                    proxyServers = previousState.proxyServers,
+                    activeProxyServer = previousState.activeProxyServer,
+                    proxyMessage = "Failed to update proxy server: ${e.message ?: "Unknown error"}"
                 )
             }
-            verifyProxyConnection(updatedServer, isBackgroundAddOrEdit = true)
         }
         return Result.success(Unit)
     }
