@@ -21,6 +21,7 @@ import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -229,11 +230,12 @@ class SettingsViewModelProxyAddTest {
             port = 1080
         )
 
-        try {
-            testDispatcher.scheduler.runCurrent()
-        } catch (e: Throwable) {
-            assertTrue("Expected CancellationException to propagate", e is kotlinx.coroutines.CancellationException)
-        }
+        testDispatcher.scheduler.runCurrent()
+
+        // CancellationException must not trigger rollback or set an error message
+        assertEquals(2, cancellingVm.state.value.proxyServers.size)
+        assertEquals("Cancelled Server", cancellingVm.state.value.proxyServers[1].name)
+        assertNull(cancellingVm.state.value.proxyMessage)
 
         cancellingVm.viewModelScope.cancel()
     }
