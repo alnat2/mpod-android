@@ -36,16 +36,6 @@ data class AppSettings(
                 if (found != null) return found
                 return proxyServers.first()
             }
-            if (proxyHost.isNotBlank()) {
-                return ProxyServerConfig(
-                    id = "legacy_default",
-                    name = "Default Proxy",
-                    host = proxyHost,
-                    port = proxyPort,
-                    username = proxyUsername,
-                    password = proxyPassword
-                )
-            }
             return null
         }
 }
@@ -98,20 +88,8 @@ class AppSettingsDataStore @Inject constructor(
 
     override val settingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
         val rawServersJson = prefs[Keys.PROXY_SERVERS_JSON]
-        val legacyHost = prefs[Keys.PROXY_HOST] ?: ""
         val servers = if (!rawServersJson.isNullOrBlank()) {
             parseProxyServersJson(rawServersJson)
-        } else if (legacyHost.isNotBlank()) {
-            listOf(
-                ProxyServerConfig(
-                    id = "legacy_default",
-                    name = "Default Proxy",
-                    host = legacyHost,
-                    port = prefs[Keys.PROXY_PORT] ?: 1080,
-                    username = prefs[Keys.PROXY_USERNAME] ?: "",
-                    password = prefs[Keys.PROXY_PASSWORD] ?: ""
-                )
-            )
         } else {
             emptyList()
         }
@@ -125,10 +103,10 @@ class AppSettingsDataStore @Inject constructor(
             proxyServers = servers,
             selectedProxyServerId = selectedId,
             proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
-            proxyHost = activeServer?.host ?: legacyHost,
-            proxyPort = activeServer?.port ?: (prefs[Keys.PROXY_PORT] ?: 1080),
-            proxyUsername = activeServer?.username ?: (prefs[Keys.PROXY_USERNAME] ?: ""),
-            proxyPassword = activeServer?.password ?: (prefs[Keys.PROXY_PASSWORD] ?: ""),
+            proxyHost = activeServer?.host ?: "",
+            proxyPort = activeServer?.port ?: 1080,
+            proxyUsername = activeServer?.username ?: "",
+            proxyPassword = activeServer?.password ?: "",
             themeMode = prefs[Keys.THEME_MODE] ?: "System",
             activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,

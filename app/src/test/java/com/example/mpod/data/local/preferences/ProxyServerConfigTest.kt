@@ -99,21 +99,12 @@ class ProxyServerConfigTest {
         )
         assertEquals(server1, settingsFallbackFirst.activeProxyServer)
 
-        // When proxy enabled, proxyServers empty, but legacy proxyHost is set
-        val settingsLegacyFallback = AppSettings(
+        // When proxy enabled, proxyServers empty -> activeProxyServer is null
+        val settingsEmpty = AppSettings(
             isProxyEnabled = true,
-            proxyServers = emptyList(),
-            proxyHost = "legacy.proxy.com",
-            proxyPort = 9050,
-            proxyUsername = "legacyUser",
-            proxyPassword = "legacyPassword"
+            proxyServers = emptyList()
         )
-        val legacyResolved = settingsLegacyFallback.activeProxyServer
-        assertTrue(legacyResolved != null)
-        assertEquals("legacy.proxy.com", legacyResolved?.host)
-        assertEquals(9050, legacyResolved?.port)
-        assertEquals("legacyUser", legacyResolved?.username)
-        assertEquals("legacyPassword", legacyResolved?.password)
+        org.junit.Assert.assertNull(settingsEmpty.activeProxyServer)
 
         // When proxy is disabled -> activeProxyServer still points to the configured server
         val settingsDisabled = AppSettings(

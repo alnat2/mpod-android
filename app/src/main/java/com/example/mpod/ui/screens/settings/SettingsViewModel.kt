@@ -125,16 +125,14 @@ class SettingsViewModel @Inject constructor(
                 loadCurrentIpGeo()
             } else {
                 val server = current.activeProxyServer
-                if (server == null && current.proxyHost.isBlank()) {
-                    _state.value = _state.value.copy(proxyMessage = "Enter proxy address and port below.")
-                } else if (server != null) {
+                if (server == null) {
+                    _state.value = _state.value.copy(proxyMessage = "No proxy set up. Add at least one.")
+                } else {
                     _state.value = _state.value.copy(
                         isProxyChecking = true,
                         activeProxyError = null
                     )
                     verifyProxyConnection(server, isBackgroundAddOrEdit = false)
-                } else {
-                    loadCurrentIpGeo()
                 }
             }
         }
@@ -194,21 +192,39 @@ class SettingsViewModel @Inject constructor(
             username = username.trim(),
             password = password
         )
-        viewModelScope.launch {
-            val wasEmpty = _state.value.proxyServers.isEmpty()
-            appSettingsDataStore.addProxyServer(newServer)
-            val current = appSettingsDataStore.settingsFlow.first()
-            proxyHttpClientFactory.updateProxy(current)
-            _state.value = _state.value.copy(proxyMessage = "Proxy server saved.")
+        val previousState = _state.value
+        val wasEmpty = previousState.proxyServers.isEmpty()
+        val optimisticServers = previousState.proxyServers + newServer
+        val optimisticActive = if (wasEmpty || previousState.activeProxyServer == null) {
+            newServer
+        } else {
+            previousState.activeProxyServer
+        }
+        _state.value = previousState.copy(
+            proxyServers = optimisticServers,
+            activeProxyServer = optimisticActive
+        )
 
-            val isActive = current.activeProxyServer?.id == newServer.id || wasEmpty
-            if (isActive) {
-                _state.value = _state.value.copy(
-                    isProxyChecking = true,
-                    activeProxyError = null
+        viewModelScope.launch {
+            try {
+                appSettingsDataStore.addProxyServer(newServer)
+                val current = appSettingsDataStore.settingsFlow.first()
+                proxyHttpClientFactory.updateProxy(current)
+                _state.value = _state.value.copy(proxyMessage = "Proxy server saved.")
+
+                val isActive = current.activeProxyServer?.id == newServer.id || wasEmpty
+                if (isActive) {
+                    _state.value = _state.value.copy(
+                        isProxyChecking = true,
+                        activeProxyError = null
+                    )
+                }
+                verifyProxyConnection(newServer, isBackgroundAddOrEdit = true)
+            } catch (e: Exception) {
+                _state.value = previousState.copy(
+                    proxyMessage = "Failed to add proxy server: ${e.message}"
                 )
             }
-            verifyProxyConnection(newServer, isBackgroundAddOrEdit = true)
         }
         return Result.success(newServer)
     }
