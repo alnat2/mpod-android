@@ -219,8 +219,11 @@ class SettingsViewModel @Inject constructor(
                         activeProxyError = null
                     )
                 }
+                // Even if the new server is not the active one, run a background health check
+                // to notify the user via topProxyNotification if the credentials or host are invalid.
                 verifyProxyConnection(newServer, isBackgroundAddOrEdit = true)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _state.value = previousState.copy(
                     proxyMessage = "Failed to add proxy server: ${e.message}"
                 )

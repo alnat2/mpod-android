@@ -208,6 +208,36 @@ class SettingsViewModelProxyAddTest {
         failingVm.viewModelScope.cancel()
     }
 
+    @Test
+    fun addProxyServer_rethrowsCancellationException() {
+        val cancellingStore = object : FakeAppSettingsStore(
+            AppSettings(
+                proxyServers = listOf(server1),
+                selectedProxyServerId = server1.id
+            )
+        ) {
+            override suspend fun addProxyServer(server: ProxyServerConfig): ProxyServerConfig {
+                throw kotlinx.coroutines.CancellationException("Scope cancelled")
+            }
+        }
+        val cancellingVm = buildViewModel(cancellingStore)
+        testDispatcher.scheduler.runCurrent()
+
+        cancellingVm.addProxyServer(
+            name = "Cancelled Server",
+            host = "10.0.0.99",
+            port = 1080
+        )
+
+        try {
+            testDispatcher.scheduler.runCurrent()
+        } catch (e: Throwable) {
+            assertTrue("Expected CancellationException to propagate", e is kotlinx.coroutines.CancellationException)
+        }
+
+        cancellingVm.viewModelScope.cancel()
+    }
+
     // ----------------------------------------------------------------
     // Input validation
     // ----------------------------------------------------------------

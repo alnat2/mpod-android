@@ -94,23 +94,26 @@ class AppSettingsDataStore @Inject constructor(
             emptyList()
         }
         val selectedId = prefs[Keys.SELECTED_PROXY_SERVER_ID] ?: servers.firstOrNull()?.id
-        val activeServer = servers.firstOrNull { it.id == selectedId } ?: servers.firstOrNull()
 
-        AppSettings(
+        val baseSettings = AppSettings(
             isAutoRefreshEnabled = prefs[Keys.AUTO_REFRESH_ENABLED] ?: false,
             dailyRefreshTime = prefs[Keys.DAILY_REFRESH_TIME] ?: "03:00",
             isProxyEnabled = prefs[Keys.PROXY_ENABLED] ?: false,
             proxyServers = servers,
             selectedProxyServerId = selectedId,
             proxyType = prefs[Keys.PROXY_TYPE] ?: "SOCKS5",
-            proxyHost = activeServer?.host ?: "",
-            proxyPort = activeServer?.port ?: 1080,
-            proxyUsername = activeServer?.username ?: "",
-            proxyPassword = activeServer?.password ?: "",
             themeMode = prefs[Keys.THEME_MODE] ?: "System",
             activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
             lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
+        )
+        val active = baseSettings.activeProxyServer
+        // TODO: Flat PROXY_HOST/PORT/USERNAME/PASSWORD fields are legacy; remove after full migration to PROXY_SERVERS_JSON
+        baseSettings.copy(
+            proxyHost = active?.host ?: "",
+            proxyPort = active?.port ?: 1080,
+            proxyUsername = active?.username ?: "",
+            proxyPassword = active?.password ?: ""
         )
     }
 
@@ -178,6 +181,7 @@ class AppSettingsDataStore @Inject constructor(
             prefs[Keys.PROXY_SERVERS_JSON] = serializeProxyServers(currentList)
             val selectedId = prefs[Keys.SELECTED_PROXY_SERVER_ID]
             if (selectedId.isNullOrBlank() || currentList.size == 1) {
+                // TODO: flat PROXY_HOST/PORT/USERNAME/PASSWORD fields are legacy; remove after full migration to PROXY_SERVERS_JSON
                 prefs[Keys.SELECTED_PROXY_SERVER_ID] = addedServer.id
                 prefs[Keys.PROXY_HOST] = addedServer.host
                 prefs[Keys.PROXY_PORT] = addedServer.port
@@ -196,6 +200,7 @@ class AppSettingsDataStore @Inject constructor(
                 currentList[index] = server
                 prefs[Keys.PROXY_SERVERS_JSON] = serializeProxyServers(currentList)
                 if (prefs[Keys.SELECTED_PROXY_SERVER_ID] == server.id) {
+                    // TODO: flat PROXY_HOST/PORT/USERNAME/PASSWORD fields are legacy; remove after full migration to PROXY_SERVERS_JSON
                     prefs[Keys.PROXY_HOST] = server.host
                     prefs[Keys.PROXY_PORT] = server.port
                     prefs[Keys.PROXY_USERNAME] = server.username
@@ -213,6 +218,7 @@ class AppSettingsDataStore @Inject constructor(
             if (prefs[Keys.SELECTED_PROXY_SERVER_ID] == serverId) {
                 val nextActive = currentList.firstOrNull()
                 if (nextActive != null) {
+                    // TODO: flat PROXY_HOST/PORT/USERNAME/PASSWORD fields are legacy; remove after full migration to PROXY_SERVERS_JSON
                     prefs[Keys.SELECTED_PROXY_SERVER_ID] = nextActive.id
                     prefs[Keys.PROXY_HOST] = nextActive.host
                     prefs[Keys.PROXY_PORT] = nextActive.port
