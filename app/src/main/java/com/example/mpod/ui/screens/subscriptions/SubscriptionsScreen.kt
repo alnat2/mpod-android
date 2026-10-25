@@ -187,7 +187,6 @@ fun SubscriptionsScreen(
                         onViewClick = toggleVisibility
                     )
                     AllCaughtUpState(
-                        onShowAll = toggleVisibility,
                         onAddRssFeed = onAddRssFeed,
                         onImportOpml = onImportOpml
                     )
@@ -518,7 +517,6 @@ private fun SubscriptionsEmptyState(
 
 @Composable
 private fun AllCaughtUpState(
-    onShowAll: () -> Unit,
     onAddRssFeed: () -> Unit,
     onImportOpml: () -> Unit,
     modifier: Modifier = Modifier
@@ -544,11 +542,6 @@ private fun AllCaughtUpState(
                 text = "There are no unlistened episodes. Show all to browse your listened podcasts.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            MpodButton(
-                text = "Show all",
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onShowAll
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

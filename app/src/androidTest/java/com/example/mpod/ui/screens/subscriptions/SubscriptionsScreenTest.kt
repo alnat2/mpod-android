@@ -490,7 +490,7 @@ class SubscriptionsScreenTest {
 
         composeRule.onNodeWithText("All caught up").assertIsDisplayed()
         composeRule.onAllNodesWithText("No podcasts yet").assertCountEquals(0)
-        composeRule.onNodeWithText("Show all").performClick()
+        composeRule.onNodeWithContentDescription("Show all").performClick()
         composeRule.onNodeWithTag("subscriptions_podcast_pager").assertIsDisplayed()
         composeRule.onNodeWithText("First listened episode").assertIsDisplayed()
     }
