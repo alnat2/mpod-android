@@ -268,75 +268,80 @@ class PodcastRepositoryRefreshAllTest {
     }
 
     private class FakePodcastDao(initial: List<PodcastEntity>) : PodcastDao {
+        private val lock = Any()
         private val podcasts = initial.toMutableList()
         val deletedPodcastIds = mutableListOf<Long>()
         var deleteAllCalls = 0
 
         override fun getSubscriptionRowsFlow(): Flow<List<com.example.mpod.data.local.model.SubscriptionRow>> = error("Repository does not observe subscriptions")
         override fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = emptyFlow()
-        override fun getAllPodcasts(): List<PodcastEntity> = snapshot()
-        override fun getPodcastById(id: Long): PodcastEntity? = podcasts.find { it.id == id }
-        override fun getPodcastByFeedUrl(feedUrl: String): PodcastEntity? = podcasts.find { it.feedUrl == feedUrl }
+        override fun getAllPodcasts(): List<PodcastEntity> = synchronized(lock) { snapshot() }
+        override fun getPodcastById(id: Long): PodcastEntity? = synchronized(lock) { podcasts.find { it.id == id } }
+        override fun getPodcastByFeedUrl(feedUrl: String): PodcastEntity? = synchronized(lock) { podcasts.find { it.feedUrl == feedUrl } }
 
-        override fun insert(podcast: PodcastEntity): Long {
+        override fun insert(podcast: PodcastEntity): Long = synchronized(lock) {
             val id = podcast.id.takeIf { it != 0L } ?: ((podcasts.maxOfOrNull { it.id } ?: 0L) + 1L)
             podcasts += podcast.copy(id = id)
-            return id
+            id
         }
 
-        override fun update(podcast: PodcastEntity) {
+        override fun update(podcast: PodcastEntity) = synchronized(lock) {
             val index = podcasts.indexOfFirst { it.id == podcast.id }
             if (index >= 0) podcasts[index] = podcast
         }
 
-        override fun deleteById(id: Long) {
+        override fun deleteById(id: Long) = synchronized(lock) {
             deletedPodcastIds += id
             podcasts.removeAll { it.id == id }
+            Unit
         }
 
-        override fun deleteAll() {
+        override fun deleteAll() = synchronized(lock) {
             deleteAllCalls += 1
             podcasts.clear()
         }
 
-        fun snapshot(): List<PodcastEntity> = podcasts.toList()
+        fun snapshot(): List<PodcastEntity> = synchronized(lock) { podcasts.toList() }
     }
 
     private class FakeEpisodeDao(initial: List<EpisodeEntity>) : EpisodeDao {
+        private val lock = Any()
         private val episodes = initial.toMutableList()
 
         override fun getEpisodesByPodcastIdFlow(podcastId: Long): Flow<List<EpisodeEntity>> = emptyFlow()
         override fun getAllEpisodesWithPodcastFlow(): Flow<List<EpisodeWithPodcast>> = emptyFlow()
-        override fun getEpisodeById(id: Long): EpisodeEntity? = episodes.find { it.id == id }
+        override fun getEpisodeById(id: Long): EpisodeEntity? = synchronized(lock) { episodes.find { it.id == id } }
         override fun getEpisodeWithPodcastById(id: Long): EpisodeWithPodcast? = null
         override fun getEpisodeByPodcastIdAndGuid(podcastId: Long, guid: String): EpisodeEntity? =
-            episodes.find { it.podcastId == podcastId && it.guid == guid }
+            synchronized(lock) { episodes.find { it.podcastId == podcastId && it.guid == guid } }
 
         override fun getEpisodesByPodcastId(podcastId: Long): List<EpisodeEntity> =
-            episodes.filter { it.podcastId == podcastId }
+            synchronized(lock) { episodes.filter { it.podcastId == podcastId } }
 
         override fun insertEpisode(episode: EpisodeEntity): Long = insertEpisodes(listOf(episode)).single()
 
-        override fun insertEpisodes(episodes: List<EpisodeEntity>): List<Long> = episodes.map { episode ->
-            if (this.episodes.any { it.podcastId == episode.podcastId && it.guid == episode.guid }) {
-                -1L
-            } else {
-                val id = episode.id.takeIf { it != 0L } ?: ((this.episodes.maxOfOrNull { it.id } ?: 0L) + 1L)
-                this.episodes += episode.copy(id = id)
-                id
+        override fun insertEpisodes(episodes: List<EpisodeEntity>): List<Long> = synchronized(lock) {
+            episodes.map { episode ->
+                if (this.episodes.any { it.podcastId == episode.podcastId && it.guid == episode.guid }) {
+                    -1L
+                } else {
+                    val id = episode.id.takeIf { it != 0L } ?: ((this.episodes.maxOfOrNull { it.id } ?: 0L) + 1L)
+                    this.episodes += episode.copy(id = id)
+                    id
+                }
             }
         }
 
-        override fun update(episode: EpisodeEntity) {
+        override fun update(episode: EpisodeEntity) = synchronized(lock) {
             val index = episodes.indexOfFirst { it.id == episode.id }
             if (index >= 0) episodes[index] = episode
         }
 
-        override fun setListened(episodeId: Long, listened: Boolean) {
+        override fun setListened(episodeId: Long, listened: Boolean) = synchronized(lock) {
             mutate(episodeId) { it.copy(isListened = listened) }
         }
 
-        override fun setAllListenedForPodcast(podcastId: Long, listened: Boolean) {
+        override fun setAllListenedForPodcast(podcastId: Long, listened: Boolean) = synchronized(lock) {
             episodes.indices.forEach { index ->
                 if (episodes[index].podcastId == podcastId) {
                     episodes[index] = episodes[index].copy(isListened = listened)
@@ -344,11 +349,11 @@ class PodcastRepositoryRefreshAllTest {
             }
         }
 
-        override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) {
+        override fun updatePlaybackPosition(episodeId: Long, positionMs: Long) = synchronized(lock) {
             mutate(episodeId) { it.copy(playbackPositionMs = positionMs) }
         }
 
-        override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) {
+        override fun updateDurationIfMissing(episodeId: Long, durationSeconds: Long) = synchronized(lock) {
             mutate(episodeId) { if (it.durationSeconds <= 0) it.copy(durationSeconds = durationSeconds) else it }
         }
 
@@ -356,20 +361,20 @@ class PodcastRepositoryRefreshAllTest {
         override fun setEpisodesListened(episodeIds: List<Long>): Int = error("Refresh does not mark listened")
         override fun deletePlaylistEpisodes(episodeIds: List<Long>): Int = error("Refresh does not delete playlist")
 
-        override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) {
+        override fun updateDownloadState(episodeId: Long, isDownloaded: Boolean, localFilePath: String?) = synchronized(lock) {
             mutate(episodeId) { it.copy(isDownloaded = isDownloaded, localFilePath = localFilePath) }
         }
 
-        override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int {
+        override fun clearDownloadStateIfMatches(episodeId: Long, expectedIsDownloaded: Boolean, expectedLocalFilePath: String?): Int = synchronized(lock) {
             val current = episodes.firstOrNull { it.id == episodeId }
-            if (current?.isDownloaded != expectedIsDownloaded || current.localFilePath != expectedLocalFilePath) return 0
+            if (current?.isDownloaded != expectedIsDownloaded || current.localFilePath != expectedLocalFilePath) return@synchronized 0
             mutate(episodeId) { it.copy(isDownloaded = false, localFilePath = null) }
-            return 1
+            1
         }
 
-        override fun getDownloadedEpisodes(): List<EpisodeEntity> = episodes.filter { it.isDownloaded }
+        override fun getDownloadedEpisodes(): List<EpisodeEntity> = synchronized(lock) { episodes.filter { it.isDownloaded } }
 
-        fun snapshot(): List<EpisodeEntity> = episodes.toList()
+        fun snapshot(): List<EpisodeEntity> = synchronized(lock) { episodes.toList() }
 
         private fun mutate(episodeId: Long, block: (EpisodeEntity) -> EpisodeEntity) {
             val index = episodes.indexOfFirst { it.id == episodeId }

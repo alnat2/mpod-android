@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -256,7 +257,7 @@ private fun rotatingIconDegrees(rotating: Boolean): Float {
     val transition = rememberInfiniteTransition(label = "refresh_icon_rotation")
     val rotation by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = -360f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 800, easing = LinearEasing)
         ),
@@ -285,6 +286,7 @@ fun MpodInput(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         visualTransformation = visualTransformation,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         textStyle = TextStyle(
             fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
             fontSize = 16.sp,
