@@ -2,6 +2,7 @@ package com.example.mpod.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.mpod.ui.screens.settings.SettingsScreen
@@ -47,6 +48,25 @@ class RefreshAllStatusUiTest {
         composeRule.onNodeWithText(REFRESH_ERROR).assertIsDisplayed()
         composeRule.onNodeWithText("Try again").performClick()
         composeRule.runOnIdle { assertEquals(1, retryCount) }
+    }
+
+    @Test
+    fun failedRefreshCanBeDismissed() {
+        var dismissedCount = 0
+        composeRule.setContent {
+            MpodTheme {
+                SubscriptionsScreen(
+                    state = SubscriptionsUiState(
+                        actionErrorMessage = REFRESH_ERROR
+                    ),
+                    onDismissRefreshError = { dismissedCount += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(REFRESH_ERROR).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dismiss").performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissedCount) }
     }
 
     @Test

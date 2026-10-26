@@ -70,6 +70,7 @@ import com.example.mpod.ui.components.MpodButton
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PodcastCard
 import com.example.mpod.ui.components.ShowNotesMobile
+import com.example.mpod.ui.components.SquareIconButton
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
@@ -97,6 +98,7 @@ fun SubscriptionsRoute(
         onSetEpisodeListened = viewModel::setEpisodeListened,
         onRetryLoad = viewModel::refresh,
         onRetryRefresh = viewModel::retryLastAction,
+        onDismissRefreshError = viewModel::clearActionError,
         onAddRssFeed = onAddRssFeed,
         onImportOpml = onImportOpml
     )
@@ -118,7 +120,8 @@ fun SubscriptionsScreen(
     onRetryLoad: () -> Unit = {},
     onAddRssFeed: () -> Unit = {},
     onImportOpml: () -> Unit = {},
-    onRetryRefresh: () -> Unit = onRefreshAll
+    onRetryRefresh: () -> Unit = onRefreshAll,
+    onDismissRefreshError: () -> Unit = {}
 ) {
     var visibility by rememberSaveable { mutableStateOf(SubscriptionVisibility.Unlistened) }
     val podcasts = remember(state.podcasts, visibility) {
@@ -386,6 +389,7 @@ fun SubscriptionsScreen(
             RefreshErrorBanner(
                 message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
                 onRetry = onRetryRefresh,
+                onDismiss = onDismissRefreshError,
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp)
@@ -570,6 +574,7 @@ private fun AllCaughtUpState(
 private fun RefreshErrorBanner(
     message: String,
     onRetry: () -> Unit = {},
+    onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -588,6 +593,12 @@ private fun RefreshErrorBanner(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_huge_alert_circle),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
             Text(
                 text = message,
                 fontSize = 14.sp,
@@ -603,6 +614,19 @@ private fun RefreshErrorBanner(
                 radius = 8.dp,
                 onClick = onRetry
             )
+            if (onDismiss != null) {
+                SquareIconButton(
+                    iconRes = R.drawable.ic_huge_multiplication_sign,
+                    contentDescription = "Dismiss",
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    size = 36.dp,
+                    iconSize = 16.dp,
+                    radius = 8.dp,
+                    elevation = 0.dp,
+                    onClick = onDismiss
+                )
+            }
         }
     }
 }
