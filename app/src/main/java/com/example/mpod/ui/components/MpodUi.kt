@@ -513,3 +513,113 @@ fun MpodOutlinedSurface(
         content()
     }
 }
+
+enum class StatusBannerType {
+    Error,
+    Info,
+    Loading
+}
+
+@Composable
+fun MpodStatusBanner(
+    message: String,
+    type: StatusBannerType = StatusBannerType.Error,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val borderColor = when (type) {
+        StatusBannerType.Error -> MaterialTheme.colorScheme.error
+        StatusBannerType.Info, StatusBannerType.Loading -> MaterialTheme.colorScheme.outline
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(if (type == StatusBannerType.Error) 1.5.dp else 1.dp, borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            when (type) {
+                StatusBannerType.Loading -> {
+                    val infiniteTransition = rememberInfiniteTransition(label = "status_banner_loading")
+                    val rotation by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = LinearEasing)
+                        ),
+                        label = "loading_rotation"
+                    )
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_huge_loading_02),
+                        contentDescription = "Loading",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .rotate(rotation)
+                    )
+                }
+                StatusBannerType.Error -> {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_huge_alert_circle),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                StatusBannerType.Info -> {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_huge_alert_circle),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (actionLabel != null && onAction != null) {
+                MpodButton(
+                    text = actionLabel,
+                    primary = true,
+                    height = 36.dp,
+                    radius = 8.dp,
+                    onClick = onAction
+                )
+            }
+
+            if (onDismiss != null) {
+                SquareIconButton(
+                    iconRes = R.drawable.ic_huge_multiplication_sign,
+                    contentDescription = "Dismiss",
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    size = 36.dp,
+                    iconSize = 16.dp,
+                    radius = 8.dp,
+                    elevation = 0.dp,
+                    onClick = onDismiss
+                )
+            }
+        }
+    }
+}

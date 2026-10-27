@@ -67,10 +67,12 @@ import com.example.mpod.ui.components.MarkAllListenedHeader
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.MpodButton
+import com.example.mpod.ui.components.MpodStatusBanner
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PodcastCard
 import com.example.mpod.ui.components.ShowNotesMobile
 import com.example.mpod.ui.components.SquareIconButton
+import com.example.mpod.ui.components.StatusBannerType
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
@@ -153,13 +155,17 @@ fun SubscriptionsScreen(
             when {
                 state.isLoading || (!state.hasLoadedOnce && state.errorMessage == null) -> {
                     PageHeader(title = "Subscriptions")
-                    SubscriptionsStatusCard(message = "Loading subscriptions")
+                    MpodStatusBanner(
+                        message = "Loading subscriptions",
+                        type = StatusBannerType.Loading
+                    )
                 }
 
                 state.errorMessage != null -> {
                     PageHeader(title = "Subscriptions")
-                    SubscriptionsStatusCard(
+                    MpodStatusBanner(
                         message = state.errorMessage,
+                        type = StatusBannerType.Error,
                         actionLabel = "Try again",
                         onAction = onRetryLoad
                     )
@@ -304,8 +310,9 @@ fun SubscriptionsScreen(
                     }
 
                     if (selectedPodcast.episodesUnavailable) {
-                        SubscriptionsStatusCard(
+                        MpodStatusBanner(
                             message = "Episodes could not be loaded. Use Refresh on the podcast card to try again.",
+                            type = StatusBannerType.Error,
                             modifier = Modifier.padding(horizontal = 2.dp)
                         )
                     } else {
@@ -386,9 +393,11 @@ fun SubscriptionsScreen(
             state.pendingUnsubscribe == null &&
             (hasRefreshError || refreshErrorMessage != null)
         ) {
-            RefreshErrorBanner(
+            MpodStatusBanner(
                 message = refreshErrorMessage ?: "Refresh failed for \"The Watch\" podcast",
-                onRetry = onRetryRefresh,
+                type = StatusBannerType.Error,
+                actionLabel = "Try again",
+                onAction = onRetryRefresh,
                 onDismiss = onDismissRefreshError,
                 modifier = Modifier
                     .statusBarsPadding()
@@ -419,37 +428,6 @@ internal fun podcastIndexForCarouselPage(page: Int, podcastCount: Int): Int {
     }
 }
 
-@Composable
-private fun SubscriptionsStatusCard(
-    message: String,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .figmaDropShadow(radius = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (actionLabel != null) {
-                MpodButton(text = actionLabel, onClick = onAction)
-            }
-        }
-    }
-}
 
 @Composable
 private fun SubscriptionsEmptyState(
@@ -564,67 +542,6 @@ private fun AllCaughtUpState(
                     outlined = true,
                     modifier = Modifier.weight(1f),
                     onClick = onImportOpml
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RefreshErrorBanner(
-    message: String,
-    onRetry: () -> Unit = {},
-    onDismiss: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.error),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_huge_alert_circle),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            MpodButton(
-                text = "Try again",
-                primary = true,
-                height = 36.dp,
-                radius = 8.dp,
-                onClick = onRetry
-            )
-            if (onDismiss != null) {
-                SquareIconButton(
-                    iconRes = R.drawable.ic_huge_multiplication_sign,
-                    contentDescription = "Dismiss",
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    size = 36.dp,
-                    iconSize = 16.dp,
-                    radius = 8.dp,
-                    elevation = 0.dp,
-                    onClick = onDismiss
                 )
             }
         }

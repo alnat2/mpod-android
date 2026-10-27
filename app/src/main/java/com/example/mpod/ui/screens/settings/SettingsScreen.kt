@@ -74,9 +74,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.mpod.R
 import com.example.mpod.ui.components.FigmaShadowStyle
 import com.example.mpod.ui.components.LabeledInput
+import com.example.mpod.ui.components.MpodStatusBanner
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.SettingItem
 import com.example.mpod.ui.components.SquareIconButton
+import com.example.mpod.ui.components.StatusBannerType
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.theme.ThemeMode
 
@@ -177,9 +179,10 @@ fun SettingsScreen(
         )
 
         if (state.errorMessage != null) {
-            SettingsStatusCard(
+            MpodStatusBanner(
                 message = state.errorMessage,
-                isError = true
+                type = StatusBannerType.Error,
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
@@ -514,35 +517,6 @@ internal fun formatDailyRefreshTime(hour: Int, minute: Int): String {
     return "%02d:%02d".format(hour, minute)
 }
 
-@Composable
-private fun SettingsStatusCard(
-    message: String,
-    modifier: Modifier = Modifier,
-    isError: Boolean = false
-) {
-    androidx.compose.material3.Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = if (isError) BorderStroke(1.dp, MaterialTheme.colorScheme.error) else null,
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Text(
-            text = message,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isError) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.padding(16.dp)
-        )
-    }
-}
 
 @Composable
 internal fun settingsSwitchColors() = SwitchDefaults.colors(

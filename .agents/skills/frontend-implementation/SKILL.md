@@ -73,6 +73,9 @@ Before implementing from Figma, read:
 - Keep reusable components in `app/src/main/java/com/example/mpod/ui/components/` and screen-level composables in `app/src/main/java/com/example/mpod/ui/screens/`.
 - Use semantic `MaterialTheme.colorScheme` tokens (`primary`, `background`, `surface`, `surfaceVariant`, `onSurface`, `onSurfaceVariant`, `outline`, `tertiary`).
 - Do not use raw hardcoded hex colors for app UI unless defining tokens in `Color.kt` or for documented asset colors.
+- Audit parent-child padding hierarchy: ensure parent container `padding` does not get accidentally duplicated on child elements (prevent double-padding that steals content width).
+- Auto Layout fidelity: if Figma container uses `w-full` with centered or spaced content (`justify-center`), Compose container must use `.fillMaxWidth()` with `Arrangement.Center` / `Arrangement.spacedBy(...)`, not `Arrangement.Start` with arbitrary extra margins.
+- Minimum screen fit: verify layout on 320dp width; ensure all tabs, action buttons, and labels fit without clipping or unexpected `TextOverflow.Ellipsis`.
 - Use `Arrangement.spacedBy(...)` for layout spacing inside `Row` and `Column`.
 - Use `Modifier.size(...)` when width and height are equal.
 - Use exact user-facing labels from Figma and docs. Do not silently rename actions.

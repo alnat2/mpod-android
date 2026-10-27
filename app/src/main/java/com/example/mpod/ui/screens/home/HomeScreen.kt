@@ -45,10 +45,12 @@ import com.example.mpod.R
 import com.example.mpod.playback.PlaybackService
 import com.example.mpod.ui.components.ModalScreenMobile
 import com.example.mpod.ui.components.MpodButton
+import com.example.mpod.ui.components.MpodStatusBanner
 import com.example.mpod.ui.components.PageHeader
 import com.example.mpod.ui.components.PlayerPlaylistItem
 import com.example.mpod.ui.components.PlayerView
 import com.example.mpod.ui.components.ShowNotesMobile
+import com.example.mpod.ui.components.StatusBannerType
 import com.example.mpod.ui.components.figmaDropShadow
 import com.example.mpod.ui.util.formatEpisodeDuration
 import com.example.mpod.ui.util.formatProgressTime
@@ -231,6 +233,7 @@ fun HomeScreen(
     val reorderStepPx = with(LocalDensity.current) { 80.dp.toPx() }
     val currentEpisode = state.queue.firstOrNull { it.id == playbackSummary.currentEpisodeId }
         ?: state.queue.firstOrNull()
+    var dismissedPlaybackError by remember(playbackSummary.errorMessage) { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -253,7 +256,13 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
-                    item { StatusCard(message = "Loading playlist") }
+                    item {
+                        MpodStatusBanner(
+                            message = "Loading playlist",
+                            type = StatusBannerType.Loading,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
                 }
 
                 state.errorMessage != null -> {
@@ -264,10 +273,12 @@ fun HomeScreen(
                         )
                     }
                     item {
-                        StatusCard(
+                        MpodStatusBanner(
                             message = state.errorMessage,
+                            type = StatusBannerType.Error,
                             actionLabel = "Retry",
-                            onAction = onRetryLoad
+                            onAction = onRetryLoad,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
                     }
                 }
@@ -309,17 +320,21 @@ fun HomeScreen(
 
                     state.actionErrorMessage?.let { message ->
                         item {
-                            StatusCard(
+                            MpodStatusBanner(
                                 message = message,
+                                type = StatusBannerType.Error,
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                         }
                     }
 
-                    playbackSummary.errorMessage?.let { message ->
+                    val activePlaybackError = playbackSummary.errorMessage?.takeIf { it != dismissedPlaybackError }
+                    activePlaybackError?.let { message ->
                         item {
-                            StatusCard(
+                            MpodStatusBanner(
                                 message = message,
+                                type = StatusBannerType.Error,
+                                onDismiss = { dismissedPlaybackError = message },
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                         }
@@ -546,43 +561,6 @@ private fun PlaylistEmptyState(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun StatusCard(
-    message: String,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .figmaDropShadow(radius = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            actionLabel?.let { label ->
-                MpodButton(
-                    text = label,
-                    height = 32.dp,
-                    radius = 6.dp,
-                    onClick = onAction
-                )
-            }
-        }
-    }
-}
-
 private fun queueSummary(episodes: List<HomeEpisodeUi>): String {
     val totalSeconds = episodes.sumOf { it.durationSeconds ?: 0 }
     val episodeLabel = if (episodes.size == 1) "episode" else "episodes"
@@ -747,5 +725,46 @@ private fun NoPodcastsEmptyState(
                 )
             }
         }
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(
+    name = "Home Screen Playback Error / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun HomeScreenPlaybackErrorPreview() {
+    com.example.mpod.ui.theme.MpodTheme {
+        HomeScreen(
+            state = HomeUiState(
+                queue = listOf(
+                    HomeEpisodeUi(
+                        id = 1L,
+                        title = "id262026947",
+                        podcastTitle = "Audio",
+                        durationSeconds = 0,
+                        playbackPositionSeconds = 0,
+                        isListened = false,
+                        downloaded = false,
+                        summary = null
+                    )
+                ),
+                activeEpisodeId = 1L,
+                hasPodcasts = true
+            ),
+            playbackSummary = HomePlaybackSummaryUiState(
+                currentEpisodeId = 1L,
+                isPlaying = false,
+                errorMessage = "Could not play this episode. Check its audio source and try again."
+            ),
+            playbackStateProvider = {
+                HomePlaybackUiState(
+                    currentEpisodeId = 1L,
+                    errorMessage = "Could not play this episode. Check its audio source and try again."
+                )
+            }
+        )
     }
 }
