@@ -550,44 +550,6 @@ fun MpodStatusBanner(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            when (type) {
-                StatusBannerType.Loading -> {
-                    val infiniteTransition = rememberInfiniteTransition(label = "status_banner_loading")
-                    val rotation by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1000, easing = LinearEasing)
-                        ),
-                        label = "loading_rotation"
-                    )
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_huge_loading_02),
-                        contentDescription = "Loading",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .rotate(rotation)
-                    )
-                }
-                StatusBannerType.Error -> {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_huge_alert_circle),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                StatusBannerType.Info -> {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_huge_alert_circle),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
             Text(
                 text = message,
                 fontSize = 14.sp,
@@ -605,9 +567,7 @@ fun MpodStatusBanner(
                     radius = 8.dp,
                     onClick = onAction
                 )
-            }
-
-            if (onDismiss != null) {
+            } else if (onDismiss != null) {
                 SquareIconButton(
                     iconRes = R.drawable.ic_huge_multiplication_sign,
                     contentDescription = "Dismiss",
