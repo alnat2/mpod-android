@@ -540,13 +540,13 @@ fun MpodStatusBanner(
             .figmaDropShadow(style = FigmaShadowStyle.Sm, radius = 16.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(if (type == StatusBannerType.Error) 1.5.dp else 1.dp, borderColor),
+        border = BorderStroke(1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -563,8 +563,9 @@ fun MpodStatusBanner(
                 MpodButton(
                     text = actionLabel,
                     primary = true,
-                    height = 36.dp,
-                    radius = 8.dp,
+                    outlined = true,
+                    height = 32.dp,
+                    radius = 6.dp,
                     onClick = onAction
                 )
             } else if (onDismiss != null) {
@@ -573,10 +574,11 @@ fun MpodStatusBanner(
                     contentDescription = "Dismiss",
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.primary,
-                    size = 36.dp,
-                    iconSize = 16.dp,
-                    radius = 8.dp,
-                    elevation = 0.dp,
+                    size = 44.dp,
+                    iconSize = 24.dp,
+                    radius = 10.dp,
+                    shadowStyle = FigmaShadowStyle.Sm,
+                    elevation = 1.dp,
                     onClick = onDismiss
                 )
             }
