@@ -47,7 +47,9 @@ import com.example.mpod.ui.theme.ThemeMode
 @Composable
 fun AppNavigation(
     themeMode: ThemeMode = ThemeMode.System,
-    onThemeModeChange: (ThemeMode) -> Unit = {}
+    onThemeModeChange: (ThemeMode) -> Unit = {},
+    initialDestination: String = Screen.Subscriptions.route,
+    sharedIntentFlow: kotlinx.coroutines.flow.Flow<android.content.Intent> = kotlinx.coroutines.flow.emptyFlow()
 ) {
     val navController = rememberNavController()
     var libraryRefreshKey by remember { mutableIntStateOf(0) }
@@ -58,6 +60,16 @@ fun AppNavigation(
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
 
+    androidx.compose.runtime.LaunchedEffect(sharedIntentFlow) {
+        sharedIntentFlow.collect {
+            libraryRefreshKey += 1
+            navController.navigate(Screen.Home.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -65,7 +77,7 @@ fun AppNavigation(
     ) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Subscriptions.route,
+            startDestination = initialDestination,
             modifier = Modifier
                 .weight(1f)
                 .background(MaterialTheme.colorScheme.background),
@@ -169,9 +181,20 @@ fun AppNavigation(
                         navController.popBackStack()
                     },
                     onAddUrl = { url ->
-                        addPodcastViewModel.addRssFeed(url) {
-                            libraryRefreshKey += 1
-                            navController.popBackStack()
+                        if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
+                            addPodcastViewModel.addAudioUrl(url) {
+                                libraryRefreshKey += 1
+                                navController.popBackStack()
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                }
+                            }
+                        } else {
+                            addPodcastViewModel.addRssFeed(url) {
+                                libraryRefreshKey += 1
+                                navController.popBackStack()
+                            }
                         }
                     },
                     onImportOpml = {

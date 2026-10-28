@@ -25,14 +25,15 @@ interface PodcastDao {
         FROM podcasts pod
         LEFT JOIN episodes e ON e.podcastId = pod.id
         LEFT JOIN playlist_items p ON p.episodeId = e.id
+        WHERE pod.feedUrl != 'mpod://single_tracks'
         ORDER BY pod.title ASC, pod.id ASC, e.publishedAt DESC
     """)
     fun getSubscriptionRowsFlow(): Flow<List<SubscriptionRow>>
 
-    @Query("SELECT * FROM podcasts ORDER BY title ASC")
+    @Query("SELECT * FROM podcasts WHERE feedUrl != 'mpod://single_tracks' ORDER BY title ASC")
     fun getAllPodcastsFlow(): Flow<List<PodcastEntity>>
 
-    @Query("SELECT * FROM podcasts ORDER BY title ASC")
+    @Query("SELECT * FROM podcasts WHERE feedUrl != 'mpod://single_tracks' ORDER BY title ASC")
     fun getAllPodcasts(): List<PodcastEntity>
 
     @Query("SELECT * FROM podcasts WHERE id = :id LIMIT 1")

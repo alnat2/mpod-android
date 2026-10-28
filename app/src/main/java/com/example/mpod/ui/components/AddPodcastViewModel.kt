@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.data.repository.SingleTrackRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ import javax.inject.Inject
 class AddPodcastViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val podcastRepository: PodcastRepository,
+    private val singleTrackRepository: SingleTrackRepository,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
 
@@ -88,6 +90,37 @@ class AddPodcastViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     isSubmitting = false,
                     errorMessage = result.exceptionOrNull()?.message ?: "Could not parse or reach RSS feed."
+                )
+            }
+        }
+    }
+
+    fun addAudioUrl(url: String, onSuccess: () -> Unit) {
+        if (_state.value.isSubmitting) return
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.isBlank()) {
+            _state.value = _state.value.copy(errorMessage = "Paste podcast link.")
+            return
+        }
+        if (!trimmedUrl.isHttpUrl()) {
+            _state.value = _state.value.copy(
+                errorMessage = "Enter a valid http or https audio link."
+            )
+            return
+        }
+
+        _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
+        viewModelScope.launch {
+            val result = runCatching {
+                singleTrackRepository.playSingleTrack(trimmedUrl)
+            }
+            if (result.isSuccess) {
+                reset()
+                onSuccess()
+            } else {
+                _state.value = _state.value.copy(
+                    isSubmitting = false,
+                    errorMessage = result.exceptionOrNull()?.message ?: "Could not load audio track."
                 )
             }
         }

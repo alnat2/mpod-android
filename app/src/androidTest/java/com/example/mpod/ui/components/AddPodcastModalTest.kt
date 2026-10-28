@@ -72,7 +72,7 @@ class AddPodcastModalTest {
             }
         }
 
-        composeRule.onNodeWithText("Import OPML File").performClick()
+        composeRule.onNodeWithText("Import OPML").performClick()
         composeRule.onNodeWithText("Add Feed").performClick()
         composeRule.onNodeWithText("Cancel").performClick()
 
@@ -96,9 +96,9 @@ class AddPodcastModalTest {
             }
         }
 
-        composeRule.onNodeWithText("Import OPML File").performClick()
+        composeRule.onNodeWithText("Import OPML").performClick()
         composeRule.onNodeWithText("Click to browse\nfrom your computer").assertIsDisplayed()
-        composeRule.onNodeWithText("RSS Feed URL").performClick()
+        composeRule.onNodeWithText("RSS Feed").performClick()
         composeRule.onNodeWithText("Paste RSS feed URL").assertIsDisplayed()
 
         composeRule.runOnIdle {
@@ -125,7 +125,7 @@ class AddPodcastModalTest {
         composeRule.onNodeWithText("OPML file is too large. Maximum size is 5 MB.").assertIsDisplayed()
         composeRule.onNodeWithText("Please wait...").assertIsNotEnabled()
         composeRule.onNodeWithText("Cancel").assertIsNotEnabled()
-        composeRule.onNodeWithText("RSS Feed URL").assertIsNotEnabled()
+        composeRule.onNodeWithText("RSS Feed").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription("Close").assertIsNotEnabled()
         composeRule.onNodeWithText("Browse files").assertIsNotEnabled()
     }
@@ -191,10 +191,34 @@ class AddPodcastModalTest {
             }
         }
 
-        composeRule.onNodeWithText("Import OPML File").performClick()
+        composeRule.onNodeWithText("Import OPML").performClick()
         restorationTester.emulateSavedInstanceStateRestore()
 
         composeRule.onNodeWithText("Click to browse\nfrom your computer").assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, imports) }
+    }
+
+    @Test
+    fun audioUrlModeDisplaysCorrectLabelsAndDispatches() {
+        var submitted: String? = null
+        composeRule.setContent {
+            MpodTheme {
+                AddPodcastModal(
+                    onDismiss = {},
+                    onAddUrl = { submitted = it },
+                    onImportOpml = {},
+                    initialMode = AddPodcastMode.AudioUrl
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Paste podcast link").assertIsDisplayed()
+        composeRule.onNodeWithTag("add_podcast_audio_url")
+            .performTextReplacement("https://feeds.example.com/podcast/audio.mp3")
+        composeRule.onNodeWithText("Add link").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals("https://feeds.example.com/podcast/audio.mp3", submitted)
+        }
     }
 }

@@ -22,4 +22,12 @@ object NetworkModule {
     ): OkHttpClient {
         return factory.createClient()
     }
+
+    @Provides
+    @Singleton
+    fun provideAudioLinkResolver(
+        resolver: com.example.mpod.data.network.resolver.DefaultAudioLinkResolver
+    ): com.example.mpod.data.network.resolver.AudioLinkResolver {
+        return resolver
+    }
 }
