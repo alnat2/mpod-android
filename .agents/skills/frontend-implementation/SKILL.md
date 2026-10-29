@@ -31,6 +31,9 @@ Before implementing from Figma, read:
 - Never continue from memory, prior screenshots, or inferred design intent unless the user explicitly approves that fallback for the current task.
 - Stay in the Android UI / Compose domain. If a visible symptom is caused by backend API behavior, service lifecycle, ExoPlayer media session, or database/room state, do not patch backend/core code blindly from this skill. State the suspected issue in chat.
 - When installing or deploying to a device, follow `.agents/AGENTS.md`: default to the production/release variant (`com.prod.mpod`), using debug/test (`com.prod.mpod.test`) only when explicitly requested.
+- **Zero Local Status Duplication**: Never create private `StatusCard` or screen-local status/error banners. All status, loading, and error displays must use the canonical `MpodStatusBanner` from `com.example.mpod.ui.components.MpodUi` (conforming to Figma section `1669:19872`).
+- **Real-world Input Matrix**: When dealing with external inputs, URLs, or sharing, never verify solely on synthetic happy-path inputs (e.g. ideal local mp3). Verify across the real-world matrix (direct streams, Apple Podcasts URLs with and without episode IDs, OpenGraph audio pages, invalid links).
+- **Cross-screen Refactor Sweep**: When redesigning or updating a visual pattern or component, run a project-wide search (`grep_search`) and refactor all screens simultaneously to prevent legacy fragmentation.
 
 ## Required Workflow
 
@@ -127,6 +130,7 @@ Before finishing a component or screen:
 - Container sizes, radii, borders, and inner icon dimensions are strictly verified (e.g. 44dp button, 24dp icon, 10dp corner radius).
 - Text fit was checked explicitly, including line count, lineHeight, and truncation/wrapping behavior.
 - Touch target sizing and accessibility semantics (`contentDescription`, `role`, `testTag`) are present.
+- Feature integrity rules verified: zero screen-local status banners remain (`MpodStatusBanner` used exclusively), real-world input matrix verified where external links/media are touched, and cross-screen refactor sweep completed.
 - Compose previews in `MpodComponentPreviews.kt` are updated and clean.
 - `./gradlew testDebugUnitTest` passes.
 - `./gradlew compileDebugKotlin` / `./gradlew assembleDebug` passes.

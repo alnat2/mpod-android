@@ -145,10 +145,10 @@ fun MpodStatusBanner(
 
 ## Чек-лист проверки выполнения (Definition of Done)
 
-- [ ] `AudioLinkResolver` реализован и покрыт unit-тестами для Apple Podcasts URL и прямых аудиофайлов.
-- [ ] При шаринге ссылки из Apple Podcasts в эмуляторе трек корректно резолвится, получает настоящее название и играет в ExoPlayer.
-- [ ] `MpodStatusBanner` вынесен в `MpodUi.kt`.
-- [ ] Все локальные `StatusCard` удалены из `HomeScreen`, `SubscriptionsScreen`, `SettingsScreen`.
-- [ ] Ошибка ExoPlayer на `HomeScreen` отображается в нормальном баннере с красной рамкой, иконкой и кнопкой закрытия.
-- [ ] Все unit-тесты (`./gradlew testDebugUnitTest`) и сборка (`./gradlew assembleDebug`) проходят успешно.
-- [ ] Правило `.agents/rules/feature-integrity.md` создано и подключено.
+- [x] `AudioLinkResolver` реализован и покрыт unit-тестами для Apple Podcasts URL и прямых аудиофайлов.
+- [x] При шаринге ссылки из Apple Podcasts в эмуляторе трек корректно резолвится, получает настоящее название и играет в ExoPlayer.
+- [x] `MpodStatusBanner` вынесен в `MpodUi.kt`.
+- [x] Все локальные `StatusCard` удалены из `HomeScreen`, `SubscriptionsScreen`, `SettingsScreen`.
+- [x] Ошибка ExoPlayer на `HomeScreen` отображается в нормальном баннере с красной рамкой, иконкой и кнопкой закрытия.
+- [x] Все unit-тесты (`./gradlew testDebugUnitTest`) и сборка (`./gradlew assembleDebug`) проходят успешно.
+- [x] Правило `.agents/rules/feature-integrity.md` создано и подключено.
