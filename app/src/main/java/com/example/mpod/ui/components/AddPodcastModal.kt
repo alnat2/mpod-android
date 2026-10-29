@@ -212,8 +212,8 @@ fun AddPodcastMobile(
             SquareIconButton(
                 iconRes = R.drawable.ic_huge_multiplication_sign,
                 contentDescription = "Close",
-                size = 36.dp,
-                iconSize = 16.dp,
+                size = 44.dp,
+                iconSize = 24.dp,
                 radius = 10.dp,
                 border = BorderStroke(
                     1.dp,
@@ -231,29 +231,26 @@ fun AddPodcastMobile(
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ModalTab(
                 text = "RSS Feed",
                 selected = mode == AddPodcastMode.RssFeedUrl,
                 enabled = !isSubmitting,
-                onClick = { onModeChange(AddPodcastMode.RssFeedUrl) },
-                modifier = Modifier.weight(1f)
+                onClick = { onModeChange(AddPodcastMode.RssFeedUrl) }
             )
             ModalTab(
                 text = "Import OPML",
                 selected = mode == AddPodcastMode.ImportOpmlFile,
                 enabled = !isSubmitting,
-                onClick = { onModeChange(AddPodcastMode.ImportOpmlFile) },
-                modifier = Modifier.weight(1f)
+                onClick = { onModeChange(AddPodcastMode.ImportOpmlFile) }
             )
             ModalTab(
                 text = "Audio URL",
                 selected = mode == AddPodcastMode.AudioUrl,
                 enabled = !isSubmitting,
-                onClick = { onModeChange(AddPodcastMode.AudioUrl) },
-                modifier = Modifier.weight(1f)
+                onClick = { onModeChange(AddPodcastMode.AudioUrl) }
             )
         }
 
@@ -304,7 +301,7 @@ fun AddPodcastMobile(
                     MpodInput(
                         value = url,
                         onValueChange = onUrlChange,
-                        placeholder = "https://feeds.example.com/p...",
+                        placeholder = "https://feeds.example.com/podcast.xml",
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Uri,
                             imeAction = ImeAction.Done
@@ -357,6 +354,7 @@ fun AddPodcastMobile(
             val actionButtonText = when {
                 isSubmitting -> "Please wait..."
                 mode == AddPodcastMode.AudioUrl -> "Add link"
+                mode == AddPodcastMode.ImportOpmlFile -> "Import file"
                 else -> "Add Feed"
             }
             MpodButton(
@@ -545,7 +543,8 @@ private fun ModalTab(
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,
             color = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

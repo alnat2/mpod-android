@@ -52,4 +52,25 @@ class SubscriptionsProjectionTest {
         assertEquals(2, result.last().totalEpisodeCount)
         assertEquals(1, result.last().unlistenedEpisodeCount)
     }
+
+    @Test
+    fun mapSubscriptionRows_filtersOutMpodSystemFeeds() {
+        val normalPodcast = PodcastEntity(id = 1, title = "Tech News", feedUrl = "https://example.com/feed.xml")
+        val singleTrackPodcast = PodcastEntity(id = 2, title = "TEDx Shorts", feedUrl = "mpod://single_tracks/tedx_shorts")
+        val genericSinglePodcast = PodcastEntity(id = 3, title = "Audio", feedUrl = "mpod://single_tracks")
+
+        val ep1 = EpisodeEntity(id = 10, podcastId = 1, guid = "ep1", title = "Tech 1", audioUrl = "https://example.com/1.mp3")
+        val ep2 = EpisodeEntity(id = 20, podcastId = 2, guid = "ep2", title = "TEDx 1", audioUrl = "https://example.com/2.mp3")
+        val ep3 = EpisodeEntity(id = 30, podcastId = 3, guid = "ep3", title = "Audio 1", audioUrl = "https://example.com/3.mp3")
+
+        val rows = subscriptionRows(
+            listOf(normalPodcast, singleTrackPodcast, genericSinglePodcast),
+            listOf(ep1, ep2, ep3)
+        )
+
+        val result = mapSubscriptionRows(rows)
+        assertEquals(1, result.size)
+        assertEquals(1L, result.single().id)
+        assertEquals("Tech News", result.single().title)
+    }
 }

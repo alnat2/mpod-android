@@ -132,6 +132,11 @@ class PodcastRepository @Inject constructor(
             val podcast = podcastDao.getPodcastById(podcastId)
                 ?: return@withContext Result.failure(IllegalArgumentException("Podcast not found: $podcastId"))
 
+            if (podcast.feedUrl.startsWith("mpod://")) {
+                // Quick listening / single tracks cannot be refreshed via RSS
+                return@withContext Result.success(Unit)
+            }
+
             val parsedFeed = fetchAndParseFeed(podcast.feedUrl, podcast.lastBuildDate)
             if (parsedFeed == null) {
                 podcastDao.update(podcast.copy(lastRefreshedAt = System.currentTimeMillis()))
@@ -316,7 +321,7 @@ class PodcastRepository @Inject constructor(
     }
 
     suspend fun exportOpml(): String = withContext(Dispatchers.IO) {
-        val podcasts = podcastDao.getAllPodcasts()
+        val podcasts = podcastDao.getAllPodcasts().filterNot { it.feedUrl.startsWith("mpod://") }
         OpmlParser.generateOpml(podcasts)
     }
 

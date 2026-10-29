@@ -165,6 +165,48 @@ class PodcastRepositoryRefreshAllTest {
         assertEquals(0, podcastDao.deleteAllCalls)
     }
 
+    @Test
+    fun refreshPodcast_ignoresMpodSystemFeedsWithoutNetworkOrError() = runBlocking {
+        val quickListenPodcast = PodcastEntity(
+            id = 99L,
+            feedUrl = "mpod://single_tracks/tedx_shorts",
+            title = "TEDx Shorts",
+            description = "Single and shared audio tracks"
+        )
+        val podcastDao = FakePodcastDao(listOf(quickListenPodcast))
+        val episodeDao = FakeEpisodeDao(emptyList())
+        val settings = RecordingAppSettingsDataStore(PREVIOUS_LAST_REFRESH)
+        val repository = repository(podcastDao, episodeDao, settings)
+
+        val result = repository.refreshPodcast(99L)
+
+        assertTrue(result.isSuccess)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun refreshAll_ignoresMpodSystemFeeds() = runBlocking {
+        server.respondByPath(
+            "/valid" to rssFeed("Valid Podcast", "valid-new")
+        )
+        val validPodcast = podcast(1L, "/valid", "Valid Podcast")
+        val quickListenPodcast = PodcastEntity(
+            id = 99L,
+            feedUrl = "mpod://single_tracks/tedx_shorts",
+            title = "TEDx Shorts",
+            description = "Single and shared audio tracks"
+        )
+        val podcastDao = FakePodcastDao(listOf(validPodcast, quickListenPodcast))
+        val episodeDao = FakeEpisodeDao(initialEpisodes())
+        val settings = RecordingAppSettingsDataStore(PREVIOUS_LAST_REFRESH)
+        val repository = repository(podcastDao, episodeDao, settings)
+
+        val result = repository.refreshAllPodcasts()
+
+        assertTrue(result.isSuccess)
+        assertEquals(1, server.requestCount)
+    }
+
     private fun repository(
         podcasts: List<PodcastEntity>,
         episodes: List<EpisodeEntity>,
@@ -275,7 +317,7 @@ class PodcastRepositoryRefreshAllTest {
 
         override fun getSubscriptionRowsFlow(): Flow<List<com.example.mpod.data.local.model.SubscriptionRow>> = error("Repository does not observe subscriptions")
         override fun getAllPodcastsFlow(): Flow<List<PodcastEntity>> = emptyFlow()
-        override fun getAllPodcasts(): List<PodcastEntity> = synchronized(lock) { snapshot() }
+        override fun getAllPodcasts(): List<PodcastEntity> = synchronized(lock) { snapshot().filterNot { it.feedUrl.startsWith("mpod://") } }
         override fun getPodcastById(id: Long): PodcastEntity? = synchronized(lock) { podcasts.find { it.id == id } }
         override fun getPodcastByFeedUrl(feedUrl: String): PodcastEntity? = synchronized(lock) { podcasts.find { it.feedUrl == feedUrl } }
 

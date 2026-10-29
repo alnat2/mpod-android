@@ -130,6 +130,29 @@ class SubscriptionsQueryTest {
         } finally { observer.cancel(); observer.join(); raw.close() }
     }
 
+    @Test fun mpodFeedsAreExcludedFromSubscriptionRowsAndAllPodcastsFlow() = runBlocking {
+        db.podcastDao().insert(PodcastEntity(id = 1, title = "Real Podcast", feedUrl = "https://example.com/feed.xml"))
+        db.podcastDao().insert(PodcastEntity(id = 2, title = "TEDx Shorts", feedUrl = "mpod://single_tracks/tedx_shorts"))
+        db.podcastDao().insert(PodcastEntity(id = 3, title = "Audio", feedUrl = "mpod://single_tracks"))
+        db.episodeDao().insertEpisode(episode(1, 1))
+        db.episodeDao().insertEpisode(episode(2, 2))
+        db.episodeDao().insertEpisode(episode(3, 3))
+
+        val subscriptionRows = db.podcastDao().getSubscriptionRowsFlow().first()
+        assertEquals(1, subscriptionRows.size)
+        assertEquals(1L, subscriptionRows.first().podcast.id)
+        assertEquals("Real Podcast", subscriptionRows.first().podcast.title)
+
+        val allPodcasts = db.podcastDao().getAllPodcastsFlow().first()
+        assertEquals(1, allPodcasts.size)
+        assertEquals(1L, allPodcasts.first().id)
+        assertEquals("Real Podcast", allPodcasts.first().title)
+
+        val allPodcastsList = db.podcastDao().getAllPodcasts()
+        assertEquals(1, allPodcastsList.size)
+        assertEquals(1L, allPodcastsList.first().id)
+    }
+
     private fun subscriptionQueries() = statements.count { it.startsWith("SELECT POD.ID AS PODCAST_ID") }
     private fun episode(id: Long, podcastId: Long) = EpisodeEntity(id = id, podcastId = podcastId,
         guid = "guid:$id", title = "Episode $id", audioUrl = "audio:$id")

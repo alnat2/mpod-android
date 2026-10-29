@@ -339,7 +339,8 @@ internal fun unsubscribeCountdownSeconds(windowSeconds: Int = UNSUBSCRIBE_WINDOW
 }
 
 internal fun mapSubscriptionRows(rows: List<SubscriptionRow>): List<SubscriptionPodcastUi> =
-    rows.groupBy { it.podcast }.map { (pod, podcastRows) ->
+    rows.filterNot { it.podcast.feedUrl.startsWith("mpod://") }
+        .groupBy { it.podcast }.map { (pod, podcastRows) ->
         val episodes = podcastRows.mapNotNull { row ->
             row.episode?.let { ep ->
                 SubscriptionEpisodeUi(

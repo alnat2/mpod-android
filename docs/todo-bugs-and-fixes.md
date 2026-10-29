@@ -149,6 +149,51 @@ fun MpodStatusBanner(
 
 ---
 
+## 4. Баг: Утечка треков быстрого прослушивания (Quick Listening / Single Tracks) на экран подписок и краш Refresh All — [РЕШЕНО]
+
+**Статус:** `РЕШЕНО`. Проверено на эмуляторе (воспроизведение в плеере, чистый SubscriptionsScreen без карточек mpod://) и полным набором unit-тестов.
+
+### Симптомы
+1. При шаринге/добавлении единичного трека (например, эпизода TEDx Shorts через Apple Podcasts) в табе `SubscriptionsScreen` ошибочно появляется карточка подписки с заголовком «TEDx Shorts», описанием «Single and shared audio tracks from TEDx Shorts» и кнопками «Refresh» и «Unsubscribe».
+2. При нажатии «Refresh All» или рефреше карточки трека приложение пытается запросить RSS-ленту по несуществующему URL схемы `mpod://...`, OkHttp выбрасывает `IllegalArgumentException: Expected URL scheme 'http' or 'https' but was 'mpod'`, и глобальное обновление падает с ошибкой.
+3. При нажатии «Unsubscribe» на этой карточке срабатывает каскадное удаление подкаста, которое уничтожает эпизод и выбрасывает его из плейлиста прямо во время прослушивания.
+4. При экспорте OPML системные URL схемы `mpod://` попадают в XML-файл экспорта подписок.
+5. Если у пользователя нет RSS-подписок, но играет Quick Listen трек, фильтрация `podcasts` без проверки очереди блокирует плеер заглушкой `NoPodcastsEmptyState` на `HomeScreen`.
+
+### Первопричина (Root Cause)
+* В `PodcastDao.kt` запросы `getSubscriptionRowsFlow()`, `getAllPodcastsFlow()` и `getAllPodcasts()` фильтровали только точное совпадение: `WHERE feedUrl != 'mpod://single_tracks'`.
+* В `SingleTrackRepository.kt` для треков с известным шоу был внедрён динамический URL: `val feedUrl = "mpod://single_tracks/${showSlug}"`.
+* Из-за несовпадения строк Room обрабатывал запись как полноценную RSS-подписку.
+
+### План исправления (How to Fix)
+
+#### Шаг 4.1: Укрепление запросов базы данных (`PodcastDao.kt`)
+Заменить точное сравнение на префиксный фильтр по схеме `mpod://%`:
+* В `getSubscriptionRowsFlow()`: `WHERE pod.feedUrl NOT LIKE 'mpod://%'`.
+* В `getAllPodcastsFlow()`: `WHERE feedUrl NOT LIKE 'mpod://%'`.
+* В `getAllPodcasts()`: `WHERE feedUrl NOT LIKE 'mpod://%'`.
+
+#### Шаг 4.2: Защита операций синхронизации и экспорта (`PodcastRepository.kt`)
+* В `refreshPodcast(podcastId)`: добавить проверку `if (podcast.feedUrl.startsWith("mpod://")) return Result.success(Unit)`.
+* В `exportOpml()`: дополнительно защитить выборку подкастов от системных URL.
+
+#### Шаг 4.3: Нормализация URI и очистка (`SingleTrackRepository.kt`)
+* Зафиксировать схему внутренних URL: `mpod://single_tracks/${showSlug}` / `mpod://single_tracks`.
+* Добавить метод очистки осиротевших записей подкастов `mpod://%`, у которых нет эпизодов.
+
+#### Шаг 4.4: Защитный слой в представлении (`SubscriptionsViewModel.kt` и `HomeScreen.kt`)
+* В `SubscriptionsViewModel.kt` в `mapSubscriptionRows` добавить фильтр `filterNot { it.podcast.feedUrl.startsWith("mpod://") }`.
+* В `HomeScreen.kt` изменить условие `!state.hasPodcasts` на `!state.hasPodcasts && state.queue.isEmpty()`, гарантируя, что Quick Listen трек всегда отображается в плеере и очереди даже при 0 RSS-подписок.
+
+#### Шаг 4.5: Синхронизация `AddPodcastModal.kt` с макетом Figma (`694:2747`)
+* Удален `Modifier.weight(1f)` у табов модального окна, из-за которого текст «Import OPML» обрезался до «Import» на экранах 320 dp.
+* Табам возвращена автоматическая ширина по контенту (`hug contents`) с центрированием `Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)`.
+* Размер кнопки закрытия шапки приведен к параметрам Figma: `size = 44.dp`, `iconSize = 24.dp`, `radius = 10.dp`.
+* Текст кнопки действия в режиме OPML приведен к макету Figma (`694:2767`): `Import file` вместо ошибочного `Add Feed`.
+* Плейсхолдер ссылки в режиме Audio URL приведен к макету: `https://feeds.example.com/podcast.xml`.
+
+---
+
 ## Чек-лист проверки выполнения (Definition of Done)
 
 - [x] `AudioLinkResolver` реализован и покрыт unit-тестами для Apple Podcasts URL и прямых аудиофайлов.
@@ -156,5 +201,13 @@ fun MpodStatusBanner(
 - [x] `MpodStatusBanner` вынесен в `MpodUi.kt`.
 - [x] Все локальные `StatusCard` удалены из `HomeScreen`, `SubscriptionsScreen`, `SettingsScreen`.
 - [x] Ошибка ExoPlayer на `HomeScreen` отображается в нормальном баннере с красной рамкой, иконкой и кнопкой закрытия.
-- [x] Все unit-тесты (`./gradlew testDebugUnitTest`) и сборка (`./gradlew assembleDebug`) проходят успешно.
 - [x] Правило `.agents/rules/feature-integrity.md` создано и подключено.
+- [x] `PodcastDao` фильтрует все `mpod://%` URL в подписках и библиотеке.
+- [x] `PodcastRepository.refreshPodcast` игнорирует `mpod://` подкасты без сетевых запросов и ошибок.
+- [x] `SubscriptionsViewModel` не пропускает `mpod://` в UI даже на унаследованных данных.
+- [x] `HomeScreen` отображает плеер и очередь при наличии треков Quick Listen даже без RSS-подписок.
+- [x] Верстка `AddPodcastModal` (все 3 режима: RSS, OPML, Audio URL) на 100% соответствует Figma (`694:2747`): «Import OPML» полностью виден без обрезки букв, кнопка закрытия 44dp, кнопка действия в OPML — «Import file».
+- [x] Unit-тесты (`./gradlew testDebugUnitTest`) успешно проходят.
+- [x] Сценарий проверен на эмуляторе через ADB интент Apple Podcasts (плеер играет, таб подписок чист, Refresh All успешен, модальное окно переключает табы без обрезки контента).
+
+

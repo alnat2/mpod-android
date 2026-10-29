@@ -73,7 +73,7 @@ class AddPodcastModalTest {
         }
 
         composeRule.onNodeWithText("Import OPML").performClick()
-        composeRule.onNodeWithText("Add Feed").performClick()
+        composeRule.onNodeWithText("Import file").performClick()
         composeRule.onNodeWithText("Cancel").performClick()
 
         composeRule.runOnIdle {

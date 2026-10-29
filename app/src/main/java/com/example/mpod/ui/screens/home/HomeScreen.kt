@@ -283,7 +283,7 @@ fun HomeScreen(
                     }
                 }
 
-                !state.hasPodcasts -> {
+                !state.hasPodcasts && state.queue.isEmpty() -> {
                     item {
                         PageHeader(
                             title = "No podcasts",
