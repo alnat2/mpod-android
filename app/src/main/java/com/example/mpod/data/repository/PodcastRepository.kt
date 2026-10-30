@@ -295,11 +295,20 @@ class PodcastRepository @Inject constructor(
                 )
             }
             val items = OpmlParser.parse(bytes.inputStream())
+            val semaphore = Semaphore(4)
+            val results = coroutineScope {
+                items.map { item ->
+                    async {
+                        semaphore.withPermit {
+                            item to addPodcastByFeedUrl(item.xmlUrl)
+                        }
+                    }
+                }.awaitAll()
+            }
             var imported = 0
             val errors = mutableListOf<String>()
-            for (item in items) {
-                addPodcastByFeedUrl(item.xmlUrl)
-                    .onSuccess { imported++ }
+            for ((item, res) in results) {
+                res.onSuccess { imported++ }
                     .onFailure { e ->
                         errors.add("${item.title}: ${e.message ?: "failed to import"}")
                     }
