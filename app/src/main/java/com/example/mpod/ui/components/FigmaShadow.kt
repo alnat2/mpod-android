@@ -3,7 +3,6 @@ package com.example.mpod.ui.components
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -103,9 +102,10 @@ fun Modifier.figmaDropShadow(
         ambientColor = style.ambientColor,
         spotColor = style.spotColor
     )
-    .drawBehind {
-        if (style.blur <= 0.dp && style.offsetY == 0.dp) return@drawBehind
-        drawIntoCanvas { canvas ->
+    .drawWithCache {
+        if (style.blur <= 0.dp && style.offsetY == 0.dp) {
+            onDrawBehind {}
+        } else {
             val paint = Paint()
             val frameworkPaint = paint.asFrameworkPaint()
             frameworkPaint.color = style.color.toArgb()
@@ -124,11 +124,16 @@ fun Modifier.figmaDropShadow(
             val top = style.offsetY.toPx()
             val right = size.width
             val bottom = size.height + style.offsetY.toPx()
-            canvas.nativeCanvas.drawRoundRect(
-                left, top, right, bottom,
-                cornerRadiusPx, cornerRadiusPx,
-                frameworkPaint
-            )
+
+            onDrawBehind {
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawRoundRect(
+                        left, top, right, bottom,
+                        cornerRadiusPx, cornerRadiusPx,
+                        frameworkPaint
+                    )
+                }
+            }
         }
     }
 
