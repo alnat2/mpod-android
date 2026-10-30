@@ -56,11 +56,7 @@ class SettingsViewModel @Inject constructor(
                     proxyUsername = prefs.proxyUsername,
                     proxyPassword = prefs.proxyPassword,
                     themeMode = prefs.themeMode,
-                    lastRefreshHeaderText = if (prefs.lastRefreshTimeFormatted.isNotBlank()) {
-                        prefs.lastRefreshTimeFormatted
-                    } else {
-                        "Last refresh never"
-                    },
+                    lastRefreshHeaderText = SettingsRefreshTimeFormatter.format(prefs.lastRefreshTimeFormatted),
                     appBuild = "mpoddy v${BuildConfig.VERSION_NAME}"
                 )
                 autoRefreshScheduler.schedule(prefs)
@@ -457,7 +453,7 @@ data class SettingsUiState(
     val proxyPassword: String = "",
     val proxyMessage: String? = null,
     val themeMode: String = "System",
-    val lastRefreshHeaderText: String = "Last refresh never",
+    val lastRefreshHeaderText: String = "Last updated: never",
     val currentIpGeoText: String? = null,
     val isExportingOpml: Boolean = false,
     val exportMessage: String? = null,

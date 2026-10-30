@@ -57,9 +57,10 @@ class PodcastRepositoryRefreshAllTest {
 
         assertTrue(result.isSuccess)
         assertEquals(1, settings.lastRefreshWrites.size)
-        assertTrue(settings.lastRefreshWrites.single().startsWith("Last refresh today at "))
-        assertFalse(settings.lastRefreshWrites.single() == PREVIOUS_LAST_REFRESH)
-        assertEquals(settings.lastRefreshWrites.single(), settings.current.lastRefreshTimeFormatted)
+        val written = settings.lastRefreshWrites.single()
+        assertTrue(written.toLongOrNull() != null && written.toLong() > 0L)
+        assertFalse(written == PREVIOUS_LAST_REFRESH)
+        assertEquals(written, settings.current.lastRefreshTimeFormatted)
     }
 
     @Test
@@ -79,7 +80,8 @@ class PodcastRepositoryRefreshAllTest {
 
         assertTrue(result.isSuccess)
         assertEquals(1, settings.lastRefreshWrites.size)
-        assertTrue(settings.lastRefreshWrites.single().startsWith("Last refresh today at "))
+        val written = settings.lastRefreshWrites.single()
+        assertTrue(written.toLongOrNull() != null && written.toLong() > 0L)
     }
 
     @Test

@@ -31,10 +31,7 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.InputStream
-import java.text.SimpleDateFormat
 import java.util.Collections
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -204,8 +201,7 @@ class PodcastRepository @Inject constructor(
                 Exception("Failed to refresh ${failures.size} podcast(s):\n" + failures.joinToString("\n"))
             )
         } else {
-            val formatter = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault())
-            appSettingsDataStore.setLastRefreshTime("Last refresh today at ${formatter.format(Date())}")
+            appSettingsDataStore.setLastRefreshTime(System.currentTimeMillis().toString())
             Result.success(Unit)
         }
     }

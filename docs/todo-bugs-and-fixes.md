@@ -218,6 +218,35 @@ fun MpodStatusBanner(
 
 ---
 
+## 6. Баг: Захардкоженное слово «today» в строке обновления на экране Settings — [РЕШЕНО]
+
+**Статус:** `РЕШЕНО`.
+
+### Симптомы
+1. В шапке экрана `Settings` отображалось: *"Last refresh today at 27.10 10:00"*, даже когда прошло несколько дней с момента последнего обновления.
+2. Слово *"today"* зашивалось в `DataStore` в момент обновления ленты и никогда не актуализировалось при наступлении следующих дней.
+
+### Первопричина (Root Cause)
+* В `PodcastRepository.kt` результат форматирования генерировался со статическим текстом: `"Last refresh today at ${formatter.format(Date())}"` и сохранялся в `appSettingsDataStore.setLastRefreshTime(...)`.
+* `SettingsViewModel.kt` передавал эту строку в UI «как есть», без относительного расчёта даты.
+
+### Решение (Fix)
+1. Создан утилитный класс `SettingsRefreshTimeFormatter` (`ui/screens/settings/SettingsRefreshTimeFormatter.kt`):
+   - Осуществляет динамическое относительное форматирование на основе текущего системного времени:
+     - Если обновление было сегодня: `Last updated today at HH:mm`.
+     - Если обновление было в предыдущие дни: `Last updated d MMM at HH:mm` (например, `Last updated 27 Oct at 10:00`).
+     - Если обновлений не было: `Last updated: never`.
+   - Обеспечивает полную обратную совместимость: корректно парсит устаревшие строки из памяти реальных устройств (`Last refresh today at 27.10 10:00`) и сразу выводит их в актуальном виде без сброса данных приложения.
+2. В `PodcastRepository.kt`:
+   - Сохранение переведено на точный миллисекундный таймстемп `System.currentTimeMillis().toString()`, исключая захардкоженный текст в хранилище.
+3. В `SettingsViewModel.kt`:
+   - `lastRefreshHeaderText` формируется через `SettingsRefreshTimeFormatter.format(prefs.lastRefreshTimeFormatted)`.
+   - Дефолтное значение обновлено на `Last updated: never`.
+4. Описание карточки `Auto refresh` оставлено неизменным согласно дизайну Figma (`"Turn on for a scheduled update."`).
+5. Написан набор модульных тестов `SettingsRefreshTimeFormatterTest.kt` для всех сценариев (legacy формат с телефона, epoch millis, ISO-8601, граничные случаи).
+
+---
+
 ## Чек-лист проверки выполнения (Definition of Done)
 
 - [x] `AudioLinkResolver` реализован и покрыт unit-тестами для Apple Podcasts URL и прямых аудиофайлов.
@@ -234,5 +263,7 @@ fun MpodStatusBanner(
 - [x] Устранена коллизия кириллических заголовков подкастов: каждый подкаст получает уникальный Unicode slug.
 - [x] Добавлен быстрый фоллбэк на RSS-фид при обработке старых выпусков Apple Podcasts.
 - [x] Unit-тесты для Unicode-тегов фидов и извлечения RSS-фида написаны и подтверждены.
+- [x] Динамическое форматирование даты последнего обновления на экране Settings (`Last updated today at HH:mm` / `Last updated 27 Oct at 10:00`) реализовано и протестировано с поддержкой обратной совместимости.
+
 
 
