@@ -56,6 +56,7 @@ class SmartListeningManager @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingDownloadJobs = ConcurrentHashMap<Long, Job>()
+    private val pendingDownloadPodcasts = ConcurrentHashMap<Long, Long>()
     private val debounceTriggers = ConcurrentHashMap<Long, CompletableDeferred<Unit>>()
     private val lifecycleMutex = Mutex()
     private var observationJob: Job? = null
@@ -125,6 +126,7 @@ class SmartListeningManager @Inject constructor(
                 jobs.forEach { it.join() }
             }
             check(pendingDownloadJobs.isEmpty()) { "Download owners must finish before stopObserving returns" }
+            pendingDownloadPodcasts.clear()
             observationJob = null
             synchronized(ownershipLock) {
                 stopping = false
@@ -143,15 +145,10 @@ class SmartListeningManager @Inject constructor(
         audioUrl: String,
         expectedGeneration: Long?,
         initialDelayMs: Long
-    ) = synchronized(ownershipLock) {
-        if (stopping || (expectedGeneration != null && expectedGeneration != lifecycleGeneration)) return@synchronized
-        val episode = episodeDao.getEpisodeById(episodeId) ?: return@synchronized
-        if (episode.podcastId in pausedPodcasts) return@synchronized
-        if (episodeId in pausedEpisodes) {
-            rescheduleAfterCleanup.add(episodeId)
-            return@synchronized
-        }
-        if (episode.isDownloaded || !episode.localFilePath.isNullOrBlank()) return@synchronized
+    ) {
+        val episode = episodeDao.getEpisodeById(episodeId) ?: return
+        if (episode.isDownloaded || !episode.localFilePath.isNullOrBlank()) return
+
         val trigger = CompletableDeferred<Unit>()
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
@@ -181,13 +178,35 @@ class SmartListeningManager @Inject constructor(
             } finally {
                 debounceTriggers.remove(episodeId)
                 pendingDownloadJobs.remove(episodeId, coroutineContext.job)
+                pendingDownloadPodcasts.remove(episodeId)
             }
         }
 
-        debounceTriggers[episodeId] = trigger
-        val previous = pendingDownloadJobs.putIfAbsent(episodeId, job)
-        if (previous == null) job.start() else {
-            debounceTriggers.remove(episodeId)
+        val started = synchronized(ownershipLock) {
+            if (stopping || (expectedGeneration != null && expectedGeneration != lifecycleGeneration)) {
+                return@synchronized false
+            }
+            if (episode.podcastId in pausedPodcasts) {
+                return@synchronized false
+            }
+            if (episodeId in pausedEpisodes) {
+                rescheduleAfterCleanup.add(episodeId)
+                return@synchronized false
+            }
+            debounceTriggers[episodeId] = trigger
+            val previous = pendingDownloadJobs.putIfAbsent(episodeId, job)
+            if (previous == null) {
+                pendingDownloadPodcasts[episodeId] = episode.podcastId
+                true
+            } else {
+                debounceTriggers.remove(episodeId)
+                false
+            }
+        }
+
+        if (started) {
+            job.start()
+        } else {
             job.cancel()
         }
     }
@@ -219,9 +238,10 @@ class SmartListeningManager @Inject constructor(
     /** Holds suppression through the caller's Room deletion, without a network/filesystem transaction. */
     suspend fun <T> withPodcastDownloadsPaused(podcastId: Long, block: suspend () -> T): T {
         val jobs = synchronized(ownershipLock) {
-            val owners = pendingDownloadJobs.filterKeys { episodeDao.getEpisodeById(it)?.podcastId == podcastId }.values.toList()
             pausedPodcasts[podcastId] = (pausedPodcasts[podcastId] ?: 0) + 1
-            owners
+            pendingDownloadJobs.entries
+                .filter { (id, _) -> pendingDownloadPodcasts[id] == podcastId }
+                .map { it.value }
         }
         try {
             // The podcast pause was installed before releasing ownershipLock. Scheduling
