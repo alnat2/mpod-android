@@ -929,6 +929,8 @@ class SmartListeningManagerTest {
         override fun insertPlaylistItems(items: List<PlaylistItemEntity>): List<Long> = items.indices.map { it.toLong() }
         override fun removeFromPlaylist(episodeId: Long) {}
         override fun clearPlaylist() {}
+        override fun updatePosition(episodeId: Long, position: Int): Int = 0
+        override fun deleteNotIn(episodeIds: List<Long>) {}
     }
 
     data class DownloadedState(val episodeId: Long, val isDownloaded: Boolean, val path: String?)

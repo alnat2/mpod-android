@@ -393,6 +393,21 @@ class EpisodeManualActionCleanupTest {
                 playlist.clear()
                 emit()
             }
+            override fun updatePosition(episodeId: Long, position: Int): Int {
+                val item = playlist[episodeId]
+                return if (item != null) {
+                    playlist[episodeId] = item.copy(position = position)
+                    emit()
+                    1
+                } else 0
+            }
+            override fun deleteNotIn(episodeIds: List<Long>) {
+                val toRemove = playlist.keys.filter { it !in episodeIds }
+                if (toRemove.isNotEmpty()) {
+                    toRemove.forEach { playlist.remove(it) }
+                    emit()
+                }
+            }
         }
     }
 }

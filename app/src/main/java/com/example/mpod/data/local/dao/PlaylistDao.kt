@@ -84,9 +84,25 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_items")
     fun clearPlaylist()
 
+    @Query("UPDATE playlist_items SET position = :position WHERE episodeId = :episodeId")
+    fun updatePosition(episodeId: Long, position: Int): Int
+
+    @Query("DELETE FROM playlist_items WHERE episodeId NOT IN (:episodeIds)")
+    fun deleteNotIn(episodeIds: List<Long>)
+
     @Transaction
     fun reorderPlaylist(items: List<PlaylistItemEntity>) {
-        clearPlaylist()
-        insertPlaylistItems(items)
+        if (items.isEmpty()) {
+            clearPlaylist()
+            return
+        }
+        val targetEpisodeIds = items.map { it.episodeId }
+        deleteNotIn(targetEpisodeIds)
+        for (item in items) {
+            val updated = updatePosition(item.episodeId, item.position)
+            if (updated == 0) {
+                insertPlaylistItem(item)
+            }
+        }
     }
 }
