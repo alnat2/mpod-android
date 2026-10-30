@@ -2,11 +2,13 @@ package com.example.mpod.data.network.resolver
 
 import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.network.ProxyHttpClientFactory
+import com.example.mpod.data.rss.RssFeedParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URI
+import java.net.URLDecoder
 import java.util.Locale
 import java.util.regex.Pattern
 import javax.inject.Inject
@@ -136,7 +138,7 @@ class DefaultAudioLinkResolver @Inject constructor(
 
         // 1. Try iTunes Lookup API if we have podcastId
         if (podcastId != null) {
-            val itunesResult = queryItunesLookup(client, podcastId, episodeId)
+            val itunesResult = queryItunesLookup(client, podcastId, episodeId, url)
             if (itunesResult != null) {
                 return Result.success(itunesResult)
             }
@@ -146,7 +148,12 @@ class DefaultAudioLinkResolver @Inject constructor(
         return parseApplePodcastsHtml(client, url)
     }
 
-    private fun queryItunesLookup(client: OkHttpClient, podcastId: String, episodeId: String?): ResolvedAudioMetadata? {
+    private fun queryItunesLookup(
+        client: OkHttpClient,
+        podcastId: String,
+        episodeId: String?,
+        appleUrl: String
+    ): ResolvedAudioMetadata? {
         return runCatching {
             val limit = if (episodeId != null) 100 else 2
             val lookupUrl = "https://itunes.apple.com/lookup?id=$podcastId&entity=podcastEpisode&limit=$limit"
@@ -159,9 +166,103 @@ class DefaultAudioLinkResolver @Inject constructor(
                 if (!response.isSuccessful) return@use null
                 val body = response.body?.string() ?: return@use null
 
-                parseItunesLookupResponse(body, episodeId)
+                val directMatch = parseItunesLookupResponse(body, episodeId)
+                if (directMatch != null) return@use directMatch
+
+                // Episode was not in the iTunes lookup limit window (e.g. older episode).
+                // Try resolving via the podcast's official RSS feedUrl provided in the iTunes response!
+                val feedUrl = extractFeedUrlFromItunesResponse(body)
+                if (!feedUrl.isNullOrBlank()) {
+                    val rssMatch = resolveFromPodcastRssFeed(client, feedUrl, episodeId, appleUrl)
+                    if (rssMatch != null) return@use rssMatch
+                }
+
+                null
             }
         }.getOrNull()
+    }
+
+    internal fun extractFeedUrlFromItunesResponse(json: String): String? {
+        return Regex(""""feedUrl"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)?.let {
+            cleanDirectUrl(unescapeJson(it))
+        }
+    }
+
+    internal fun resolveFromPodcastRssFeed(
+        client: OkHttpClient,
+        feedUrl: String,
+        targetEpisodeId: String?,
+        appleUrl: String
+    ): ResolvedAudioMetadata? {
+        return runCatching {
+            val request = Request.Builder()
+                .url(feedUrl)
+                .header("User-Agent", NetworkModule.USER_AGENT)
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val inputStream = response.body?.byteStream() ?: return@use null
+                val parsedFeed = RssFeedParser.parse(inputStream)
+                if (parsedFeed.episodes.isEmpty()) return@use null
+
+                val targetSlugTitle = extractSlugTitleFromAppleUrl(appleUrl)
+
+                // 1. Try finding by episodeId matching guid/link/audioUrl
+                var matched = if (!targetEpisodeId.isNullOrBlank()) {
+                    parsedFeed.episodes.find { ep ->
+                        ep.guid == targetEpisodeId ||
+                            ep.guid.contains(targetEpisodeId) ||
+                            ep.audioUrl.contains(targetEpisodeId)
+                    }
+                } else null
+
+                // 2. Try finding by matching title from URL slug
+                if (matched == null && !targetSlugTitle.isNullOrBlank()) {
+                    val normalizedSlug = normalizeForComparison(targetSlugTitle)
+                    matched = parsedFeed.episodes.find { ep ->
+                        val normalizedTitle = normalizeForComparison(ep.title)
+                        normalizedTitle == normalizedSlug ||
+                            normalizedTitle.contains(normalizedSlug) ||
+                            normalizedSlug.contains(normalizedTitle)
+                    }
+                }
+
+                // 3. Fallback: If no match and targetEpisodeId is null, pick first episode
+                if (matched == null && targetEpisodeId.isNullOrBlank()) {
+                    matched = parsedFeed.episodes.firstOrNull()
+                }
+
+                val ep = matched ?: return@use null
+                if (ep.audioUrl.isBlank()) return@use null
+
+                ResolvedAudioMetadata(
+                    directAudioUrl = cleanDirectUrl(ep.audioUrl),
+                    title = ep.title.ifBlank { targetSlugTitle ?: "Podcast Episode" },
+                    author = parsedFeed.author.ifBlank { parsedFeed.title },
+                    podcastTitle = parsedFeed.title.ifBlank { parsedFeed.author },
+                    artworkUrl = parsedFeed.artworkUrl.ifBlank { null },
+                    durationSeconds = if (ep.durationSeconds > 0) ep.durationSeconds.toInt() else null,
+                    description = ep.description.ifBlank { null }
+                )
+            }
+        }.getOrNull()
+    }
+
+    internal fun extractSlugTitleFromAppleUrl(url: String): String? {
+        val slug = Regex("""/podcast/([^/?#]+)/id\d+""").find(url)?.groupValues?.get(1) ?: return null
+        return runCatching {
+            URLDecoder.decode(slug, "UTF-8")
+                .replace('-', ' ')
+                .replace('_', ' ')
+                .trim()
+        }.getOrNull()
+    }
+
+    internal fun normalizeForComparison(str: String): String {
+        return str.lowercase(Locale.ROOT)
+            .replace(Regex("""[^\p{L}\p{N}]+"""), " ")
+            .trim()
     }
 
     internal fun parseItunesLookupResponse(json: String, targetEpisodeId: String?): ResolvedAudioMetadata? {

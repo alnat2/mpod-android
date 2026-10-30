@@ -161,4 +161,36 @@ class AudioLinkResolverTest {
         val parsed = resolver.parseGenericWebHtml(sampleHtml, "https://news.com/article")
         assertNull(parsed)
     }
+
+    @Test
+    fun extractFeedUrlFromItunesResponse_findsFeedUrlInJson() {
+        val json = """
+            {
+              "resultCount": 1,
+              "results": [
+                {
+                  "wrapperType": "track",
+                  "collectionName": "Нуар в большом городе",
+                  "feedUrl": "https://cloud.mave.digital/38024"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val feedUrl = resolver.extractFeedUrlFromItunesResponse(json)
+        assertEquals("https://cloud.mave.digital/38024", feedUrl)
+    }
+
+    @Test
+    fun extractSlugTitleFromAppleUrl_decodesCyrillicSlug() {
+        val url = "https://podcasts.apple.com/ru/podcast/%D1%83%D0%B4%D0%B0%D1%87%D0%B0-%D0%BD%D0%B0-%D0%B4%D0%BE%D1%80%D0%BE%D0%B3%D0%B0%D1%85/id1358638122?i=1000453118551"
+        val slugTitle = resolver.extractSlugTitleFromAppleUrl(url)
+        assertEquals("удача на дорогах", slugTitle)
+    }
+
+    @Test
+    fun normalizeForComparison_stripsPunctuationAndWhitespace() {
+        assertEquals("удача на дорогах", resolver.normalizeForComparison("Удача на дорогах!"))
+        assertEquals("why has gold got so expensive", resolver.normalizeForComparison("Why has gold got so expensive?"))
+    }
 }

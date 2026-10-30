@@ -12,6 +12,8 @@ import com.example.mpod.data.network.resolver.AudioLinkResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.net.URLEncoder
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,6 +53,10 @@ open class SingleTrackRepository @Inject constructor(
         }
 
         val directUrl = resolved.directAudioUrl
+        if (directUrl.contains("podcasts.apple.com") || directUrl.contains("itunes.apple.com")) {
+            throw IllegalArgumentException("Resolved audio URL cannot be an Apple Podcasts web page: $directUrl")
+        }
+
         val finalTitle = title?.takeIf { it.isNotBlank() } ?: resolved.title
         val showTitle = resolved.podcastTitle ?: resolved.author ?: SINGLE_TRACKS_PODCAST_TITLE
         val artworkUrl = resolved.artworkUrl ?: ""
@@ -59,15 +65,31 @@ open class SingleTrackRepository @Inject constructor(
         val description = resolved.description ?: ""
 
         val feedUrl = if (showTitle != SINGLE_TRACKS_PODCAST_TITLE) {
-            "mpod://single_tracks/${showTitle.lowercase().replace(Regex("[^a-z0-9_-]+"), "_")}"
+            val slug = showTitle.lowercase(Locale.ROOT)
+                .replace(Regex("""[^\p{L}\p{N}_-]+"""), "_")
+                .trim('_')
+            val identifier = if (slug.isNotBlank()) slug else {
+                runCatching { URLEncoder.encode(showTitle, "UTF-8") }.getOrDefault("track")
+            }
+            "mpod://single_tracks/$identifier"
         } else {
             SINGLE_TRACKS_FEED_URL
         }
 
         val existingPodcast = podcastDao.getPodcastByFeedUrl(feedUrl)
         val podcastId = if (existingPodcast != null) {
+            var updated = existingPodcast
+            var needsUpdate = false
             if (artworkUrl.isNotBlank() && existingPodcast.artworkUrl.isBlank()) {
-                podcastDao.update(existingPodcast.copy(artworkUrl = artworkUrl))
+                updated = updated.copy(artworkUrl = artworkUrl)
+                needsUpdate = true
+            }
+            if (existingPodcast.title != showTitle && showTitle != SINGLE_TRACKS_PODCAST_TITLE) {
+                updated = updated.copy(title = showTitle)
+                needsUpdate = true
+            }
+            if (needsUpdate) {
+                podcastDao.update(updated)
             }
             existingPodcast.id
         } else {
@@ -86,6 +108,16 @@ open class SingleTrackRepository @Inject constructor(
             ?: episodeDao.getEpisodeByPodcastIdAndGuid(podcastId, cleanUrl)
 
         val episodeId = if (existingEpisode != null) {
+            if (existingEpisode.audioUrl != directUrl || (existingEpisode.title.isBlank() && finalTitle.isNotBlank())) {
+                episodeDao.update(
+                    existingEpisode.copy(
+                        title = finalTitle,
+                        audioUrl = directUrl,
+                        durationSeconds = if (duration > 0) duration else existingEpisode.durationSeconds,
+                        description = if (description.isNotBlank()) description else existingEpisode.description
+                    )
+                )
+            }
             existingEpisode.id
         } else {
             episodeDao.insertEpisode(

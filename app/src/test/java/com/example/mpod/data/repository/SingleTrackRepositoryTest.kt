@@ -209,6 +209,77 @@ class SingleTrackRepositoryTest {
         assertEquals("https://cdn.example.com/art600.jpg", podcast?.artworkUrl)
     }
 
+    @Test
+    fun playSingleTrack_cyrillicPodcastTitles_produceDistinctFeedUrlsAndSeparatePodcasts() = runTest {
+        // First track from "Утренняя ванна"
+        fakeAudioLinkResolver.customMetadata = com.example.mpod.data.network.resolver.ResolvedAudioMetadata(
+            directAudioUrl = "https://cdn.example.com/bath.mp3",
+            title = "Morning Episode",
+            podcastTitle = "Утренняя ванна"
+        )
+        val bathEpisodeId = repository.playSingleTrack("https://example.com/link1")
+        val bathEp = episodes[bathEpisodeId]
+        val bathPodcast = podcasts[bathEp?.podcastId]
+        assertEquals("mpod://single_tracks/утренняя_ванна", bathPodcast?.feedUrl)
+        assertEquals("Утренняя ванна", bathPodcast?.title)
+
+        // Second track from "Нуар в большом городе"
+        fakeAudioLinkResolver.customMetadata = com.example.mpod.data.network.resolver.ResolvedAudioMetadata(
+            directAudioUrl = "https://cdn.example.com/noir.mp3",
+            title = "Удача на дорогах",
+            podcastTitle = "Нуар в большом городе"
+        )
+        val noirEpisodeId = repository.playSingleTrack("https://example.com/link2")
+        val noirEp = episodes[noirEpisodeId]
+        val noirPodcast = podcasts[noirEp?.podcastId]
+        assertEquals("mpod://single_tracks/нуар_в_большом_городе", noirPodcast?.feedUrl)
+        assertEquals("Нуар в большом городе", noirPodcast?.title)
+
+        // Must be separate podcasts!
+        org.junit.Assert.assertNotEquals(bathPodcast?.id, noirPodcast?.id)
+        org.junit.Assert.assertNotEquals(bathEp?.podcastId, noirEp?.podcastId)
+    }
+
+    @Test
+    fun playSingleTrack_healsExistingEpisodeWithBetterAudioUrl() = runTest {
+        // Episode was previously added with a raw web URL
+        val podcast = PodcastEntity(id = 10L, feedUrl = "mpod://single_tracks/tedx", title = "TEDx")
+        podcasts[10L] = podcast
+        val staleEpisode = EpisodeEntity(
+            id = 200L,
+            podcastId = 10L,
+            guid = "https://podcasts.apple.com/us/podcast/id1?i=2",
+            title = "",
+            audioUrl = "https://podcasts.apple.com/us/podcast/id1?i=2"
+        )
+        episodes[200L] = staleEpisode
+
+        // Now played with resolved direct MP3
+        fakeAudioLinkResolver.customMetadata = com.example.mpod.data.network.resolver.ResolvedAudioMetadata(
+            directAudioUrl = "https://cdn.example.com/real_stream.mp3",
+            title = "Real Episode Title",
+            podcastTitle = "TEDx",
+            durationSeconds = 600
+        )
+
+        val returnedId = repository.playSingleTrack("https://podcasts.apple.com/us/podcast/id1?i=2")
+        assertEquals(200L, returnedId)
+
+        val updated = episodes[200L]
+        assertEquals("https://cdn.example.com/real_stream.mp3", updated?.audioUrl)
+        assertEquals("Real Episode Title", updated?.title)
+        assertEquals(600L, updated?.durationSeconds)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun playSingleTrack_rejectsAppleWebUrlAsDirectAudio() = runTest {
+        fakeAudioLinkResolver.customMetadata = com.example.mpod.data.network.resolver.ResolvedAudioMetadata(
+            directAudioUrl = "https://podcasts.apple.com/ru/podcast/something/id123",
+            title = "Episode"
+        )
+        repository.playSingleTrack("https://example.com/link")
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun createPodcastDao(): PodcastDao {
         return Proxy.newProxyInstance(
@@ -225,6 +296,11 @@ class SingleTrackRepositoryTest {
                     val id = podcastIdCounter++
                     podcasts[id] = entity.copy(id = id)
                     id
+                }
+                "update" -> {
+                    val entity = args[0] as PodcastEntity
+                    podcasts[entity.id] = entity
+                    null
                 }
                 else -> null
             }
@@ -248,6 +324,11 @@ class SingleTrackRepositoryTest {
                     val id = episodeIdCounter++
                     episodes[id] = entity.copy(id = id)
                     id
+                }
+                "update" -> {
+                    val entity = args[0] as EpisodeEntity
+                    episodes[entity.id] = entity
+                    null
                 }
                 else -> null
             }
