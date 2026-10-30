@@ -4,8 +4,11 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import java.io.StringReader
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
 import java.util.Locale
 
 data class ParsedPodcastFeed(
@@ -41,22 +44,44 @@ object RssFeedParser {
         }
     }
 
-    private fun newDateFormats() = listOf(
-        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.US),
-        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US),
-        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US),
-        SimpleDateFormat("dd MMM yyyy HH:mm:ss Z", Locale.US),
-        SimpleDateFormat("dd MMM yyyy HH:mm:ss z", Locale.US),
-        SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.US),
-        SimpleDateFormat("EEE, dd MMM yy HH:mm:ss Z", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US),
-        SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    private val DATE_FORMATTERS: List<DateTimeFormatter> = listOf(
+        // RFC-822 / RFC-1123 variants
+        "EEE, dd MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm:ss z",
+        "EEE, dd MMM yyyy HH:mm:ss",
+        "dd MMM yyyy HH:mm:ss Z",
+        "dd MMM yyyy HH:mm:ss z",
+        "dd MMM yyyy HH:mm:ss",
+        "EEE, d MMM yyyy HH:mm:ss Z",
+        "EEE, d MMM yyyy HH:mm:ss z",
+        "d MMM yyyy HH:mm:ss Z",
+        "d MMM yyyy HH:mm:ss z",
+        // ISO-8601 variants
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ssZ",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd"
+    ).map { pattern ->
+        DateTimeFormatterBuilder()
+            .appendPattern(pattern)
+            .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
+            .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+            .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
+            .toFormatter(Locale.US)
+            .withZone(ZoneId.systemDefault())
+    } + listOf(
+        DateTimeFormatterBuilder()
+            .appendPattern("EEE, dd MMM ")
+            .appendValueReduced(ChronoField.YEAR, 2, 2, 2000)
+            .appendPattern(" HH:mm:ss Z")
+            .toFormatter(Locale.US)
+            .withZone(ZoneId.systemDefault()),
+        DateTimeFormatter.RFC_1123_DATE_TIME.withZone(ZoneId.systemDefault()),
+        DateTimeFormatter.ISO_DATE_TIME.withZone(ZoneId.systemDefault())
     )
 
     fun parse(inputStream: InputStream): ParsedPodcastFeed {
@@ -435,10 +460,10 @@ object RssFeedParser {
     fun parseDateOrNull(dateStr: String): Long? {
         val trimmed = dateStr.trim()
         if (trimmed.isEmpty()) return null
-        for (format in newDateFormats()) {
+        for (formatter in DATE_FORMATTERS) {
             try {
-                val parsed = format.parse(trimmed)
-                if (parsed != null) return parsed.time
+                val temporal = formatter.parse(trimmed)
+                return Instant.from(temporal).toEpochMilli()
             } catch (_: Exception) {}
         }
         return null
