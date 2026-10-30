@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import com.example.mpod.R
+import com.example.mpod.ui.theme.InterFontFamily
 import com.example.mpod.ui.theme.MpodTheme
 import java.net.URI
 
@@ -230,8 +231,8 @@ fun AddPodcastMobile(
                 .padding(bottom = 12.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                .padding(horizontal = 3.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
             ModalTab(
@@ -534,11 +535,12 @@ private fun ModalTab(
             )
             .selectable(selected = selected, enabled = enabled, role = Role.Tab, onClick = onClick)
             .then(if (enabled) Modifier else Modifier.alpha(0.65f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 7.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
+            fontFamily = InterFontFamily,
             fontSize = 14.sp,
             lineHeight = 20.sp,
             fontWeight = FontWeight.Medium,

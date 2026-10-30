@@ -15,7 +15,12 @@ val InterFontFamily = FontFamily(
     Font(R.font.inter_bold, FontWeight.Bold)
 )
 
+private val defaultTypography = Typography()
+
 val Typography = Typography(
+    displayLarge = defaultTypography.displayLarge.copy(fontFamily = InterFontFamily),
+    displayMedium = defaultTypography.displayMedium.copy(fontFamily = InterFontFamily),
+    displaySmall = defaultTypography.displaySmall.copy(fontFamily = InterFontFamily),
     // 3xl/Semi Bold (30px)
     headlineLarge = TextStyle(
         fontFamily = InterFontFamily,
@@ -24,12 +29,23 @@ val Typography = Typography(
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
+    headlineMedium = defaultTypography.headlineMedium.copy(fontFamily = InterFontFamily),
+    headlineSmall = defaultTypography.headlineSmall.copy(fontFamily = InterFontFamily),
+    titleLarge = defaultTypography.titleLarge.copy(fontFamily = InterFontFamily),
     // base/Semi Bold (16px) - used for setting titles
     titleMedium = TextStyle(
         fontFamily = InterFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 24.sp,
+        letterSpacing = 0.sp
+    ),
+    // sm/Semi Bold (14px) - used for episode titles
+    titleSmall = TextStyle(
+        fontFamily = InterFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
         letterSpacing = 0.sp
     ),
     // base/Regular (16px) - used for setting values
@@ -56,14 +72,7 @@ val Typography = Typography(
         lineHeight = 20.sp,
         letterSpacing = 0.sp
     ),
-    // sm/Semi Bold (14px) - used for episode titles
-    titleSmall = TextStyle(
-        fontFamily = InterFontFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.sp
-    ),
+    labelLarge = defaultTypography.labelLarge.copy(fontFamily = InterFontFamily),
     // xs/Regular (12px) - used for small metadata (duration)
     labelMedium = TextStyle(
         fontFamily = InterFontFamily,
