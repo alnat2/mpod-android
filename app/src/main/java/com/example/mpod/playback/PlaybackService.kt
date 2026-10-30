@@ -36,12 +36,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import javax.inject.Inject
 
-private const val POSITION_SAVE_INTERVAL_MS = 5_000L
+private const val POSITION_SAVE_INTERVAL_MS = 15_000L
 private const val POSITION_SYNC_THRESHOLD_MS = 1_000L
 
 @AndroidEntryPoint
@@ -118,6 +119,14 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         savePositionJob?.cancel()
+        currentEpisodeId()?.let { episodeId ->
+            val pos = player.currentPosition.coerceAtLeast(0L)
+            runCatching {
+                runBlocking(Dispatchers.IO) {
+                    episodeDao.updatePlaybackPosition(episodeId, pos)
+                }
+            }
+        }
         serviceScope.cancel()
         mediaSession?.release()
         mediaSession = null
@@ -275,7 +284,7 @@ class PlaybackService : MediaSessionService() {
                 savePositionJob?.cancel()
                 savePositionJob = null
                 if (player.playbackState != Player.STATE_ENDED) {
-                    serviceScope.launch { saveCurrentPosition() }
+                    serviceScope.launch { saveCurrentPosition(force = true) }
                 }
             }
         }
@@ -296,7 +305,7 @@ class PlaybackService : MediaSessionService() {
         ) {
             if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                 if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex) {
-                    serviceScope.launch { saveCurrentPosition() }
+                    serviceScope.launch { saveCurrentPosition(force = true) }
                     currentEpisodeId()?.let { episodeId ->
                         completedEpisodeTracker.reset(episodeId)
                     }
@@ -341,7 +350,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
-                serviceScope.launch { saveCurrentPosition() }
+                serviceScope.launch { saveCurrentPosition(force = true) }
             }
             if (playbackState != Player.STATE_ENDED) return
             val episodeId = currentEpisodeId() ?: return
@@ -356,6 +365,9 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    private var lastSavedPositionSec: Long = -1L
+    private var lastSavedEpisodeId: Long? = null
+
     private fun startPeriodicSave() {
         savePositionJob?.cancel()
         savePositionJob = serviceScope.launch {
@@ -366,13 +378,19 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private suspend fun saveCurrentPosition() {
+    private suspend fun saveCurrentPosition(force: Boolean = false) {
         val episodeId = currentEpisodeId() ?: return
         val pos = player.currentPosition.coerceAtLeast(0L)
+        val posSec = pos / 1000L
+        if (!force && episodeId == lastSavedEpisodeId && posSec == lastSavedPositionSec) {
+            return
+        }
         val durMs = player.duration
         val durSec = if (durMs > 0L) durMs / 1000L else 0L
         withContext(Dispatchers.IO) {
             episodeDao.updatePlaybackPosition(episodeId, pos)
+            lastSavedPositionSec = posSec
+            lastSavedEpisodeId = episodeId
             if (durSec > 0L) {
                 episodeDao.updateDurationIfMissing(episodeId, durSec)
             }
