@@ -48,7 +48,7 @@ import com.example.mpod.ui.theme.ThemeMode
 fun AppNavigation(
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
-    initialDestination: String = Screen.Subscriptions.route,
+    initialDestination: String = Screen.Home.route,
     sharedIntentFlow: kotlinx.coroutines.flow.Flow<android.content.Intent> = kotlinx.coroutines.flow.emptyFlow()
 ) {
     val navController = rememberNavController()

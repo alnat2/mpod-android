@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val isSharedIntent = handleIntent(intent)
-        val initialDestination = if (isSharedIntent) Screen.Home.route else Screen.Subscriptions.route
+        val initialDestination = Screen.Home.route
 
         setContent {
             val themeMode by remember {
