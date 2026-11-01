@@ -107,12 +107,20 @@ class AddPodcastViewModel @Inject constructor(
         if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
-            _state.value = _state.value.copy(errorMessage = "Paste RSS feed URL.")
+            val errorMsg = "Paste RSS feed URL."
+            _state.value = _state.value.copy(errorMessage = errorMsg)
+            _bannerState.value = AddPodcastBannerUiState(
+                message = errorMsg,
+                type = StatusBannerType.Error
+            )
             return
         }
         if (!trimmedUrl.isHttpUrl()) {
-            _state.value = _state.value.copy(
-                errorMessage = "Enter a valid http or https RSS feed URL."
+            val errorMsg = "Enter a valid http or https RSS feed URL."
+            _state.value = _state.value.copy(errorMessage = errorMsg)
+            _bannerState.value = AddPodcastBannerUiState(
+                message = errorMsg,
+                type = StatusBannerType.Error
             )
             return
         }
@@ -153,12 +161,20 @@ class AddPodcastViewModel @Inject constructor(
         if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
-            _state.value = _state.value.copy(errorMessage = "Paste podcast link.")
+            val errorMsg = "Paste podcast link."
+            _state.value = _state.value.copy(errorMessage = errorMsg)
+            _bannerState.value = AddPodcastBannerUiState(
+                message = errorMsg,
+                type = StatusBannerType.Error
+            )
             return
         }
         if (!trimmedUrl.isHttpUrl()) {
-            _state.value = _state.value.copy(
-                errorMessage = "Enter a valid http or https audio link."
+            val errorMsg = "Enter a valid http or https audio link."
+            _state.value = _state.value.copy(errorMessage = errorMsg)
+            _bannerState.value = AddPodcastBannerUiState(
+                message = errorMsg,
+                type = StatusBannerType.Error
             )
             return
         }
@@ -253,10 +269,12 @@ class AddPodcastViewModel @Inject constructor(
         }
     }
 
-    private fun String.isHttpUrl(): Boolean = runCatching {
-        val uri = URI(this)
+    internal fun isHttpUrl(url: String): Boolean = runCatching {
+        val uri = URI(url)
         uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
     }.getOrDefault(false)
+
+    private fun String.isHttpUrl(): Boolean = isHttpUrl(this)
 }
 
 data class AddPodcastUiState(

@@ -193,18 +193,27 @@ fun AppNavigation(
                         navController.popBackStack()
                     },
                     onAddUrl = { url ->
-                        navController.popBackStack()
-                        if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
-                            addPodcastViewModel.addAudioUrl(url) {
-                                libraryRefreshKey += 1
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                }
+                        val trimmed = url.trim()
+                        if (trimmed.isBlank() || !addPodcastViewModel.isHttpUrl(trimmed)) {
+                            if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
+                                addPodcastViewModel.addAudioUrl(url) {}
+                            } else {
+                                addPodcastViewModel.addRssFeed(url) {}
                             }
                         } else {
-                            addPodcastViewModel.addRssFeed(url) {
-                                libraryRefreshKey += 1
+                            navController.popBackStack()
+                            if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
+                                addPodcastViewModel.addAudioUrl(trimmed) {
+                                    libraryRefreshKey += 1
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            } else {
+                                addPodcastViewModel.addRssFeed(trimmed) {
+                                    libraryRefreshKey += 1
+                                }
                             }
                         }
                     },

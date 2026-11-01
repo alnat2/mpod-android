@@ -51,6 +51,27 @@ class AddPodcastViewModelAudioUrlTest {
 
         assertFalse(successCalled)
         assertEquals("Enter a valid http or https audio link.", viewModel.state.value.errorMessage)
+        assertEquals("Enter a valid http or https audio link.", viewModel.bannerState.value?.message)
+        assertEquals(StatusBannerType.Error, viewModel.bannerState.value?.type)
+        assertFalse(viewModel.state.value.isSubmitting)
+    }
+
+    @Test
+    fun addRssFeed_rejectsEmptyUrl() = runTest {
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = singleTrackRepository,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var successCalled = false
+        viewModel.addRssFeed("   ") { successCalled = true }
+
+        assertFalse(successCalled)
+        assertEquals("Paste RSS feed URL.", viewModel.state.value.errorMessage)
+        assertEquals("Paste RSS feed URL.", viewModel.bannerState.value?.message)
+        assertEquals(StatusBannerType.Error, viewModel.bannerState.value?.type)
         assertFalse(viewModel.state.value.isSubmitting)
     }
 
