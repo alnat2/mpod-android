@@ -115,6 +115,40 @@ class PodcastRepositoryOpmlTest {
         assertEquals(0, fakeEpisodeDao.insertCount.get())
     }
 
+    @Test
+    fun importOpml_existingPodcast_isSkippedWithoutError() = runBlocking {
+        fakePodcastDao.insert(
+            PodcastEntity(
+                feedUrl = "https://example.com/feed.xml",
+                title = "Existing Podcast",
+                description = "Desc",
+                author = "Author",
+                artworkUrl = "",
+                link = "",
+                lastBuildDate = "",
+                lastRefreshedAt = 0L
+            )
+        )
+
+        val opml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <opml version="2.0">
+              <head><title>Feeds</title></head>
+              <body>
+                <outline text="Existing Podcast" title="Existing Podcast" type="rss" xmlUrl="https://example.com/feed.xml" />
+              </body>
+            </opml>
+        """.trimIndent()
+
+        val result = repository.importOpml(ByteArrayInputStream(opml.toByteArray(Charsets.UTF_8)))
+        assertTrue(result.isSuccess)
+        val summary = result.getOrNull()
+        org.junit.Assert.assertNotNull(summary)
+        assertEquals(0, summary?.imported)
+        assertEquals(1, summary?.skipped)
+        assertTrue(summary?.errors?.isEmpty() == true)
+    }
+
     class FakePodcastDao : PodcastDao {
         val insertCount = AtomicInteger(0)
         private val podcasts = mutableListOf<PodcastEntity>()

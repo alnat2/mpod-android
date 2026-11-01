@@ -244,10 +244,11 @@ class AddPodcastViewModel @Inject constructor(
                     summary.imported > 0 -> "Imported ${summary.imported} podcasts (${summary.skipped} skipped)"
                     else -> "No podcasts imported (${summary.skipped} skipped)"
                 }
+                val hasErrors = summary.errors.isNotEmpty()
                 _bannerState.value = AddPodcastBannerUiState(
                     message = message,
-                    type = if (summary.imported > 0) StatusBannerType.Info else StatusBannerType.Error,
-                    actionLabel = if (summary.errors.isNotEmpty()) "Details" else null
+                    type = if (hasErrors) StatusBannerType.Error else StatusBannerType.Info,
+                    actionLabel = if (hasErrors) "Details" else null
                 )
                 if (summary.errors.isEmpty()) {
                     scheduleAutoDismiss(5000L)

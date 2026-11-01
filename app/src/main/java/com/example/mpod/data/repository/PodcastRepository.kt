@@ -298,11 +298,18 @@ class PodcastRepository @Inject constructor(
             val items = OpmlParser.parse(bytes.inputStream())
             var imported = 0
             val errors = mutableListOf<String>()
-            for (item in items) {
+            for ((index, item) in items.withIndex()) {
+                if (index > 0) {
+                    kotlinx.coroutines.delay(120L)
+                }
                 addPodcastByFeedUrl(item.xmlUrl)
                     .onSuccess { imported++ }
                     .onFailure { e ->
-                        errors.add("${item.title}: ${e.message ?: "failed to import"}")
+                        if (e is IllegalArgumentException && e.message?.contains("already in your library") == true) {
+                            // Already subscribed podcast is counted in skipped, but not treated as an import error
+                        } else {
+                            errors.add("${item.title}: ${e.message ?: "failed to import"}")
+                        }
                     }
             }
             Result.success(
@@ -351,6 +358,9 @@ class PodcastRepository @Inject constructor(
                         return null
                     }
                     if (!response.isSuccessful) {
+                        if (response.code == 429 || response.code in 500..599) {
+                            throw java.io.IOException("HTTP ${response.code} fetching feed: ${response.message}")
+                        }
                         throw IllegalStateException("HTTP ${response.code} fetching feed: ${response.message}")
                     }
                     val httpCacheTag = response.header("ETag") ?: response.header("Last-Modified")
