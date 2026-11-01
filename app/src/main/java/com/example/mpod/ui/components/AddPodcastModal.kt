@@ -221,7 +221,7 @@ fun AddPodcastMobile(
                     MaterialTheme.colorScheme.outline
                 ),
                 contentColor = MaterialTheme.colorScheme.primary,
-                onClick = onDismiss
+                onClick = if (!isSubmitting) onDismiss else null
             )
         }
 
@@ -349,7 +349,7 @@ fun AddPodcastMobile(
                 primary = false,
                 elevation = 0.dp,
                 modifier = Modifier.weight(1f),
-                enabled = true,
+                enabled = !isSubmitting,
                 onClick = onDismiss
             )
             val actionButtonText = when {
