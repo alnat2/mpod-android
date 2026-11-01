@@ -2,6 +2,8 @@ package com.example.mpod.data.network.resolver
 
 import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.network.ProxyHttpClientFactory
+import com.example.mpod.data.rss.ParsedEpisodeItem
+import com.example.mpod.data.rss.ParsedPodcastFeed
 import com.example.mpod.data.rss.RssFeedParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -239,11 +241,11 @@ class DefaultAudioLinkResolver @Inject constructor(
                 ResolvedAudioMetadata(
                     directAudioUrl = cleanDirectUrl(ep.audioUrl),
                     title = ep.title.ifBlank { targetSlugTitle ?: "Podcast Episode" },
-                    author = parsedFeed.author.ifBlank { parsedFeed.title },
-                    podcastTitle = parsedFeed.title.ifBlank { parsedFeed.author },
-                    artworkUrl = parsedFeed.artworkUrl.ifBlank { null },
+                    author = (parsedFeed.author.ifBlank { parsedFeed.title }).takeIf { it.isNotBlank() },
+                    podcastTitle = (parsedFeed.title.ifBlank { parsedFeed.author }).takeIf { it.isNotBlank() },
+                    artworkUrl = parsedFeed.artworkUrl.takeIf { it.isNotBlank() },
                     durationSeconds = if (ep.durationSeconds > 0) ep.durationSeconds.toInt() else null,
-                    description = ep.description.ifBlank { null }
+                    description = ep.description.takeIf { it.isNotBlank() }
                 )
             }
         }.getOrNull()
@@ -502,11 +504,11 @@ class DefaultAudioLinkResolver @Inject constructor(
                 ResolvedAudioMetadata(
                     directAudioUrl = cleanDirectUrl(ep.audioUrl),
                     title = ep.title.ifBlank { "Podcast Episode" },
-                    author = parsedFeed.author.ifBlank { parsedFeed.title },
-                    podcastTitle = parsedFeed.title.ifBlank { parsedFeed.author },
-                    artworkUrl = parsedFeed.artworkUrl.ifBlank { null },
+                    author = (parsedFeed.author.ifBlank { parsedFeed.title }).takeIf { it.isNotBlank() },
+                    podcastTitle = (parsedFeed.title.ifBlank { parsedFeed.author }).takeIf { it.isNotBlank() },
+                    artworkUrl = parsedFeed.artworkUrl.takeIf { it.isNotBlank() },
                     durationSeconds = if (ep.durationSeconds > 0) ep.durationSeconds.toInt() else null,
-                    description = ep.description.ifBlank { null }
+                    description = ep.description.takeIf { it.isNotBlank() }
                 )
             }
         }.getOrNull()
