@@ -10,6 +10,8 @@ import com.example.mpod.data.repository.SingleTrackRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +38,12 @@ class AddPodcastViewModel @Inject constructor(
     )
     val state: StateFlow<AddPodcastUiState> = _state.asStateFlow()
 
+    private val _bannerState = MutableStateFlow<AddPodcastBannerUiState?>(null)
+    val bannerState: StateFlow<AddPodcastBannerUiState?> = _bannerState.asStateFlow()
+
+    private var lastFailedAction: LastFailedAction? = null
+    private var autoDismissJob: Job? = null
+
     fun begin(mode: AddPodcastMode) {
         savedStateHandle[MODE_KEY] = mode.name
         savedStateHandle[RSS_URL_KEY] = ""
@@ -46,6 +54,35 @@ class AddPodcastViewModel @Inject constructor(
         savedStateHandle.remove<String>(MODE_KEY)
         savedStateHandle.remove<String>(RSS_URL_KEY)
         _state.value = AddPodcastUiState()
+    }
+
+    fun dismissBanner() {
+        autoDismissJob?.cancel()
+        _bannerState.value = null
+    }
+
+    fun retryLastAction(
+        onRssSuccess: () -> Unit = {},
+        onAudioSuccess: () -> Unit = {},
+        onOpmlSuccess: () -> Unit = {}
+    ) {
+        val last = lastFailedAction ?: return
+        dismissBanner()
+        when (last) {
+            is LastFailedAction.Rss -> addRssFeed(last.url, onRssSuccess)
+            is LastFailedAction.Audio -> addAudioUrl(last.url, onAudioSuccess)
+            is LastFailedAction.Opml -> importOpml(last.uri, onOpmlSuccess)
+        }
+    }
+
+    private fun scheduleAutoDismiss(delayMs: Long = 4000L) {
+        autoDismissJob?.cancel()
+        autoDismissJob = viewModelScope.launch {
+            delay(delayMs)
+            if (_bannerState.value?.type == StatusBannerType.Info) {
+                _bannerState.value = null
+            }
+        }
     }
 
     fun setMode(mode: AddPodcastMode) {
@@ -81,15 +118,32 @@ class AddPodcastViewModel @Inject constructor(
         }
 
         _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
+        _bannerState.value = AddPodcastBannerUiState(
+            message = "Adding podcast...",
+            type = StatusBannerType.Loading
+        )
         viewModelScope.launch {
             val result = podcastRepository.addPodcastByFeedUrl(trimmedUrl)
             if (result.isSuccess) {
                 reset()
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = "Podcast added successfully",
+                    type = StatusBannerType.Info
+                )
+                scheduleAutoDismiss(4000L)
                 onSuccess()
             } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Could not parse or reach RSS feed."
+                lastFailedAction = LastFailedAction.Rss(trimmedUrl)
                 _state.value = _state.value.copy(
                     isSubmitting = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Could not parse or reach RSS feed."
+                    errorMessage = errorMsg,
+                    rssUrl = trimmedUrl
+                )
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = errorMsg,
+                    type = StatusBannerType.Error,
+                    actionLabel = "Try again"
                 )
             }
         }
@@ -110,17 +164,34 @@ class AddPodcastViewModel @Inject constructor(
         }
 
         _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
+        _bannerState.value = AddPodcastBannerUiState(
+            message = "Resolving audio link...",
+            type = StatusBannerType.Loading
+        )
         viewModelScope.launch {
             val result = runCatching {
                 singleTrackRepository.playSingleTrack(trimmedUrl)
             }
             if (result.isSuccess) {
                 reset()
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = "Playing audio track",
+                    type = StatusBannerType.Info
+                )
+                scheduleAutoDismiss(3000L)
                 onSuccess()
             } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
+                lastFailedAction = LastFailedAction.Audio(trimmedUrl)
                 _state.value = _state.value.copy(
                     isSubmitting = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Could not load audio track."
+                    errorMessage = errorMsg,
+                    rssUrl = trimmedUrl
+                )
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = errorMsg,
+                    type = StatusBannerType.Error,
+                    actionLabel = "Try again"
                 )
             }
         }
@@ -129,6 +200,10 @@ class AddPodcastViewModel @Inject constructor(
     fun importOpml(uri: Uri, onSuccess: () -> Unit) {
         if (_state.value.isSubmitting) return
         _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
+        _bannerState.value = AddPodcastBannerUiState(
+            message = "Importing OPML podcasts...",
+            type = StatusBannerType.Loading
+        )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -148,11 +223,31 @@ class AddPodcastViewModel @Inject constructor(
                         errors = summary.errors
                     )
                 )
+                val message = when {
+                    summary.skipped == 0 -> "Imported ${summary.imported} podcasts"
+                    summary.imported > 0 -> "Imported ${summary.imported} podcasts (${summary.skipped} skipped)"
+                    else -> "No podcasts imported (${summary.skipped} skipped)"
+                }
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = message,
+                    type = if (summary.imported > 0) StatusBannerType.Info else StatusBannerType.Error,
+                    actionLabel = if (summary.errors.isNotEmpty()) "Details" else null
+                )
+                if (summary.errors.isEmpty()) {
+                    scheduleAutoDismiss(5000L)
+                }
                 onSuccess()
             } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: "Could not read or parse OPML file."
+                lastFailedAction = LastFailedAction.Opml(uri)
                 _state.value = _state.value.copy(
                     isSubmitting = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Could not read or parse OPML file."
+                    errorMessage = errorMsg
+                )
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = errorMsg,
+                    type = StatusBannerType.Error,
+                    actionLabel = "Try again"
                 )
             }
         }
@@ -177,6 +272,18 @@ data class OpmlImportResultUi(
     val skipped: Int,
     val errors: List<String> = emptyList()
 )
+
+data class AddPodcastBannerUiState(
+    val message: String,
+    val type: StatusBannerType,
+    val actionLabel: String? = null
+)
+
+sealed class LastFailedAction {
+    data class Rss(val url: String) : LastFailedAction()
+    data class Audio(val url: String) : LastFailedAction()
+    data class Opml(val uri: Uri) : LastFailedAction()
+}
 
 private const val MODE_KEY = "add_podcast_mode"
 private const val RSS_URL_KEY = "add_podcast_rss_url"

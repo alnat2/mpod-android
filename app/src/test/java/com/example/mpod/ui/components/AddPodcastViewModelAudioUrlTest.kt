@@ -125,5 +125,45 @@ class AddPodcastViewModelAudioUrlTest {
         assertTrue(successCalled)
         assertFalse(viewModel.state.value.isSubmitting)
         assertNull(viewModel.state.value.errorMessage)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+        assertEquals("Playing audio track", viewModel.bannerState.value?.message)
+
+        viewModel.dismissBanner()
+        assertNull(viewModel.bannerState.value)
+    }
+
+    @Test
+    fun addAudioUrl_failure_setsErrorBannerWithRetry() = runTest {
+        val failingRepo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.failure(IllegalArgumentException("Could not extract audio"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                throw IllegalArgumentException("Could not extract audio")
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = failingRepo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        viewModel.addAudioUrl("https://example.com/bad-link") {}
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val banner = viewModel.bannerState.value
+        assertEquals(StatusBannerType.Error, banner?.type)
+        assertEquals("Could not extract audio", banner?.message)
+        assertEquals("Try again", banner?.actionLabel)
     }
 }

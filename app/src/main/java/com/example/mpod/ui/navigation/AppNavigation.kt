@@ -11,9 +11,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,7 +24,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -36,6 +41,8 @@ import com.example.mpod.ui.components.AddPodcastModal
 import com.example.mpod.ui.components.AddPodcastMode
 import com.example.mpod.ui.components.AddPodcastViewModel
 import com.example.mpod.ui.components.MpodBottomNav
+import com.example.mpod.ui.components.MpodStatusBanner
+import com.example.mpod.ui.components.StatusBannerType
 import com.example.mpod.ui.screens.home.HomeRoute
 import com.example.mpod.ui.screens.settings.AddProxyScreen
 import com.example.mpod.ui.screens.settings.EditProxyScreen
@@ -55,6 +62,7 @@ fun AppNavigation(
     var libraryRefreshKey by remember { mutableIntStateOf(0) }
     val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
     val addPodcastState by addPodcastViewModel.state.collectAsStateWithLifecycle()
+    val bannerState by addPodcastViewModel.bannerState.collectAsStateWithLifecycle()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -70,11 +78,14 @@ fun AppNavigation(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         NavHost(
             navController = navController,
             startDestination = initialDestination,
@@ -170,6 +181,7 @@ fun AppNavigation(
                     contract = ActivityResultContracts.OpenDocument()
                 ) { uri ->
                     uri?.let { selectedUri ->
+                        navController.popBackStack()
                         addPodcastViewModel.importOpml(selectedUri) {
                             libraryRefreshKey += 1
                         }
@@ -181,10 +193,10 @@ fun AppNavigation(
                         navController.popBackStack()
                     },
                     onAddUrl = { url ->
+                        navController.popBackStack()
                         if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
                             addPodcastViewModel.addAudioUrl(url) {
                                 libraryRefreshKey += 1
-                                navController.popBackStack()
                                 navController.navigate(Screen.Home.route) {
                                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                     launchSingleTop = true
@@ -193,7 +205,6 @@ fun AppNavigation(
                         } else {
                             addPodcastViewModel.addRssFeed(url) {
                                 libraryRefreshKey += 1
-                                navController.popBackStack()
                             }
                         }
                     },
@@ -230,4 +241,38 @@ fun AppNavigation(
             )
         }
     }
+
+    bannerState?.let { banner ->
+        MpodStatusBanner(
+            message = banner.message,
+            type = banner.type,
+            actionLabel = banner.actionLabel,
+            onAction = if (banner.actionLabel != null) {
+                {
+                    if (banner.actionLabel == "Details") {
+                        navController.navigate(Screen.AddPodcast.route)
+                    } else {
+                        addPodcastViewModel.retryLastAction(
+                            onRssSuccess = { libraryRefreshKey += 1 },
+                            onAudioSuccess = {
+                                libraryRefreshKey += 1
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                }
+                            },
+                            onOpmlSuccess = { libraryRefreshKey += 1 }
+                        )
+                    }
+                }
+            } else null,
+            onDismiss = { addPodcastViewModel.dismissBanner() },
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(top = 10.dp)
+                .align(Alignment.TopCenter)
+        )
+    }
+}
 }
