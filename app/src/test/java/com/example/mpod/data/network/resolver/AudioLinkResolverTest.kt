@@ -193,4 +193,68 @@ class AudioLinkResolverTest {
         assertEquals("удача на дорогах", resolver.normalizeForComparison("Удача на дорогах!"))
         assertEquals("why has gold got so expensive", resolver.normalizeForComparison("Why has gold got so expensive?"))
     }
+
+    @Test
+    fun findAudioUrlInHtml_extractsMaveCdnAudioUrl() {
+        val html = """
+            <html>
+            <body>
+              <script>
+                var data = {"audioUrl": "https://cdn.mave.digital/storage/podcasts/cb1c2bc8/episodes/c6c0f679.mp3"};
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val audioUrl = resolver.findAudioUrlInHtml(html)
+        assertEquals("https://cdn.mave.digital/storage/podcasts/cb1c2bc8/episodes/c6c0f679.mp3", audioUrl)
+    }
+
+    @Test
+    fun findAudioUrlInHtml_extractsMaveStoragePath() {
+        val html = """
+            <html>
+            <body>
+              <script id="__NUXT_DATA__">
+                ["storage/podcasts/cb1c2bc8-1109-477c-9681-7fa344d51e95/episodes/c6c0f679-2c7a-4ccc-9239-aeb61fb2e4a4.mp3"]
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val audioUrl = resolver.findAudioUrlInHtml(html)
+        assertEquals(
+            "https://cdn.mave.digital/storage/podcasts/cb1c2bc8-1109-477c-9681-7fa344d51e95/episodes/c6c0f679-2c7a-4ccc-9239-aeb61fb2e4a4.mp3",
+            audioUrl
+        )
+    }
+
+    @Test
+    fun findRssFeedUrlInHtml_extractsMaveCloudFeedUrl() {
+        val html = """
+            <html>
+            <head><title>Думаем дальше</title></head>
+            <body>
+              <p>Listen on <a href="https://cloud.mave.digital/51724">RSS</a></p>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val feedUrl = resolver.findRssFeedUrlInHtml(html, "https://thinkon.mave.digital/ep-70")
+        assertEquals("https://cloud.mave.digital/51724", feedUrl)
+    }
+
+    @Test
+    fun findRssFeedUrlInHtml_extractsAlternateRssLink() {
+        val html = """
+            <html>
+            <head>
+              <link rel="alternate" type="application/rss+xml" title="Podcast RSS" href="/rss.xml" />
+            </head>
+            </html>
+        """.trimIndent()
+
+        val feedUrl = resolver.findRssFeedUrlInHtml(html, "https://myblog.com/podcast/ep-1")
+        assertEquals("https://myblog.com/rss.xml", feedUrl)
+    }
 }
