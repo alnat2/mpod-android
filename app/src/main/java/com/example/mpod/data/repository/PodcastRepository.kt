@@ -18,6 +18,7 @@ import com.example.mpod.playback.SmartListeningManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -295,20 +296,11 @@ class PodcastRepository @Inject constructor(
                 )
             }
             val items = OpmlParser.parse(bytes.inputStream())
-            val semaphore = Semaphore(4)
-            val results = coroutineScope {
-                items.map { item ->
-                    async {
-                        semaphore.withPermit {
-                            item to addPodcastByFeedUrl(item.xmlUrl)
-                        }
-                    }
-                }.awaitAll()
-            }
             var imported = 0
             val errors = mutableListOf<String>()
-            for ((item, res) in results) {
-                res.onSuccess { imported++ }
+            for (item in items) {
+                addPodcastByFeedUrl(item.xmlUrl)
+                    .onSuccess { imported++ }
                     .onFailure { e ->
                         errors.add("${item.title}: ${e.message ?: "failed to import"}")
                     }
@@ -349,23 +341,38 @@ class PodcastRepository @Inject constructor(
         }
 
         val request = requestBuilder.build()
+        val maxAttempts = 3
+        var lastException: Exception? = null
 
-        client.newCall(request).execute().use { response ->
-            if (response.code == 304) {
-                return null
-            }
-            if (!response.isSuccessful) {
-                throw IllegalStateException("HTTP ${response.code} fetching feed: ${response.message}")
-            }
-            val httpCacheTag = response.header("ETag") ?: response.header("Last-Modified")
-            val body = response.body?.byteStream() ?: throw IllegalStateException("Empty response body")
-            val parsed = RssFeedParser.parse(body.buffered())
-            return if (parsed.lastBuildDate.isBlank() && !httpCacheTag.isNullOrBlank()) {
-                parsed.copy(lastBuildDate = httpCacheTag)
-            } else {
-                parsed
+        for (attempt in 1..maxAttempts) {
+            try {
+                return client.newCall(request).execute().use { response ->
+                    if (response.code == 304) {
+                        return null
+                    }
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException("HTTP ${response.code} fetching feed: ${response.message}")
+                    }
+                    val httpCacheTag = response.header("ETag") ?: response.header("Last-Modified")
+                    val body = response.body?.byteStream() ?: throw IllegalStateException("Empty response body")
+                    val parsed = RssFeedParser.parse(body.buffered())
+                    return if (parsed.lastBuildDate.isBlank() && !httpCacheTag.isNullOrBlank()) {
+                        parsed.copy(lastBuildDate = httpCacheTag)
+                    } else {
+                        parsed
+                    }
+                }
+            } catch (e: Exception) {
+                lastException = e
+                val isTransientNetworkError = e is java.io.IOException && e !is IllegalStateException
+                if (isTransientNetworkError && attempt < maxAttempts) {
+                    kotlinx.coroutines.delay(attempt * 500L)
+                    continue
+                }
+                throw e
             }
         }
+        throw lastException ?: IllegalStateException("Failed to fetch feed after $maxAttempts attempts")
     }
 
     data class OpmlImportSummary(
