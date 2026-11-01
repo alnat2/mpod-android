@@ -141,7 +141,7 @@ class AddPodcastViewModelAudioUrlTest {
 
         var successCalled = false
         viewModel.addAudioUrl("https://example.com/audio.mp3") { successCalled = true }
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertTrue(successCalled)
         assertFalse(viewModel.state.value.isSubmitting)
@@ -149,7 +149,7 @@ class AddPodcastViewModelAudioUrlTest {
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
         assertEquals("Playing audio track", viewModel.bannerState.value?.message)
 
-        viewModel.dismissBanner()
+        testDispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.bannerState.value)
     }
 
