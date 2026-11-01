@@ -13,6 +13,7 @@
 ## Сборка и установка
 
 - При запросе установить приложение на телефон по умолчанию собирай и устанавливай production/release вариант `com.prod.mpod`.
+- Перед каждым пушем в ветку `main` с изменениями кода приложения инкрементируй `versionCode` (+1) и патч-версию `versionName` в `app/build.gradle.kts`.
 - Debug/test вариант `com.prod.mpod.test` используй только по явному запросу пользователя.
 - Перед install проверь выбранный device, build variant и applicationId. Не удаляй app data и не выполняй uninstall для обхода ошибки без отдельного разрешения.
 - Используй project Gradle wrapper и существующие build variants. Точные task names проверь в актуальной Gradle configuration.
