@@ -385,8 +385,8 @@ class DefaultAudioLinkResolver @Inject constructor(
                 }
 
                 val html = response.body?.string().orEmpty()
-                parseGenericWebHtml(html, finalUrl)
-                    ?: resolveFromWebPageRssFallback(client, html, finalUrl)
+                resolveFromWebPageRssFallback(client, html, finalUrl)
+                    ?: parseGenericWebHtml(html, finalUrl)
                     ?: error("Could not extract audio from this link. Make sure it's a valid podcast episode or direct audio link.")
             }
         }
@@ -428,6 +428,57 @@ class DefaultAudioLinkResolver @Inject constructor(
         return null
     }
 
+    internal fun matchEpisodeInFeed(parsedFeed: ParsedPodcastFeed, pageUrl: String): ParsedEpisodeItem? {
+        val targetPath = try { URI.create(pageUrl).path?.trimEnd('/') ?: "" } catch (_: Exception) { "" }
+        val targetSegment = targetPath.substringAfterLast('/', "").trim()
+        val targetNumber = Regex("""\d+""").find(targetSegment)?.value
+
+        // 1. Match by exact pageUrl or targetPath in guid
+        var matched = parsedFeed.episodes.find { ep ->
+            val guid = ep.guid.trimEnd('/')
+            guid.isNotBlank() && (guid == pageUrl.trimEnd('/') || (targetPath.isNotBlank() && guid.endsWith(targetPath)))
+        }
+
+        // 2. Match by target segment (e.g. "ep-70") in guid or audioUrl
+        if (matched == null && targetSegment.isNotBlank()) {
+            matched = parsedFeed.episodes.find { ep ->
+                ep.guid.contains(targetSegment, ignoreCase = true) ||
+                    ep.audioUrl.contains(targetSegment, ignoreCase = true)
+            }
+        }
+
+        // 3. Match by episode number in title or guid
+        if (matched == null && !targetNumber.isNullOrBlank()) {
+            matched = parsedFeed.episodes.find { ep ->
+                ep.title.startsWith("$targetNumber.") ||
+                    ep.title.startsWith("$targetNumber ") ||
+                    ep.title.contains("#$targetNumber") ||
+                    ep.title.contains("№$targetNumber") ||
+                    ep.guid.contains("ep-$targetNumber") ||
+                    ep.guid.contains("ep$targetNumber") ||
+                    ep.guid.contains("/$targetNumber")
+            }
+        }
+
+        // 4. Fallback: match by title similarity
+        if (matched == null && targetSegment.isNotBlank()) {
+            val normalizedSegment = normalizeForComparison(targetSegment)
+            if (normalizedSegment.isNotBlank()) {
+                matched = parsedFeed.episodes.find { ep ->
+                    val normalizedTitle = normalizeForComparison(ep.title)
+                    normalizedTitle.isNotBlank() && (normalizedTitle.contains(normalizedSegment) || normalizedSegment.contains(normalizedTitle))
+                }
+            }
+        }
+
+        // 5. Fallback: only if pageUrl has NO target episode segment (e.g. root podcast page), pick latest episode
+        if (matched == null && targetSegment.isBlank()) {
+            matched = parsedFeed.episodes.firstOrNull()
+        }
+
+        return matched
+    }
+
     internal fun resolveEpisodeFromWebRss(
         client: OkHttpClient,
         feedUrl: String,
@@ -445,46 +496,7 @@ class DefaultAudioLinkResolver @Inject constructor(
                 val parsedFeed = RssFeedParser.parse(inputStream)
                 if (parsedFeed.episodes.isEmpty()) return@use null
 
-                val targetPath = try { URI.create(pageUrl).path?.trimEnd('/') ?: "" } catch (_: Exception) { "" }
-                val targetSegment = targetPath.substringAfterLast('/', "").trim()
-                val targetNumber = Regex("""\d+""").find(targetSegment)?.value
-
-                // 1. Match by exact link or link ending with targetPath
-                var matched = parsedFeed.episodes.find { ep ->
-                    val epLink = ep.link.trimEnd('/')
-                    epLink.isNotBlank() && (epLink == pageUrl.trimEnd('/') || (targetPath.isNotBlank() && epLink.endsWith(targetPath)))
-                }
-
-                // 2. Match by target segment (e.g. "ep-70") in guid, link, or audioUrl
-                if (matched == null && targetSegment.isNotBlank()) {
-                    matched = parsedFeed.episodes.find { ep ->
-                        ep.guid.contains(targetSegment, ignoreCase = true) ||
-                            ep.link.contains(targetSegment, ignoreCase = true) ||
-                            ep.audioUrl.contains(targetSegment, ignoreCase = true)
-                    }
-                }
-
-                // 3. Match by episode number in title or guid
-                if (matched == null && !targetNumber.isNullOrBlank()) {
-                    matched = parsedFeed.episodes.find { ep ->
-                        ep.title.startsWith("$targetNumber.") ||
-                            ep.title.startsWith("$targetNumber ") ||
-                            ep.title.contains("#$targetNumber") ||
-                            ep.title.contains("№$targetNumber") ||
-                            ep.guid.contains(targetNumber)
-                    }
-                }
-
-                // 4. Fallback: match by title similarity
-                if (matched == null && targetSegment.isNotBlank()) {
-                    val normalizedSegment = normalizeForComparison(targetSegment)
-                    matched = parsedFeed.episodes.find { ep ->
-                        val normalizedTitle = normalizeForComparison(ep.title)
-                        normalizedTitle.contains(normalizedSegment) || normalizedSegment.contains(normalizedTitle)
-                    }
-                }
-
-                val ep = matched ?: parsedFeed.episodes.firstOrNull() ?: return@use null
+                val ep = matchEpisodeInFeed(parsedFeed, pageUrl) ?: return@use null
                 if (ep.audioUrl.isBlank()) return@use null
 
                 ResolvedAudioMetadata(
@@ -492,7 +504,7 @@ class DefaultAudioLinkResolver @Inject constructor(
                     title = ep.title.ifBlank { "Podcast Episode" },
                     author = parsedFeed.author.ifBlank { parsedFeed.title },
                     podcastTitle = parsedFeed.title.ifBlank { parsedFeed.author },
-                    artworkUrl = (ep.artworkUrl ?: parsedFeed.artworkUrl).ifBlank { null },
+                    artworkUrl = parsedFeed.artworkUrl.ifBlank { null },
                     durationSeconds = if (ep.durationSeconds > 0) ep.durationSeconds.toInt() else null,
                     description = ep.description.ifBlank { null }
                 )

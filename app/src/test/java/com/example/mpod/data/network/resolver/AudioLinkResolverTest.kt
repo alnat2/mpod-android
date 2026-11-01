@@ -1,7 +1,14 @@
 package com.example.mpod.data.network.resolver
 
 import com.example.mpod.data.network.ProxyHttpClientFactory
+import com.example.mpod.data.rss.ParsedEpisodeItem
+import com.example.mpod.data.rss.ParsedPodcastFeed
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -256,5 +263,145 @@ class AudioLinkResolverTest {
 
         val feedUrl = resolver.findRssFeedUrlInHtml(html, "https://myblog.com/podcast/ep-1")
         assertEquals("https://myblog.com/rss.xml", feedUrl)
+    }
+
+    @Test
+    fun matchEpisodeInFeed_matchesByGuidSegment() {
+        val feed = ParsedPodcastFeed(
+            title = "Думаем дальше",
+            description = "Интеллектуальный подкаст",
+            author = "Слава",
+            artworkUrl = "https://cdn.mave.digital/cover.jpg",
+            link = "https://thinkon.mave.digital",
+            lastBuildDate = "Fri, 01 Nov 2026 12:00:00 GMT",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "https://thinkon.mave.digital/ep-71",
+                    title = "71. Свежий выпуск",
+                    description = "Описание 71",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/71.mp3",
+                    durationSeconds = 3600,
+                    publishedAt = 1000L,
+                    publishedAtString = "01 Nov 2026"
+                ),
+                ParsedEpisodeItem(
+                    guid = "https://thinkon.mave.digital/ep-70",
+                    title = "70. Что такое удача?",
+                    description = "Описание 70",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/70.mp3",
+                    durationSeconds = 3000,
+                    publishedAt = 500L,
+                    publishedAtString = "25 Oct 2026"
+                )
+            )
+        )
+
+        val matched = resolver.matchEpisodeInFeed(feed, "https://thinkon.mave.digital/ep-70")
+        assertNotNull(matched)
+        assertEquals("70. Что такое удача?", matched?.title)
+        assertEquals("https://cdn.mave.digital/storage/podcasts/episodes/70.mp3", matched?.audioUrl)
+    }
+
+    @Test
+    fun matchEpisodeInFeed_returnsNullWhenSpecificEpisodeNotFound() {
+        val feed = ParsedPodcastFeed(
+            title = "Думаем дальше",
+            description = "Интеллектуальный подкаст",
+            author = "Слава",
+            artworkUrl = "https://cdn.mave.digital/cover.jpg",
+            link = "https://thinkon.mave.digital",
+            lastBuildDate = "Fri, 01 Nov 2026 12:00:00 GMT",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "https://thinkon.mave.digital/ep-71",
+                    title = "71. Свежий выпуск",
+                    description = "Описание 71",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/71.mp3",
+                    durationSeconds = 3600,
+                    publishedAt = 1000L,
+                    publishedAtString = "01 Nov 2026"
+                )
+            )
+        )
+
+        // Does not match ep-999 and must NOT fallback to latest ep-71
+        val matched = resolver.matchEpisodeInFeed(feed, "https://thinkon.mave.digital/ep-999")
+        assertNull(matched)
+    }
+
+    @Test
+    fun matchEpisodeInFeed_fallsBackToFirstEpisodeForRootUrl() {
+        val feed = ParsedPodcastFeed(
+            title = "Думаем дальше",
+            description = "Интеллектуальный подкаст",
+            author = "Слава",
+            artworkUrl = "https://cdn.mave.digital/cover.jpg",
+            link = "https://thinkon.mave.digital",
+            lastBuildDate = "Fri, 01 Nov 2026 12:00:00 GMT",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "https://thinkon.mave.digital/ep-71",
+                    title = "71. Свежий выпуск",
+                    description = "Описание 71",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/71.mp3",
+                    durationSeconds = 3600,
+                    publishedAt = 1000L,
+                    publishedAtString = "01 Nov 2026"
+                )
+            )
+        )
+
+        val matched = resolver.matchEpisodeInFeed(feed, "https://thinkon.mave.digital/")
+        assertNotNull(matched)
+        assertEquals("71. Свежий выпуск", matched?.title)
+    }
+
+    @Test
+    fun resolveEpisodeFromWebRss_resolvesMetadataUsingRssFeed() {
+        val sampleRss = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+              <channel>
+                <title>Думаем дальше</title>
+                <description>Интеллектуальный подкаст</description>
+                <itunes:author>Слава</itunes:author>
+                <itunes:image href="https://cdn.mave.digital/cover.jpg"/>
+                <item>
+                  <title>70. Что такое удача?</title>
+                  <guid>https://thinkon.mave.digital/ep-70</guid>
+                  <enclosure url="https://cdn.mave.digital/storage/podcasts/episodes/70.mp3" type="audio/mpeg" length="12345"/>
+                  <itunes:duration>3000</itunes:duration>
+                  <description>Выпуск про удачу</description>
+                </item>
+              </channel>
+            </rss>
+        """.trimIndent()
+
+        val fakeClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(sampleRss.toResponseBody("application/rss+xml".toMediaType()))
+                    .build()
+            }
+            .build()
+
+        val resolved = resolver.resolveEpisodeFromWebRss(
+            client = fakeClient,
+            feedUrl = "https://cloud.mave.digital/51724",
+            pageUrl = "https://thinkon.mave.digital/ep-70"
+        )
+
+        assertNotNull(resolved)
+        assertEquals("https://cdn.mave.digital/storage/podcasts/episodes/70.mp3", resolved?.directAudioUrl)
+        assertEquals("70. Что такое удача?", resolved?.title)
+        assertEquals("Думаем дальше", resolved?.podcastTitle)
+        assertEquals("Слава", resolved?.author)
+        assertEquals("https://cdn.mave.digital/cover.jpg", resolved?.artworkUrl)
+        assertEquals(3000, resolved?.durationSeconds)
+        assertEquals("Выпуск про удачу", resolved?.description)
     }
 }
