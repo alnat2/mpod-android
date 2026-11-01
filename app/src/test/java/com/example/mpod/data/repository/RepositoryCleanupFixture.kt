@@ -22,4 +22,6 @@ internal fun repositoryCleanupManager(episodes: EpisodeDao, client: ProxyHttpCli
         override fun insertPlaylistItems(items: List<PlaylistItemEntity>): List<Long> = error("Refresh/OPML does not mutate playlist")
         override fun removeFromPlaylist(episodeId: Long) = error("Refresh/OPML does not mutate playlist")
         override fun clearPlaylist() = error("Refresh/OPML does not mutate playlist")
+        override fun updatePosition(episodeId: Long, position: Int): Int = error("Refresh/OPML does not mutate playlist")
+        override fun deleteNotIn(episodeIds: List<Long>) = error("Refresh/OPML does not mutate playlist")
     }, episodes, client)
