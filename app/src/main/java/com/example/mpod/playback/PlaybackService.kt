@@ -252,6 +252,9 @@ class PlaybackService : MediaSessionService() {
             }
 
             val targetIndex = playlistItems.indexOfFirst { it.episode.id == target.episodeId }
+            if (currentEpisodeId != null && player.playbackState != Player.STATE_IDLE) {
+                saveCurrentPosition(force = true)
+            }
             player.removeListener(playerListener)
             player.setMediaItems(playlistItems.map { it.toMediaItem() }, targetIndex, target.positionMs)
             previousEpisodeId = target.episodeId

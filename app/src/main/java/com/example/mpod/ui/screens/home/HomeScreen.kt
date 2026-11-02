@@ -605,7 +605,7 @@ private fun HomePlaybackUiState.toSummary(): HomePlaybackSummaryUiState {
     )
 }
 
-private fun Player?.toHomePlaybackUiState(
+internal fun Player?.toHomePlaybackUiState(
     activeEpisodeId: Long?,
     queue: List<HomeEpisodeUi>
 ): HomePlaybackUiState {
@@ -615,8 +615,12 @@ private fun Player?.toHomePlaybackUiState(
     val episode = queue.firstOrNull { it.id == episodeId }
     val durationMs = this?.duration?.takeIf { it > 0 }
         ?: ((episode?.durationSeconds ?: 0) * 1_000L)
-    val positionMs = this?.currentPosition
-        ?: (episode?.playbackPositionSeconds?.toLong()?.times(1_000L) ?: 0L)
+    val savedPositionMs = episode?.playbackPositionSeconds?.toLong()?.times(1_000L) ?: 0L
+    val positionMs = if (this?.playerError != null) {
+        savedPositionMs
+    } else {
+        this?.currentPosition ?: savedPositionMs
+    }
 
     return HomePlaybackUiState(
         currentEpisodeId = episodeId,
