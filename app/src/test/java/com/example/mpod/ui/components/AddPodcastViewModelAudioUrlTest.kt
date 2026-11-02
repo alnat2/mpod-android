@@ -461,6 +461,52 @@ class AddPodcastViewModelAudioUrlTest {
         assertFalse(success1Called)
         assertTrue("Second task must succeed even if first task failed", success2Called)
         assertEquals(listOf("https://example.com/good.mp3"), completedUris)
+        assertEquals("Error banner must not be masked by subsequent successful task", StatusBannerType.Error, viewModel.bannerState.value?.type)
+        assertEquals("Network error on bad track", viewModel.bannerState.value?.message)
+        assertEquals("Try again", viewModel.bannerState.value?.actionLabel)
+    }
+
+    @Test
+    fun addAudioUrl_multipleSuccessesInQueue_showsInfoBannerAtEnd() = runTest {
+        val completedUris = mutableListOf<String>()
+
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                completedUris.add(urlOrUri)
+                return 42L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var success1Called = false
+        var success2Called = false
+
+        viewModel.addAudioUrl("https://example.com/track1.mp3") { success1Called = true }
+        viewModel.addAudioUrl("https://example.com/track2.mp3") { success2Called = true }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(success1Called)
+        assertTrue(success2Called)
+        assertEquals(listOf("https://example.com/track1.mp3", "https://example.com/track2.mp3"), completedUris)
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+        assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
     }
 }

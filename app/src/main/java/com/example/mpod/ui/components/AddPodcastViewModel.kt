@@ -60,6 +60,7 @@ class AddPodcastViewModel @Inject constructor(
     val bannerState: StateFlow<AddPodcastBannerUiState?> = _bannerState.asStateFlow()
 
     private var lastFailedAction: LastFailedAction? = null
+    private var pendingBatchFailure: Pair<String, LastFailedAction.Audio>? = null
     private var autoDismissJob: Job? = null
 
     fun begin(mode: AddPodcastMode) {
@@ -210,26 +211,38 @@ class AddPodcastViewModel @Inject constructor(
         }
         if (result.isSuccess) {
             reset()
-            _bannerState.value = AddPodcastBannerUiState(
-                message = "Audio track added to playlist",
-                type = StatusBannerType.Info
-            )
-            scheduleAutoDismiss(3000L)
             task.onSuccess()
         } else {
             val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
-            lastFailedAction = LastFailedAction.Audio(task.url, task.title)
+            val failedAction = LastFailedAction.Audio(task.url, task.title)
+            lastFailedAction = failedAction
+            pendingBatchFailure = errorMsg to failedAction
             _state.value = _state.value.copy(
                 errorMessage = errorMsg,
                 rssUrl = task.url
             )
-            _bannerState.value = AddPodcastBannerUiState(
-                message = errorMsg,
-                type = StatusBannerType.Error,
-                actionLabel = "Try again"
-            )
         }
-        _state.value = _state.value.copy(isSubmitting = false)
+
+        val hasMoreInQueue = !audioIngestionChannel.isEmpty
+        if (!hasMoreInQueue) {
+            val failure = pendingBatchFailure
+            if (failure != null) {
+                pendingBatchFailure = null
+                lastFailedAction = failure.second
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = failure.first,
+                    type = StatusBannerType.Error,
+                    actionLabel = "Try again"
+                )
+            } else {
+                _bannerState.value = AddPodcastBannerUiState(
+                    message = "Audio track added to playlist",
+                    type = StatusBannerType.Info
+                )
+                scheduleAutoDismiss(3000L)
+            }
+            _state.value = _state.value.copy(isSubmitting = false)
+        }
     }
 
     fun importOpml(uri: Uri, onSuccess: () -> Unit) {
