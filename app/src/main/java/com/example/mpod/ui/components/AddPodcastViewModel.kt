@@ -70,7 +70,7 @@ class AddPodcastViewModel @Inject constructor(
         dismissBanner()
         when (last) {
             is LastFailedAction.Rss -> addRssFeed(last.url, onRssSuccess)
-            is LastFailedAction.Audio -> addAudioUrl(last.url, onAudioSuccess)
+            is LastFailedAction.Audio -> addAudioUrl(last.url, last.title, onAudioSuccess)
             is LastFailedAction.Opml -> importOpml(last.uri, onOpmlSuccess)
         }
     }
@@ -157,7 +157,7 @@ class AddPodcastViewModel @Inject constructor(
         }
     }
 
-    fun addAudioUrl(url: String, onSuccess: () -> Unit) {
+    fun addAudioUrl(url: String, title: String? = null, onSuccess: () -> Unit = {}) {
         if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
@@ -186,7 +186,7 @@ class AddPodcastViewModel @Inject constructor(
         )
         viewModelScope.launch {
             val result = runCatching {
-                singleTrackRepository.playSingleTrack(trimmedUrl)
+                singleTrackRepository.playSingleTrack(trimmedUrl, title)
             }
             if (result.isSuccess) {
                 reset()
@@ -198,7 +198,7 @@ class AddPodcastViewModel @Inject constructor(
                 onSuccess()
             } else {
                 val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
-                lastFailedAction = LastFailedAction.Audio(trimmedUrl)
+                lastFailedAction = LastFailedAction.Audio(trimmedUrl, title)
                 _state.value = _state.value.copy(
                     isSubmitting = false,
                     errorMessage = errorMsg,
@@ -300,7 +300,7 @@ data class AddPodcastBannerUiState(
 
 sealed class LastFailedAction {
     data class Rss(val url: String) : LastFailedAction()
-    data class Audio(val url: String) : LastFailedAction()
+    data class Audio(val url: String, val title: String? = null) : LastFailedAction()
     data class Opml(val uri: Uri) : LastFailedAction()
 }
 

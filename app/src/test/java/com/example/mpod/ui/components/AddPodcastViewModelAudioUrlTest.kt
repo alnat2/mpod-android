@@ -187,4 +187,92 @@ class AddPodcastViewModelAudioUrlTest {
         assertEquals("Could not extract audio", banner?.message)
         assertEquals("Try again", banner?.actionLabel)
     }
+
+    @Test
+    fun addAudioUrl_showsLoadingBannerImmediately() = runTest {
+        var resolveStarted = false
+        val slowRepo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                resolveStarted = true
+                kotlinx.coroutines.delay(5000L)
+                return 42L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = slowRepo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        viewModel.addAudioUrl("https://example.com/slow-stream.mp3", "Shared Title")
+        assertEquals(StatusBannerType.Loading, viewModel.bannerState.value?.type)
+        assertEquals("Resolving audio link...", viewModel.bannerState.value?.message)
+        assertTrue(viewModel.state.value.isSubmitting)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(resolveStarted)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+        assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
+    }
+
+    @Test
+    fun retryLastAction_retriesWithOriginalTitle() = runTest {
+        var attempts = 0
+        var receivedTitle: String? = null
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                attempts++
+                receivedTitle = title
+                if (attempts == 1) {
+                    throw IllegalArgumentException("Temporary network timeout")
+                }
+                return 42L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        viewModel.addAudioUrl("https://example.com/track.mp3", "Important Podcast")
+        testDispatcher.scheduler.runCurrent()
+
+        assertEquals(1, attempts)
+        assertEquals(StatusBannerType.Error, viewModel.bannerState.value?.type)
+        assertEquals("Try again", viewModel.bannerState.value?.actionLabel)
+
+        viewModel.retryLastAction()
+        testDispatcher.scheduler.runCurrent()
+
+        assertEquals(2, attempts)
+        assertEquals("Important Podcast", receivedTitle)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+    }
 }

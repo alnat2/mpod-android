@@ -50,6 +50,7 @@ import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.settings.SettingsViewModel
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 import com.example.mpod.ui.theme.ThemeMode
+import com.example.mpod.util.SharedIntentParser
 
 @Composable
 fun AppNavigation(
@@ -69,11 +70,18 @@ fun AppNavigation(
     val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
 
     androidx.compose.runtime.LaunchedEffect(sharedIntentFlow) {
-        sharedIntentFlow.collect {
-            libraryRefreshKey += 1
+        sharedIntentFlow.collect { intent ->
+            val audioData = SharedIntentParser.parse(intent)
             navController.navigate(Screen.Home.route) {
                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                 launchSingleTop = true
+            }
+            if (audioData != null) {
+                addPodcastViewModel.addAudioUrl(audioData.urlOrUri, audioData.title) {
+                    libraryRefreshKey += 1
+                }
+            } else {
+                libraryRefreshKey += 1
             }
         }
     }

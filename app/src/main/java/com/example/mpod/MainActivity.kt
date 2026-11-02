@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.mpod.data.local.preferences.AppSettingsStore
-import com.example.mpod.data.repository.SingleTrackRepository
 import com.example.mpod.ui.navigation.AppNavigation
 import com.example.mpod.ui.navigation.Screen
 import com.example.mpod.ui.theme.MpodTheme
@@ -30,15 +29,17 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var appSettingsDataStore: AppSettingsStore
-    @Inject lateinit var singleTrackRepository: SingleTrackRepository
 
-    private val sharedIntentFlow = MutableSharedFlow<Intent>(extraBufferCapacity = 1)
+    private val sharedIntentFlow = MutableSharedFlow<Intent>(replay = 1, extraBufferCapacity = 1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val isSharedIntent = handleIntent(intent)
+        if (SharedIntentParser.parse(intent) != null) {
+            sharedIntentFlow.tryEmit(intent)
+        }
+
         val initialDestination = Screen.Home.route
 
         setContent {
@@ -70,20 +71,8 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (handleIntent(intent)) {
+        if (SharedIntentParser.parse(intent) != null) {
             sharedIntentFlow.tryEmit(intent)
         }
-    }
-
-    private fun handleIntent(intent: Intent?): Boolean {
-        val audioData = SharedIntentParser.parse(intent) ?: return false
-        lifecycleScope.launch {
-            runCatching {
-                singleTrackRepository.playSingleTrack(audioData.urlOrUri, audioData.title)
-            }.onFailure { error ->
-                android.util.Log.e("MainActivity", "Failed to resolve or play shared track: ${audioData.urlOrUri}", error)
-            }
-        }
-        return true
     }
 }
