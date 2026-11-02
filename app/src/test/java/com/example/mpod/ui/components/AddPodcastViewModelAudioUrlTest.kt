@@ -147,7 +147,7 @@ class AddPodcastViewModelAudioUrlTest {
         assertFalse(viewModel.state.value.isSubmitting)
         assertNull(viewModel.state.value.errorMessage)
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
-        assertEquals("Playing audio track", viewModel.bannerState.value?.message)
+        assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
 
         testDispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.bannerState.value)

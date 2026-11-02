@@ -191,7 +191,7 @@ class AddPodcastViewModel @Inject constructor(
             if (result.isSuccess) {
                 reset()
                 _bannerState.value = AddPodcastBannerUiState(
-                    message = "Playing audio track",
+                    message = "Audio track added to playlist",
                     type = StatusBannerType.Info
                 )
                 scheduleAutoDismiss(3000L)

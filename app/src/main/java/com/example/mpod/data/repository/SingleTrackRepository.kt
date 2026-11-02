@@ -133,18 +133,17 @@ open class SingleTrackRepository @Inject constructor(
             )
         }
 
-        // Prepend to playlist at position 0 so it plays immediately
         val currentItems = playlistDao.getPlaylistItemsWithEpisodes()
-        val otherItems = currentItems.filter { it.episode.id != episodeId }
-        val newPlaylistItems = listOf(
-            PlaylistItemEntity(episodeId = episodeId, position = 0)
-        ) + otherItems.mapIndexed { idx, item ->
-            PlaylistItemEntity(id = item.playlistItemId, episodeId = item.episode.id, position = idx + 1)
-        }
-        playlistDao.reorderPlaylist(newPlaylistItems)
+        val alreadyInPlaylist = currentItems.any { it.episode.id == episodeId }
 
-        // Set as active episode and notify queue invalidator
-        appSettingsDataStore.setActiveEpisodeId(episodeId)
+        if (currentItems.isEmpty()) {
+            playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = 0))
+            appSettingsDataStore.setActiveEpisodeId(episodeId)
+        } else if (!alreadyInPlaylist) {
+            val nextPos = (playlistDao.getMaxPosition() ?: (currentItems.size - 1)) + 1
+            playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
+        }
+
         queueInvalidator.invalidate()
 
         episodeId

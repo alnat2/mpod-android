@@ -93,13 +93,13 @@ class SingleTrackRepositoryTest {
     }
 
     @Test
-    fun playSingleTrack_insertsEpisodePrependsToPlaylistAndSetsActive() = runTest {
+    fun playSingleTrack_whenQueueNonEmpty_appendsToPlaylistAndPreservesActiveEpisode() = runTest {
         var invalidationCount = 0
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             fakeQueueInvalidator.events.collect { invalidationCount++ }
         }
 
-        // Given an existing item in the playlist
+        // Given an existing item in the playlist and active episode
         val existingEpisode = EpisodeEntity(
             id = 50L,
             podcastId = 1L,
@@ -117,8 +117,9 @@ class SingleTrackRepositoryTest {
                 podcastArtworkUrl = ""
             )
         )
+        fakeAppSettingsStore.setActiveEpisodeId(50L)
 
-        // When playing a single track
+        // When adding a single track
         val episodeId = repository.playSingleTrack(
             urlOrUri = "https://example.com/audio/my-special-song.mp3",
             title = "My Special Song"
@@ -130,12 +131,41 @@ class SingleTrackRepositoryTest {
         assertEquals("My Special Song", inserted?.title)
         assertEquals("https://example.com/audio/my-special-song.mp3", inserted?.audioUrl)
 
-        // Playlist reordered: single track at position 0, existing shifted to position 1
+        // Playlist appended: existing remains at position 0, new single track appended at position 1
         assertEquals(2, playlistItems.size)
+        assertEquals(50L, playlistItems[0].episode.id)
+        assertEquals(0, playlistItems[0].position)
+        assertEquals(episodeId, playlistItems[1].episode.id)
+        assertEquals(1, playlistItems[1].position)
+
+        // Active episode preserved (NOT displaced!)
+        val settings = fakeAppSettingsStore.settingsFlow.first()
+        assertEquals(50L, settings.activeEpisodeId)
+
+        // Invalidator notified
+        assertEquals(1, invalidationCount)
+    }
+
+    @Test
+    fun playSingleTrack_whenQueueEmpty_insertsAtZeroAndSetsActive() = runTest {
+        var invalidationCount = 0
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            fakeQueueInvalidator.events.collect { invalidationCount++ }
+        }
+
+        // Given an empty playlist
+        playlistItems.clear()
+
+        // When playing a single track
+        val episodeId = repository.playSingleTrack(
+            urlOrUri = "https://example.com/audio/solo.mp3",
+            title = "Solo Song"
+        )
+
+        // Single track inserted at position 0
+        assertEquals(1, playlistItems.size)
         assertEquals(episodeId, playlistItems[0].episode.id)
         assertEquals(0, playlistItems[0].position)
-        assertEquals(50L, playlistItems[1].episode.id)
-        assertEquals(1, playlistItems[1].position)
 
         // Active episode set in preferences
         val settings = fakeAppSettingsStore.settingsFlow.first()
@@ -344,6 +374,24 @@ class SingleTrackRepositoryTest {
             when (method.name) {
                 "getPlaylistItemsWithEpisodes" -> {
                     playlistItems.toList()
+                }
+                "getMaxPosition" -> {
+                    playlistItems.maxOfOrNull { it.position }
+                }
+                "insertPlaylistItem" -> {
+                    val item = args[0] as PlaylistItemEntity
+                    val ep = episodes[item.episodeId] ?: error("Episode not found")
+                    val id = if (item.id != 0L) item.id else playlistIdCounter++
+                    playlistItems.add(
+                        PlaylistItemWithEpisode(
+                            playlistItemId = id,
+                            position = item.position,
+                            episode = ep,
+                            podcastTitle = "Audio",
+                            podcastArtworkUrl = ""
+                        )
+                    )
+                    id
                 }
                 "reorderPlaylist" -> {
                     val newItems = args[0] as List<PlaylistItemEntity>
