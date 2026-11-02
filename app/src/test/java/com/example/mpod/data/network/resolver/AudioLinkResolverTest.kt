@@ -461,4 +461,89 @@ class AudioLinkResolverTest {
         val feedUrl = resolver.findRssFeedUrlInHtml(html, "https://thinkon.mave.digital/ep-69")
         assertEquals("https://cloud.mave.digital/51724", feedUrl)
     }
+
+    @Test
+    fun matchEpisodeInFeed_exactUrlTakesPrecedenceOverPageTitle() {
+        val feed = ParsedPodcastFeed(
+            title = "Podcast",
+            description = "Desc",
+            author = "Author",
+            artworkUrl = "",
+            link = "https://example.com",
+            lastBuildDate = "",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "https://example.com/ep-2",
+                    title = "Episode Two",
+                    description = "",
+                    audioUrl = "https://example.com/2.mp3",
+                    durationSeconds = 1200,
+                    publishedAt = 200L,
+                    publishedAtString = ""
+                ),
+                ParsedEpisodeItem(
+                    guid = "https://example.com/ep-1",
+                    title = "Episode One",
+                    description = "",
+                    audioUrl = "https://example.com/1.mp3",
+                    durationSeconds = 1000,
+                    publishedAt = 100L,
+                    publishedAtString = ""
+                )
+            )
+        )
+
+        // pageUrl exactly matches ep-2, but pageTitle says "Episode One"
+        val matched = resolver.matchEpisodeInFeed(
+            parsedFeed = feed,
+            pageUrl = "https://example.com/ep-2",
+            pageTitle = "Episode One"
+        )
+        assertNotNull(matched)
+        assertEquals("Episode Two", matched?.title)
+        assertEquals("https://example.com/2.mp3", matched?.audioUrl)
+    }
+
+    @Test
+    fun matchEpisodeInFeed_ignoresPageTitle_whenItMatchesPodcastTitle() {
+        val feed = ParsedPodcastFeed(
+            title = "Думаем дальше",
+            description = "Desc",
+            author = "Author",
+            artworkUrl = "",
+            link = "https://thinkon.mave.digital",
+            lastBuildDate = "",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "uuid-1",
+                    title = "Думаем дальше #1: Вводный выпуск",
+                    description = "",
+                    audioUrl = "https://example.com/1.mp3",
+                    durationSeconds = 1000,
+                    publishedAt = 100L,
+                    publishedAtString = ""
+                ),
+                ParsedEpisodeItem(
+                    guid = "uuid-2",
+                    title = "Думаем дальше #2: Основной выпуск",
+                    description = "",
+                    audioUrl = "https://example.com/2.mp3",
+                    durationSeconds = 2000,
+                    publishedAt = 200L,
+                    publishedAtString = ""
+                )
+            )
+        )
+
+        // When pageTitle is just the podcast title ("Думаем дальше") from a root page,
+        // it shouldn't falsely latch onto episode 1 via substring matching;
+        // since root page has empty segment, it falls back to first/latest episode properly without false positive.
+        val matched = resolver.matchEpisodeInFeed(
+            parsedFeed = feed,
+            pageUrl = "https://thinkon.mave.digital/",
+            pageTitle = "Думаем дальше"
+        )
+        assertNotNull(matched)
+        assertEquals("Думаем дальше #1: Вводный выпуск", matched?.title)
+    }
 }

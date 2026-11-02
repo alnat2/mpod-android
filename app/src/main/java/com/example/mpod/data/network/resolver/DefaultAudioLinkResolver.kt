@@ -387,7 +387,7 @@ class DefaultAudioLinkResolver @Inject constructor(
                 }
 
                 val rawHtml = response.body?.string().orEmpty()
-                val html = rawHtml.replace("\\/", "/")
+                val html = cleanHtml(rawHtml)
                 val pageTitle = findMetaContent(html, "og:title")
                     ?: findTagContent(html, "title")
                     ?: findMetaContent(rawHtml, "og:title")
@@ -400,6 +400,8 @@ class DefaultAudioLinkResolver @Inject constructor(
         }
     }
 
+    internal fun cleanHtml(html: String): String = html.replace("\\/", "/")
+
     internal fun resolveFromWebPageRssFallback(
         client: OkHttpClient,
         html: String,
@@ -411,7 +413,7 @@ class DefaultAudioLinkResolver @Inject constructor(
     }
 
     internal fun findRssFeedUrlInHtml(html: String, pageUrl: String): String? {
-        val cleanHtml = html.replace("\\/", "/")
+        val cleanHtml = cleanHtml(html)
         // 1. Standard RSS/Atom link tag: <link rel="alternate" type="application/rss+xml" href="...">
         val linkMatch = Regex(
             """<link[^>]+(?:type=["'](?:application/rss\+xml|application/atom\+xml|text/xml)["'][^>]+href=["']([^"']+)["']|href=["']([^"']+)["'][^>]+type=["'](?:application/rss\+xml|application/atom\+xml|text/xml)["'])""",
@@ -447,24 +449,7 @@ class DefaultAudioLinkResolver @Inject constructor(
         val targetSegment = targetPath.substringAfterLast('/', "").trim()
         val targetNumber = Regex("""\d+""").find(targetSegment)?.value
 
-        // 1. Match by pageTitle in episode title
-        if (!pageTitle.isNullOrBlank()) {
-            val cleanPageTitle = unescapeHtml(pageTitle).trim()
-            val normalizedPageTitle = normalizeForComparison(cleanPageTitle)
-            if (normalizedPageTitle.isNotBlank()) {
-                val matched = parsedFeed.episodes.find { ep ->
-                    val normalizedEpTitle = normalizeForComparison(ep.title)
-                    normalizedEpTitle.isNotBlank() && (
-                        normalizedEpTitle == normalizedPageTitle ||
-                            normalizedEpTitle.contains(normalizedPageTitle) ||
-                            normalizedPageTitle.contains(normalizedEpTitle)
-                    )
-                }
-                if (matched != null) return matched
-            }
-        }
-
-        // 2. Match by exact pageUrl or targetPath in guid
+        // 1. Exact match by pageUrl or targetPath in guid (highest priority — definitive URL match)
         var matched = parsedFeed.episodes.find { ep ->
             val guid = ep.guid.trimEnd('/')
             guid.isNotBlank() && (guid == pageUrl.trimEnd('/') || (targetPath.isNotBlank() && guid.endsWith(targetPath)))
@@ -478,7 +463,39 @@ class DefaultAudioLinkResolver @Inject constructor(
             }
         }
 
-        // 3. Match by episode number in title or guid
+        // 3. Match by pageTitle in episode title (guard against pageTitle matching podcast title/author!)
+        if (matched == null && !pageTitle.isNullOrBlank()) {
+            val cleanPageTitle = unescapeHtml(pageTitle).trim()
+            val normalizedPageTitle = normalizeForComparison(cleanPageTitle)
+            val normalizedFeedTitle = normalizeForComparison(parsedFeed.title)
+            val normalizedFeedAuthor = normalizeForComparison(parsedFeed.author)
+
+            val isPodcastTitleOnly = normalizedPageTitle.isNotBlank() && (
+                normalizedPageTitle == normalizedFeedTitle ||
+                    (normalizedFeedTitle.isNotBlank() && normalizedFeedTitle.contains(normalizedPageTitle)) ||
+                    normalizedPageTitle == normalizedFeedAuthor
+            )
+
+            if (normalizedPageTitle.isNotBlank() && !isPodcastTitleOnly) {
+                // A. Exact title match first
+                matched = parsedFeed.episodes.find { ep ->
+                    val normalizedEpTitle = normalizeForComparison(ep.title)
+                    normalizedEpTitle.isNotBlank() && normalizedEpTitle == normalizedPageTitle
+                }
+                // B. Substring match only for specific titles (length > 6)
+                if (matched == null && normalizedPageTitle.length > 6) {
+                    matched = parsedFeed.episodes.find { ep ->
+                        val normalizedEpTitle = normalizeForComparison(ep.title)
+                        normalizedEpTitle.isNotBlank() && (
+                            normalizedEpTitle.contains(normalizedPageTitle) ||
+                                normalizedPageTitle.contains(normalizedEpTitle)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 4. Match by episode number in title or guid
         if (matched == null && !targetNumber.isNullOrBlank()) {
             matched = parsedFeed.episodes.find { ep ->
                 ep.title.startsWith("$targetNumber.") ||
@@ -491,7 +508,7 @@ class DefaultAudioLinkResolver @Inject constructor(
             }
         }
 
-        // 4. Fallback: match by title similarity
+        // 5. Fallback: match by title similarity with URL segment
         if (matched == null && targetSegment.isNotBlank()) {
             val normalizedSegment = normalizeForComparison(targetSegment)
             if (normalizedSegment.isNotBlank()) {
@@ -502,7 +519,7 @@ class DefaultAudioLinkResolver @Inject constructor(
             }
         }
 
-        // 5. Fallback: only if pageUrl has NO target episode segment (e.g. root podcast page), pick latest episode
+        // 6. Fallback: only if pageUrl has NO target episode segment (e.g. root podcast page), pick latest episode
         if (matched == null && targetSegment.isBlank()) {
             matched = parsedFeed.episodes.firstOrNull()
         }
@@ -567,7 +584,7 @@ class DefaultAudioLinkResolver @Inject constructor(
     }
 
     internal fun findAudioUrlInHtml(html: String): String? {
-        val cleanHtml = html.replace("\\/", "/")
+        val cleanHtml = cleanHtml(html)
         // og:audio or og:audio:secure_url
         val ogAudio = findMetaContent(cleanHtml, "og:audio:secure_url")
             ?: findMetaContent(cleanHtml, "og:audio")
