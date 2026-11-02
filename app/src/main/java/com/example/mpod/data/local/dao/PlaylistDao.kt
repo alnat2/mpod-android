@@ -91,6 +91,14 @@ interface PlaylistDao {
     fun deleteNotIn(episodeIds: List<Long>)
 
     @Transaction
+    fun appendEpisodeIfMissing(episodeId: Long): Boolean {
+        if (isEpisodeInPlaylist(episodeId)) return false
+        val nextPos = (getMaxPosition() ?: -1) + 1
+        insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
+        return true
+    }
+
+    @Transaction
     fun reorderPlaylist(items: List<PlaylistItemEntity>) {
         if (items.isEmpty()) {
             clearPlaylist()

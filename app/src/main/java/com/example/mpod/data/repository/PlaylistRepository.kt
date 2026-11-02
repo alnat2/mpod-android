@@ -21,9 +21,7 @@ class PlaylistRepository @Inject constructor(
     }
 
     suspend fun addEpisodeToPlaylist(episodeId: Long) = withContext(Dispatchers.IO) {
-        if (playlistDao.isEpisodeInPlaylist(episodeId)) return@withContext
-        val nextPos = (playlistDao.getMaxPosition() ?: -1) + 1
-        playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
+        playlistDao.appendEpisodeIfMissing(episodeId)
     }
 
     suspend fun removeFromPlaylist(episodeId: Long) = withContext(Dispatchers.IO) {

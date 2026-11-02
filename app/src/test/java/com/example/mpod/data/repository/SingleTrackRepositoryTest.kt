@@ -133,10 +133,13 @@ class SingleTrackRepositoryTest {
 
         // Playlist appended: existing remains at position 0, new single track appended at position 1
         assertEquals(2, playlistItems.size)
-        assertEquals(50L, playlistItems[0].episode.id)
-        assertEquals(0, playlistItems[0].position)
-        assertEquals(episodeId, playlistItems[1].episode.id)
-        assertEquals(1, playlistItems[1].position)
+        val existingItem = playlistItems.find { it.episode.id == 50L }
+        assertNotNull(existingItem)
+        assertEquals(0, existingItem?.position)
+
+        val newItem = playlistItems.find { it.episode.id == episodeId }
+        assertNotNull(newItem)
+        assertEquals(1, newItem?.position)
 
         // Active episode preserved (NOT displaced!)
         val settings = fakeAppSettingsStore.settingsFlow.first()
@@ -377,6 +380,30 @@ class SingleTrackRepositoryTest {
                 }
                 "getMaxPosition" -> {
                     playlistItems.maxOfOrNull { it.position }
+                }
+                "isEpisodeInPlaylist" -> {
+                    val epId = args[0] as Long
+                    playlistItems.any { it.episode.id == epId }
+                }
+                "appendEpisodeIfMissing" -> {
+                    val epId = args[0] as Long
+                    if (playlistItems.any { it.episode.id == epId }) {
+                        false
+                    } else {
+                        val maxPos = playlistItems.maxOfOrNull { it.position } ?: -1
+                        val nextPos = maxPos + 1
+                        val ep = episodes[epId] ?: error("Episode not found")
+                        playlistItems.add(
+                            PlaylistItemWithEpisode(
+                                playlistItemId = playlistIdCounter++,
+                                position = nextPos,
+                                episode = ep,
+                                podcastTitle = "Audio",
+                                podcastArtworkUrl = ""
+                            )
+                        )
+                        true
+                    }
                 }
                 "insertPlaylistItem" -> {
                     val item = args[0] as PlaylistItemEntity

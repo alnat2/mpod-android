@@ -133,15 +133,10 @@ open class SingleTrackRepository @Inject constructor(
             )
         }
 
-        val currentItems = playlistDao.getPlaylistItemsWithEpisodes()
-        val alreadyInPlaylist = currentItems.any { it.episode.id == episodeId }
-
-        if (currentItems.isEmpty()) {
-            playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = 0))
+        val wasEmpty = playlistDao.getMaxPosition() == null
+        playlistDao.appendEpisodeIfMissing(episodeId)
+        if (wasEmpty) {
             appSettingsDataStore.setActiveEpisodeId(episodeId)
-        } else if (!alreadyInPlaylist) {
-            val nextPos = (playlistDao.getMaxPosition() ?: (currentItems.size - 1)) + 1
-            playlistDao.insertPlaylistItem(PlaylistItemEntity(episodeId = episodeId, position = nextPos))
         }
 
         queueInvalidator.invalidate()
