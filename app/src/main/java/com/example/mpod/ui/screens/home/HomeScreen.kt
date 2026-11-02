@@ -198,7 +198,16 @@ fun HomeRoute(
                 val index = (0 until player.mediaItemCount)
                     .firstOrNull { player.getMediaItemAt(it).mediaId == episodeId.toString() }
                 if (index != null) {
-                    player.seekToDefaultPosition(index)
+                    val seekPosMs = resolveEpisodeSeekPositionMs(
+                        episodeId = episodeId,
+                        queue = state.queue,
+                        currentMediaItemIndex = player.currentMediaItemIndex,
+                        targetMediaItemIndex = index,
+                        isPlayerIdle = player.playbackState == Player.STATE_IDLE
+                    )
+                    if (seekPosMs != null) {
+                        player.seekTo(index, seekPosMs)
+                    }
                     player.play()
                 }
             }
@@ -209,6 +218,20 @@ fun HomeRoute(
         onMoveEpisode = viewModel::moveEpisode,
         onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist
     )
+}
+
+internal fun resolveEpisodeSeekPositionMs(
+    episodeId: Long,
+    queue: List<HomeEpisodeUi>,
+    currentMediaItemIndex: Int,
+    targetMediaItemIndex: Int,
+    isPlayerIdle: Boolean
+): Long? {
+    if (currentMediaItemIndex == targetMediaItemIndex && !isPlayerIdle) {
+        return null
+    }
+    val targetEpisode = queue.find { it.id == episodeId }
+    return (targetEpisode?.playbackPositionSeconds?.takeIf { it > 0 } ?: 0L) * 1_000L
 }
 
 @Composable

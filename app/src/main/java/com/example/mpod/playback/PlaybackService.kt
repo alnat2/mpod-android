@@ -252,7 +252,7 @@ class PlaybackService : MediaSessionService() {
             }
 
             val targetIndex = playlistItems.indexOfFirst { it.episode.id == target.episodeId }
-            if (currentEpisodeId != null && player.playbackState != Player.STATE_IDLE) {
+            if (currentEpisodeId != null && player.playbackState != Player.STATE_IDLE && (player.isPlaying || player.currentPosition > 0L)) {
                 saveCurrentPosition(force = true)
             }
             player.removeListener(playerListener)
@@ -352,9 +352,6 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_READY) {
-                serviceScope.launch { saveCurrentPosition(force = true) }
-            }
             if (playbackState != Player.STATE_ENDED) return
             val episodeId = currentEpisodeId() ?: return
             handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
