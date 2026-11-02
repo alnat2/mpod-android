@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        tryPersistUriPermission(intent)
         if (SharedIntentParser.parse(intent) != null) {
             sharedIntentFlow.tryEmit(intent)
         }
@@ -71,8 +72,27 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        tryPersistUriPermission(intent)
         if (SharedIntentParser.parse(intent) != null) {
             sharedIntentFlow.tryEmit(intent)
+        }
+    }
+
+    private fun tryPersistUriPermission(intent: Intent?) {
+        val uri = intent?.data ?: if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra(Intent.EXTRA_STREAM) as? android.net.Uri
+        } ?: return
+
+        if (uri.scheme.equals("content", ignoreCase = true)) {
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: SecurityException) {
+                // Sender did not set FLAG_GRANT_PERSISTABLE_URI_PERMISSION;
+                // transient read grant to the Activity remains valid for process lifetime.
+            }
         }
     }
 }

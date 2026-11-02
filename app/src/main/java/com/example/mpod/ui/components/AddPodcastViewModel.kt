@@ -11,6 +11,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltViewModel
@@ -27,6 +29,22 @@ class AddPodcastViewModel @Inject constructor(
     private val singleTrackRepository: SingleTrackRepository,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
+
+    private data class AudioIngestionTask(
+        val url: String,
+        val title: String?,
+        val onSuccess: () -> Unit
+    )
+
+    private val audioIngestionChannel = Channel<AudioIngestionTask>(Channel.UNLIMITED)
+
+    init {
+        viewModelScope.launch {
+            for (task in audioIngestionChannel) {
+                processAudioIngestionTask(task)
+            }
+        }
+    }
 
     private val _state = MutableStateFlow(
         AddPodcastUiState(
@@ -158,7 +176,6 @@ class AddPodcastViewModel @Inject constructor(
     }
 
     fun addAudioUrl(url: String, title: String? = null, onSuccess: () -> Unit = {}) {
-        if (_state.value.isSubmitting) return
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) {
             val errorMsg = "Paste podcast link."
@@ -169,8 +186,8 @@ class AddPodcastViewModel @Inject constructor(
             )
             return
         }
-        if (!trimmedUrl.isHttpUrl()) {
-            val errorMsg = "Enter a valid http or https audio link."
+        if (!isSupportedAudioSource(trimmedUrl)) {
+            val errorMsg = "Enter a valid audio link or file."
             _state.value = _state.value.copy(errorMessage = errorMsg)
             _bannerState.value = AddPodcastBannerUiState(
                 message = errorMsg,
@@ -179,38 +196,40 @@ class AddPodcastViewModel @Inject constructor(
             return
         }
 
+        audioIngestionChannel.trySend(AudioIngestionTask(trimmedUrl, title, onSuccess))
+    }
+
+    private suspend fun processAudioIngestionTask(task: AudioIngestionTask) {
         _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
         _bannerState.value = AddPodcastBannerUiState(
             message = "Resolving audio link...",
             type = StatusBannerType.Loading
         )
-        viewModelScope.launch {
-            val result = runCatching {
-                singleTrackRepository.playSingleTrack(trimmedUrl, title)
-            }
-            if (result.isSuccess) {
-                reset()
-                _bannerState.value = AddPodcastBannerUiState(
-                    message = "Audio track added to playlist",
-                    type = StatusBannerType.Info
-                )
-                scheduleAutoDismiss(3000L)
-                onSuccess()
-            } else {
-                val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
-                lastFailedAction = LastFailedAction.Audio(trimmedUrl, title)
-                _state.value = _state.value.copy(
-                    isSubmitting = false,
-                    errorMessage = errorMsg,
-                    rssUrl = trimmedUrl
-                )
-                _bannerState.value = AddPodcastBannerUiState(
-                    message = errorMsg,
-                    type = StatusBannerType.Error,
-                    actionLabel = "Try again"
-                )
-            }
+        val result = runCatching {
+            singleTrackRepository.playSingleTrack(task.url, task.title)
         }
+        if (result.isSuccess) {
+            reset()
+            _bannerState.value = AddPodcastBannerUiState(
+                message = "Audio track added to playlist",
+                type = StatusBannerType.Info
+            )
+            scheduleAutoDismiss(3000L)
+            task.onSuccess()
+        } else {
+            val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
+            lastFailedAction = LastFailedAction.Audio(task.url, task.title)
+            _state.value = _state.value.copy(
+                errorMessage = errorMsg,
+                rssUrl = task.url
+            )
+            _bannerState.value = AddPodcastBannerUiState(
+                message = errorMsg,
+                type = StatusBannerType.Error,
+                actionLabel = "Try again"
+            )
+        }
+        _state.value = _state.value.copy(isSubmitting = false)
     }
 
     fun importOpml(uri: Uri, onSuccess: () -> Unit) {
@@ -269,6 +288,16 @@ class AddPodcastViewModel @Inject constructor(
             }
         }
     }
+
+    internal fun isSupportedAudioSource(url: String): Boolean = runCatching {
+        val uri = URI(url.trim())
+        val scheme = uri.scheme?.lowercase(Locale.ROOT)
+        when (scheme) {
+            "http", "https" -> !uri.host.isNullOrBlank()
+            "content", "file" -> !uri.schemeSpecificPart.isNullOrBlank()
+            else -> false
+        }
+    }.getOrDefault(false)
 
     internal fun isHttpUrl(url: String): Boolean = runCatching {
         val uri = URI(url)

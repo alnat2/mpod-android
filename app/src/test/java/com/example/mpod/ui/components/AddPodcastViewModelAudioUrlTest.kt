@@ -50,8 +50,8 @@ class AddPodcastViewModelAudioUrlTest {
         viewModel.addAudioUrl("ftp://example.com/audio.mp3") { successCalled = true }
 
         assertFalse(successCalled)
-        assertEquals("Enter a valid http or https audio link.", viewModel.state.value.errorMessage)
-        assertEquals("Enter a valid http or https audio link.", viewModel.bannerState.value?.message)
+        assertEquals("Enter a valid audio link or file.", viewModel.state.value.errorMessage)
+        assertEquals("Enter a valid audio link or file.", viewModel.bannerState.value?.message)
         assertEquals(StatusBannerType.Error, viewModel.bannerState.value?.type)
         assertFalse(viewModel.state.value.isSubmitting)
     }
@@ -273,6 +273,194 @@ class AddPodcastViewModelAudioUrlTest {
 
         assertEquals(2, attempts)
         assertEquals("Important Podcast", receivedTitle)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+    }
+
+    @Test
+    fun addAudioUrl_acceptsContentUri_callsRepositoryWithUriAndTitle() = runTest {
+        var calledUri: String? = null
+        var calledTitle: String? = null
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Local Audio"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                calledUri = urlOrUri
+                calledTitle = title
+                return 77L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var successCalled = false
+        val contentUri = "content://media/external/audio/media/100"
+        viewModel.addAudioUrl(contentUri, "My Shared Voice Note") { successCalled = true }
+        testDispatcher.scheduler.runCurrent()
+
+        assertTrue(successCalled)
+        assertEquals(contentUri, calledUri)
+        assertEquals("My Shared Voice Note", calledTitle)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+        assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
+    }
+
+    @Test
+    fun addAudioUrl_acceptsFileUri_callsRepositoryWithUriAndTitle() = runTest {
+        var calledUri: String? = null
+        var calledTitle: String? = null
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "File Audio"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                calledUri = urlOrUri
+                calledTitle = title
+                return 88L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var successCalled = false
+        val fileUri = "file:///storage/emulated/0/Download/recording.m4a"
+        viewModel.addAudioUrl(fileUri, "Downloaded Audio") { successCalled = true }
+        testDispatcher.scheduler.runCurrent()
+
+        assertTrue(successCalled)
+        assertEquals(fileUri, calledUri)
+        assertEquals("Downloaded Audio", calledTitle)
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+    }
+
+    @Test
+    fun addAudioUrl_sequentialQueue_processesSecondTaskOnlyAfterFirstFinishes() = runTest {
+        val executionOrder = mutableListOf<String>()
+        val firstStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val allowFirstToFinish = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                if (urlOrUri.contains("track1")) {
+                    executionOrder.add("start1")
+                    firstStarted.complete(Unit)
+                    allowFirstToFinish.await()
+                    executionOrder.add("end1")
+                    return 1L
+                } else {
+                    executionOrder.add("start2")
+                    executionOrder.add("end2")
+                    return 2L
+                }
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var success1Called = false
+        var success2Called = false
+
+        viewModel.addAudioUrl("https://example.com/track1.mp3") { success1Called = true }
+        viewModel.addAudioUrl("https://example.com/track2.mp3") { success2Called = true }
+
+        testDispatcher.scheduler.runCurrent()
+        assertTrue(firstStarted.isCompleted)
+        assertEquals(listOf("start1"), executionOrder)
+        assertFalse("Second task must not start before first task completes", success2Called)
+
+        allowFirstToFinish.complete(Unit)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("start1", "end1", "start2", "end2"), executionOrder)
+        assertTrue(success1Called)
+        assertTrue(success2Called)
+    }
+
+    @Test
+    fun addAudioUrl_independentErrorHandling_failureOnFirstDoesNotBlockSecond() = runTest {
+        val completedUris = mutableListOf<String>()
+
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                if (urlOrUri.contains("bad")) {
+                    throw IllegalArgumentException("Network error on bad track")
+                }
+                completedUris.add(urlOrUri)
+                return 42L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var success1Called = false
+        var success2Called = false
+
+        viewModel.addAudioUrl("https://example.com/bad.mp3") { success1Called = true }
+        viewModel.addAudioUrl("https://example.com/good.mp3") { success2Called = true }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(success1Called)
+        assertTrue("Second task must succeed even if first task failed", success2Called)
+        assertEquals(listOf("https://example.com/good.mp3"), completedUris)
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
     }
 }

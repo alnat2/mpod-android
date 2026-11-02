@@ -78,7 +78,8 @@ fun AddPodcastModal(
         val trimmedUrl = url.trim()
         inputError = when {
             trimmedUrl.isBlank() -> if (mode == AddPodcastMode.AudioUrl) "Paste podcast link." else "Paste RSS feed URL."
-            !trimmedUrl.isHttpUrl() -> if (mode == AddPodcastMode.AudioUrl) "Enter a valid http or https audio link." else "Enter a valid http or https RSS feed URL."
+            mode == AddPodcastMode.AudioUrl && !trimmedUrl.isSupportedAudioSource() -> "Enter a valid audio link or file."
+            mode != AddPodcastMode.AudioUrl && !trimmedUrl.isHttpUrl() -> "Enter a valid http or https RSS feed URL."
             else -> null
         }
         if (inputError == null) {
@@ -550,6 +551,16 @@ private fun ModalTab(
         )
     }
 }
+
+private fun String.isSupportedAudioSource(): Boolean = runCatching {
+    val uri = URI(this.trim())
+    val scheme = uri.scheme?.lowercase(java.util.Locale.ROOT)
+    when (scheme) {
+        "http", "https" -> !uri.host.isNullOrBlank()
+        "content", "file" -> !uri.schemeSpecificPart.isNullOrBlank()
+        else -> false
+    }
+}.getOrDefault(false)
 
 private fun String.isHttpUrl(): Boolean = runCatching {
     val uri = URI(this)

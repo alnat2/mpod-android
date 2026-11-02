@@ -36,8 +36,11 @@ class DefaultAudioLinkResolver @Inject constructor(
             return@withContext Result.failure(IllegalArgumentException("URL cannot be empty"))
         }
 
-        // Direct local/content URIs
-        if (trimmedUrl.startsWith("content://") || trimmedUrl.startsWith("file://")) {
+        val uri = runCatching { URI.create(trimmedUrl) }.getOrNull()
+            ?: return@withContext Result.failure(IllegalArgumentException("Invalid URL format: $trimmedUrl"))
+
+        val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: ""
+        if (scheme == "content" || scheme == "file") {
             return@withContext Result.success(
                 ResolvedAudioMetadata(
                     directAudioUrl = trimmedUrl,
@@ -45,9 +48,6 @@ class DefaultAudioLinkResolver @Inject constructor(
                 )
             )
         }
-
-        val uri = runCatching { URI.create(trimmedUrl) }.getOrNull()
-            ?: return@withContext Result.failure(IllegalArgumentException("Invalid URL format: $trimmedUrl"))
 
         val host = uri.host?.lowercase(Locale.ROOT) ?: ""
 
