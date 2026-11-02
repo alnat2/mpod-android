@@ -404,4 +404,61 @@ class AudioLinkResolverTest {
         assertEquals(3000, resolved?.durationSeconds)
         assertEquals("Выпуск про удачу", resolved?.description)
     }
+
+    @Test
+    fun matchEpisodeInFeed_matchesByPageTitle_whenGuidIsUuidAndTitleHasNoNumber() {
+        val feed = ParsedPodcastFeed(
+            title = "Думаем дальше",
+            description = "Интеллектуальный подкаст",
+            author = "Илья Бирман",
+            artworkUrl = "https://cdn.mave.digital/cover.jpg",
+            link = "https://thinkon.mave.digital",
+            lastBuildDate = "Fri, 01 Nov 2026 12:00:00 GMT",
+            episodes = listOf(
+                ParsedEpisodeItem(
+                    guid = "uuid-ep-70",
+                    title = "Что такое удача?",
+                    description = "Описание 70",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/70.mp3",
+                    durationSeconds = 3000,
+                    publishedAt = 500L,
+                    publishedAtString = "25 Oct 2026"
+                ),
+                ParsedEpisodeItem(
+                    guid = "uuid-ep-69-match-factory",
+                    title = "Мне уже надо на спичечный завод",
+                    description = "Выпуск с Викой Лисицыной",
+                    audioUrl = "https://cdn.mave.digital/storage/podcasts/episodes/69.mp3",
+                    durationSeconds = 4850,
+                    publishedAt = 1000L,
+                    publishedAtString = "01 Nov 2026"
+                )
+            )
+        )
+
+        val matched = resolver.matchEpisodeInFeed(
+            parsedFeed = feed,
+            pageUrl = "https://thinkon.mave.digital/ep-69",
+            pageTitle = "Мне уже надо на спичечный завод"
+        )
+        assertNotNull(matched)
+        assertEquals("Мне уже надо на спичечный завод", matched?.title)
+        assertEquals("https://cdn.mave.digital/storage/podcasts/episodes/69.mp3", matched?.audioUrl)
+        assertEquals(4850L, matched?.durationSeconds)
+    }
+
+    @Test
+    fun findRssFeedUrlInHtml_extractsMaveCloudFeedUrl_fromEscapedNuxtPayload() {
+        val html = """
+            <html>
+            <head><title>Думаем дальше</title></head>
+            <body>
+              <script id="__NUXT_DATA__">["https:\/\/cloud.mave.digital\/51724"]</script>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val feedUrl = resolver.findRssFeedUrlInHtml(html, "https://thinkon.mave.digital/ep-69")
+        assertEquals("https://cloud.mave.digital/51724", feedUrl)
+    }
 }

@@ -386,8 +386,14 @@ class DefaultAudioLinkResolver @Inject constructor(
                     }
                 }
 
-                val html = response.body?.string().orEmpty()
-                resolveFromWebPageRssFallback(client, html, finalUrl)
+                val rawHtml = response.body?.string().orEmpty()
+                val html = rawHtml.replace("\\/", "/")
+                val pageTitle = findMetaContent(html, "og:title")
+                    ?: findTagContent(html, "title")
+                    ?: findMetaContent(rawHtml, "og:title")
+                    ?: findTagContent(rawHtml, "title")
+
+                resolveFromWebPageRssFallback(client, html, finalUrl, pageTitle)
                     ?: parseGenericWebHtml(html, finalUrl)
                     ?: error("Could not extract audio from this link. Make sure it's a valid podcast episode or direct audio link.")
             }
@@ -397,18 +403,20 @@ class DefaultAudioLinkResolver @Inject constructor(
     internal fun resolveFromWebPageRssFallback(
         client: OkHttpClient,
         html: String,
-        pageUrl: String
+        pageUrl: String,
+        pageTitle: String? = null
     ): ResolvedAudioMetadata? {
         val feedUrl = findRssFeedUrlInHtml(html, pageUrl) ?: return null
-        return resolveEpisodeFromWebRss(client, feedUrl, pageUrl)
+        return resolveEpisodeFromWebRss(client, feedUrl, pageUrl, pageTitle)
     }
 
     internal fun findRssFeedUrlInHtml(html: String, pageUrl: String): String? {
+        val cleanHtml = html.replace("\\/", "/")
         // 1. Standard RSS/Atom link tag: <link rel="alternate" type="application/rss+xml" href="...">
         val linkMatch = Regex(
             """<link[^>]+(?:type=["'](?:application/rss\+xml|application/atom\+xml|text/xml)["'][^>]+href=["']([^"']+)["']|href=["']([^"']+)["'][^>]+type=["'](?:application/rss\+xml|application/atom\+xml|text/xml)["'])""",
             RegexOption.IGNORE_CASE
-        ).find(html)
+        ).find(cleanHtml)
         val linkHref = linkMatch?.groupValues?.get(1)?.ifBlank { null }
             ?: linkMatch?.groupValues?.get(2)?.ifBlank { null }
         if (!linkHref.isNullOrBlank()) {
@@ -416,13 +424,13 @@ class DefaultAudioLinkResolver @Inject constructor(
         }
 
         // 2. Mave Cloud RSS URL (e.g. https://cloud.mave.digital/51724)
-        val maveCloudMatch = Regex("""https?://cloud\.mave\.digital/\d+""").find(html)?.value
+        val maveCloudMatch = Regex("""https?://cloud\.mave\.digital/\d+""").find(cleanHtml)?.value
         if (!maveCloudMatch.isNullOrBlank()) {
             return maveCloudMatch
         }
 
         // 3. Common feed link in page content
-        val commonFeedMatch = Regex("""https?://[^"'\s\\]+/(?:rss|feed|podcast\.xml)""", RegexOption.IGNORE_CASE).find(html)?.value
+        val commonFeedMatch = Regex("""https?://[^"'\s\\]+/(?:rss|feed|podcast\.xml)""", RegexOption.IGNORE_CASE).find(cleanHtml)?.value
         if (!commonFeedMatch.isNullOrBlank()) {
             return commonFeedMatch
         }
@@ -430,12 +438,33 @@ class DefaultAudioLinkResolver @Inject constructor(
         return null
     }
 
-    internal fun matchEpisodeInFeed(parsedFeed: ParsedPodcastFeed, pageUrl: String): ParsedEpisodeItem? {
+    internal fun matchEpisodeInFeed(
+        parsedFeed: ParsedPodcastFeed,
+        pageUrl: String,
+        pageTitle: String? = null
+    ): ParsedEpisodeItem? {
         val targetPath = try { URI.create(pageUrl).path?.trimEnd('/') ?: "" } catch (_: Exception) { "" }
         val targetSegment = targetPath.substringAfterLast('/', "").trim()
         val targetNumber = Regex("""\d+""").find(targetSegment)?.value
 
-        // 1. Match by exact pageUrl or targetPath in guid
+        // 1. Match by pageTitle in episode title
+        if (!pageTitle.isNullOrBlank()) {
+            val cleanPageTitle = unescapeHtml(pageTitle).trim()
+            val normalizedPageTitle = normalizeForComparison(cleanPageTitle)
+            if (normalizedPageTitle.isNotBlank()) {
+                val matched = parsedFeed.episodes.find { ep ->
+                    val normalizedEpTitle = normalizeForComparison(ep.title)
+                    normalizedEpTitle.isNotBlank() && (
+                        normalizedEpTitle == normalizedPageTitle ||
+                            normalizedEpTitle.contains(normalizedPageTitle) ||
+                            normalizedPageTitle.contains(normalizedEpTitle)
+                    )
+                }
+                if (matched != null) return matched
+            }
+        }
+
+        // 2. Match by exact pageUrl or targetPath in guid
         var matched = parsedFeed.episodes.find { ep ->
             val guid = ep.guid.trimEnd('/')
             guid.isNotBlank() && (guid == pageUrl.trimEnd('/') || (targetPath.isNotBlank() && guid.endsWith(targetPath)))
@@ -484,7 +513,8 @@ class DefaultAudioLinkResolver @Inject constructor(
     internal fun resolveEpisodeFromWebRss(
         client: OkHttpClient,
         feedUrl: String,
-        pageUrl: String
+        pageUrl: String,
+        pageTitle: String? = null
     ): ResolvedAudioMetadata? {
         return runCatching {
             val request = Request.Builder()
@@ -498,7 +528,7 @@ class DefaultAudioLinkResolver @Inject constructor(
                 val parsedFeed = RssFeedParser.parse(inputStream)
                 if (parsedFeed.episodes.isEmpty()) return@use null
 
-                val ep = matchEpisodeInFeed(parsedFeed, pageUrl) ?: return@use null
+                val ep = matchEpisodeInFeed(parsedFeed, pageUrl, pageTitle) ?: return@use null
                 if (ep.audioUrl.isBlank()) return@use null
 
                 ResolvedAudioMetadata(
@@ -537,32 +567,33 @@ class DefaultAudioLinkResolver @Inject constructor(
     }
 
     internal fun findAudioUrlInHtml(html: String): String? {
+        val cleanHtml = html.replace("\\/", "/")
         // og:audio or og:audio:secure_url
-        val ogAudio = findMetaContent(html, "og:audio:secure_url")
-            ?: findMetaContent(html, "og:audio")
-            ?: findMetaContent(html, "twitter:player:stream")
+        val ogAudio = findMetaContent(cleanHtml, "og:audio:secure_url")
+            ?: findMetaContent(cleanHtml, "og:audio")
+            ?: findMetaContent(cleanHtml, "twitter:player:stream")
         if (!ogAudio.isNullOrBlank()) return ogAudio
 
         // <audio src="...">
         val audioSrc = Regex("""<audio[^>]+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .find(html)?.groupValues?.get(1)
+            .find(cleanHtml)?.groupValues?.get(1)
         if (!audioSrc.isNullOrBlank()) return audioSrc
 
         // <source src="..." type="audio/...">
         val sourceSrc = Regex("""<source[^>]+src=["']([^"']+)["'][^>]+type=["']audio/[^"']+["']""", RegexOption.IGNORE_CASE)
-            .find(html)?.groupValues?.get(1)
+            .find(cleanHtml)?.groupValues?.get(1)
             ?: Regex("""<source[^>]+type=["']audio/[^"']+["'][^>]+src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.get(1)
+                .find(cleanHtml)?.groupValues?.get(1)
         if (!sourceSrc.isNullOrBlank()) return sourceSrc
 
         // Mave CDN audio URL
         val maveCdnAudio = Regex("""https?://(?:cdn|api|media)\.mave\.digital/[^\s"'\\]+\.mp3""", RegexOption.IGNORE_CASE)
-            .find(html)?.value
+            .find(cleanHtml)?.value
         if (!maveCdnAudio.isNullOrBlank()) return maveCdnAudio
 
         // Mave relative storage path in script/data payload
         val maveStorageAudio = Regex("""storage/podcasts/[^\s"'\\]+\.mp3""", RegexOption.IGNORE_CASE)
-            .find(html)?.value
+            .find(cleanHtml)?.value
         if (!maveStorageAudio.isNullOrBlank()) return "https://cdn.mave.digital/$maveStorageAudio"
 
         return null
