@@ -231,7 +231,8 @@ internal fun resolveEpisodeSeekPositionMs(
         return null
     }
     val targetEpisode = queue.find { it.id == episodeId }
-    return (targetEpisode?.playbackPositionSeconds?.takeIf { it > 0 } ?: 0L) * 1_000L
+    val positionSeconds = targetEpisode?.playbackPositionSeconds?.takeIf { it > 0 }?.toLong() ?: 0L
+    return positionSeconds * 1_000L
 }
 
 @Composable

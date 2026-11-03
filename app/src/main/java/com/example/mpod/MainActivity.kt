@@ -79,14 +79,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun tryPersistUriPermission(intent: Intent?) {
-        val uri = intent?.data ?: if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            intent?.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent?.getParcelableExtra(Intent.EXTRA_STREAM) as? android.net.Uri
-        } ?: return
-
-        if (uri.scheme.equals("content", ignoreCase = true)) {
+        val audioData = SharedIntentParser.parse(intent) ?: return
+        val uri = runCatching { android.net.Uri.parse(audioData.urlOrUri) }.getOrNull() ?: return
+        if (uri.scheme?.equals("content", ignoreCase = true) == true) {
             try {
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (_: SecurityException) {
