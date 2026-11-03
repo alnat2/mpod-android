@@ -60,7 +60,12 @@ class AddPodcastViewModel @Inject constructor(
     val bannerState: StateFlow<AddPodcastBannerUiState?> = _bannerState.asStateFlow()
 
     private var lastFailedAction: LastFailedAction? = null
-    private var pendingBatchFailure: Pair<String, LastFailedAction.Audio>? = null
+    private data class FailedAudioTask(
+        val url: String,
+        val title: String?,
+        val errorMessage: String
+    )
+    private val pendingBatchFailures = mutableListOf<FailedAudioTask>()
     private var autoDismissJob: Job? = null
 
     fun begin(mode: AddPodcastMode) {
@@ -89,7 +94,11 @@ class AddPodcastViewModel @Inject constructor(
         dismissBanner()
         when (last) {
             is LastFailedAction.Rss -> addRssFeed(last.url, onRssSuccess)
-            is LastFailedAction.Audio -> addAudioUrl(last.url, last.title, onAudioSuccess)
+            is LastFailedAction.Audio -> {
+                last.items.forEach { item ->
+                    addAudioUrl(item.url, item.title, onAudioSuccess)
+                }
+            }
             is LastFailedAction.Opml -> importOpml(last.uri, onOpmlSuccess)
         }
     }
@@ -214,9 +223,11 @@ class AddPodcastViewModel @Inject constructor(
             task.onSuccess()
         } else {
             val errorMsg = result.exceptionOrNull()?.message ?: "Could not load audio track."
-            val failedAction = LastFailedAction.Audio(task.url, task.title)
-            lastFailedAction = failedAction
-            pendingBatchFailure = errorMsg to failedAction
+            val failedTask = FailedAudioTask(task.url, task.title, errorMsg)
+            pendingBatchFailures.add(failedTask)
+            lastFailedAction = LastFailedAction.Audio(
+                pendingBatchFailures.map { AudioFailedItem(it.url, it.title) }
+            )
             _state.value = _state.value.copy(
                 errorMessage = errorMsg,
                 rssUrl = task.url
@@ -225,12 +236,19 @@ class AddPodcastViewModel @Inject constructor(
 
         val hasMoreInQueue = !audioIngestionChannel.isEmpty
         if (!hasMoreInQueue) {
-            val failure = pendingBatchFailure
-            if (failure != null) {
-                pendingBatchFailure = null
-                lastFailedAction = failure.second
+            if (pendingBatchFailures.isNotEmpty()) {
+                val failuresToReport = pendingBatchFailures.toList()
+                pendingBatchFailures.clear()
+                lastFailedAction = LastFailedAction.Audio(
+                    failuresToReport.map { AudioFailedItem(it.url, it.title) }
+                )
+                val bannerMessage = if (failuresToReport.size == 1) {
+                    failuresToReport.first().errorMessage
+                } else {
+                    "Could not load ${failuresToReport.size} audio tracks."
+                }
                 _bannerState.value = AddPodcastBannerUiState(
-                    message = failure.first,
+                    message = bannerMessage,
                     type = StatusBannerType.Error,
                     actionLabel = "Try again"
                 )
@@ -340,9 +358,13 @@ data class AddPodcastBannerUiState(
     val actionLabel: String? = null
 )
 
+data class AudioFailedItem(val url: String, val title: String? = null)
+
 sealed class LastFailedAction {
     data class Rss(val url: String) : LastFailedAction()
-    data class Audio(val url: String, val title: String? = null) : LastFailedAction()
+    data class Audio(val items: List<AudioFailedItem>) : LastFailedAction() {
+        constructor(url: String, title: String? = null) : this(listOf(AudioFailedItem(url, title)))
+    }
     data class Opml(val uri: Uri) : LastFailedAction()
 }
 

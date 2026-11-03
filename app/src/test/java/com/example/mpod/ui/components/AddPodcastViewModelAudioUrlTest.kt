@@ -509,4 +509,86 @@ class AddPodcastViewModelAudioUrlTest {
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
         assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
     }
+
+    @Test
+    fun addAudioUrl_multipleFailuresInQueue_reportsMultipleFailuresAndRetriesAll() = runTest {
+        val completedUris = mutableListOf<String>()
+        val attemptedUris = mutableListOf<String>()
+        var allowFailuresToSucceedOnRetry = false
+
+        val repo = object : SingleTrackRepository(
+            podcastDao = mock(com.example.mpod.data.local.dao.PodcastDao::class.java),
+            episodeDao = mock(com.example.mpod.data.local.dao.EpisodeDao::class.java),
+            playlistDao = mock(com.example.mpod.data.local.dao.PlaylistDao::class.java),
+            appSettingsDataStore = com.example.mpod.data.local.preferences.FakeAppSettingsStore(),
+            queueInvalidator = com.example.mpod.playback.PlaybackQueueInvalidator(),
+            audioLinkResolver = object : com.example.mpod.data.network.resolver.AudioLinkResolver {
+                override suspend fun resolve(rawUrl: String): Result<com.example.mpod.data.network.resolver.ResolvedAudioMetadata> {
+                    return Result.success(com.example.mpod.data.network.resolver.ResolvedAudioMetadata(rawUrl, "Track"))
+                }
+            }
+        ) {
+            override suspend fun playSingleTrack(urlOrUri: String, title: String?): Long {
+                attemptedUris.add(urlOrUri)
+                if (urlOrUri.contains("bad") && !allowFailuresToSucceedOnRetry) {
+                    throw IllegalArgumentException("Network error on $urlOrUri")
+                }
+                completedUris.add(urlOrUri)
+                return 42L
+            }
+        }
+
+        val viewModel = AddPodcastViewModel(
+            context = context,
+            podcastRepository = podcastRepository,
+            singleTrackRepository = repo,
+            savedStateHandle = SavedStateHandle()
+        )
+
+        var success1Called = false
+        var success2Called = false
+        var success3Called = false
+
+        viewModel.addAudioUrl("https://example.com/bad1.mp3", "Bad Track 1") { success1Called = true }
+        viewModel.addAudioUrl("https://example.com/bad2.mp3", "Bad Track 2") { success2Called = true }
+        viewModel.addAudioUrl("https://example.com/good3.mp3", "Good Track 3") { success3Called = true }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(success1Called)
+        assertFalse(success2Called)
+        assertTrue(success3Called)
+        assertEquals(listOf("https://example.com/good3.mp3"), completedUris)
+        assertEquals(StatusBannerType.Error, viewModel.bannerState.value?.type)
+        assertEquals("Could not load 2 audio tracks.", viewModel.bannerState.value?.message)
+        assertEquals("Try again", viewModel.bannerState.value?.actionLabel)
+
+        allowFailuresToSucceedOnRetry = true
+        var retrySuccessCount = 0
+        viewModel.retryLastAction(onAudioSuccess = { retrySuccessCount++ })
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, retrySuccessCount)
+        assertEquals(
+            listOf(
+                "https://example.com/bad1.mp3",
+                "https://example.com/bad2.mp3",
+                "https://example.com/good3.mp3",
+                "https://example.com/bad1.mp3",
+                "https://example.com/bad2.mp3"
+            ),
+            attemptedUris
+        )
+        assertEquals(
+            listOf(
+                "https://example.com/good3.mp3",
+                "https://example.com/bad1.mp3",
+                "https://example.com/bad2.mp3"
+            ),
+            completedUris
+        )
+        assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
+        assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
+    }
 }
