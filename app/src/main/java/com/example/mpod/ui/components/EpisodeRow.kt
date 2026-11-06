@@ -1,14 +1,25 @@
 package com.example.mpod.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.ripple
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.mpod.ui.theme.accent
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,10 +40,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,6 +76,38 @@ fun PlayerPlaylistItem(
     val shadowStyle = if (isCurrent) FigmaShadowStyle.Sm else FigmaShadowStyle.Xs
 
     val shape = RoundedCornerShape(16.dp)
+
+    val scale = remember { Animatable(1f) }
+    var prevDownloaded by remember { mutableStateOf(downloaded) }
+
+    LaunchedEffect(downloaded) {
+        if (!prevDownloaded && downloaded) {
+            prevDownloaded = true
+            try {
+                scale.animateTo(
+                    targetValue = 1.18f,
+                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+                )
+                scale.animateTo(
+                    targetValue = 1.0f,
+                    animationSpec = tween(durationMillis = 200, easing = FastOutLinearInEasing)
+                )
+            } finally {
+                withContext(NonCancellable) {
+                    scale.snapTo(1f)
+                }
+            }
+        } else {
+            // Track false when file is removed so the next download re-triggers the animation
+            prevDownloaded = downloaded
+        }
+    }
+
+    val playIconRes = when {
+        isPlaying -> if (downloaded) R.drawable.ic_huge_pause_solid else R.drawable.ic_huge_pause
+        else -> if (downloaded) R.drawable.ic_huge_play_solid else R.drawable.ic_huge_play
+    }
+
     EpisodeItemSurface(
         modifier = modifier
             .fillMaxWidth()
@@ -119,14 +158,14 @@ fun PlayerPlaylistItem(
                         onClick = onRemoveFromPlaylist
                     )
                     EpisodeInlineActionButton(
-                        iconRes = if (isPlaying) {
-                            R.drawable.ic_huge_pause
-                        } else {
-                            R.drawable.ic_huge_play
-                        },
+                        iconRes = playIconRes,
                         contentDescription = if (isPlaying) "Pause $title" else "Play $title",
                         testTag = "player_episode_play_action",
                         enabled = actionsEnabled,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = scale.value
+                            scaleY = scale.value
+                        },
                         onClick = onPlayToggle
                     )
                 }
@@ -359,17 +398,14 @@ private fun EpisodeInlineActionButton(
     contentDescription: String,
     testTag: String,
     enabled: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     SquareIconButton(
         iconRes = iconRes,
         contentDescription = contentDescription,
-        modifier = Modifier
+        modifier = modifier
             .testTag(testTag)
-            .semantics {
-                this.contentDescription = contentDescription
-                role = Role.Button
-            }
             .alpha(if (enabled) 1f else 0.45f),
         containerColor = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.primary,

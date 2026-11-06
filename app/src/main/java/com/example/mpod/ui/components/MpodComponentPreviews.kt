@@ -150,7 +150,15 @@ private fun MobileComponentCatalog() {
         title = "Why store loyalty cards became a UX minefield",
         duration = "54m",
         isPlaying = true,
-        compactPlaybackMenu = true
+        compactPlaybackMenu = true,
+        downloaded = false
+    )
+    EpisodeRow(
+        title = "Why store loyalty cards became a UX minefield",
+        duration = "54m",
+        isPlaying = false,
+        compactPlaybackMenu = true,
+        downloaded = true
     )
     EpisodeRow(
         title = "How public transit maps teach invisible habits",
