@@ -11,6 +11,9 @@ data class SharedAudioData(
 object SharedIntentParser {
     private val HTTP_URL_REGEX = Regex("https?://[^\\s<>\"']+")
 
+    fun isShareIntent(intent: Intent?): Boolean =
+        intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE
+
     fun parse(intent: Intent?): SharedAudioData? {
         if (intent == null) return null
         val action = intent.action ?: return null

@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,40 +51,96 @@ import com.example.mpod.ui.screens.settings.SettingsRoute
 import com.example.mpod.ui.screens.settings.SettingsViewModel
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsRoute
 import com.example.mpod.ui.theme.ThemeMode
-import com.example.mpod.util.SharedIntentParser
+import com.example.mpod.data.local.entity.ShareImportStatus
+import com.example.mpod.share.ShareImportManager
+import com.example.mpod.share.selectVisibleShareBatchId
+import com.example.mpod.util.AudioSourceValidator
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavigation(
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChange: (ThemeMode) -> Unit = {},
     initialDestination: String = Screen.Home.route,
-    sharedIntentFlow: kotlinx.coroutines.flow.Flow<android.content.Intent> = kotlinx.coroutines.flow.emptyFlow()
+    shareImportManager: ShareImportManager
 ) {
     val navController = rememberNavController()
     var libraryRefreshKey by remember { mutableIntStateOf(0) }
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val addPodcastViewModel: AddPodcastViewModel = hiltViewModel()
     val addPodcastState by addPodcastViewModel.state.collectAsStateWithLifecycle()
     val bannerState by addPodcastViewModel.bannerState.collectAsStateWithLifecycle()
+    val recentImports by shareImportManager.recentImports.collectAsStateWithLifecycle(emptyList())
+    val unsupportedShareMessage by shareImportManager.unsupportedShareMessage.collectAsStateWithLifecycle()
+    val activeSubmissionCount by shareImportManager.activeSubmissionCount.collectAsStateWithLifecycle()
+    var handledBatchIds by remember { mutableStateOf(emptySet<String>()) }
+    var dismissedShareBatchIds by remember { mutableStateOf(emptySet<String>()) }
+    var unsupportedShareDismissed by remember { mutableStateOf(false) }
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
 
-    androidx.compose.runtime.LaunchedEffect(sharedIntentFlow) {
-        sharedIntentFlow.collect { intent ->
-            val audioData = SharedIntentParser.parse(intent)
-            navController.navigate(Screen.Home.route) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
+    val latestBatchId = selectVisibleShareBatchId(recentImports)
+    val latestBatch = remember(recentImports, latestBatchId) {
+        latestBatchId?.let { batchId -> recentImports.filter { it.batchId == batchId } }.orEmpty()
+    }
+    val pendingImports = latestBatch.filter {
+        it.status in setOf(ShareImportStatus.ENQUEUED, ShareImportStatus.COPYING, ShareImportStatus.IMPORTING)
+    }
+    val successfulImports = latestBatch.count { it.status == ShareImportStatus.DONE }
+    val failedImports = latestBatch.filter { it.status == ShareImportStatus.FAILED }
+    val latestCopy = pendingImports.firstOrNull { it.status == ShareImportStatus.COPYING }
+    val shareBannerType = when {
+        pendingImports.isNotEmpty() || activeSubmissionCount > 0 -> StatusBannerType.Loading
+        failedImports.isNotEmpty() -> StatusBannerType.Error
+        successfulImports > 0 -> StatusBannerType.Info
+        else -> null
+    }
+    val shareBannerMessage = when {
+        activeSubmissionCount > 0 && pendingImports.isEmpty() -> "Adding shared audio…"
+        pendingImports.isNotEmpty() && latestCopy?.totalBytes?.let { it > 0 } == true -> {
+            val percent = (latestCopy.progressBytes * 100 / latestCopy.totalBytes!!).coerceIn(0, 100)
+            "Copying shared audio… $percent%"
+        }
+        pendingImports.isNotEmpty() -> "Adding shared audio…"
+        failedImports.isNotEmpty() && successfulImports > 0 ->
+            "Added $successfulImports audio; could not add ${failedImports.size}."
+        failedImports.size == 1 -> failedImports.single().error ?: "Could not import shared audio."
+        failedImports.isNotEmpty() -> "Could not add ${failedImports.size} audio tracks."
+        successfulImports > 0 -> "Added $successfulImports audio ${if (successfulImports == 1) "track" else "tracks"}."
+        else -> null
+    }
+    val shareBatchClosed = latestBatch.isNotEmpty() && pendingImports.isEmpty()
+
+    androidx.compose.runtime.LaunchedEffect(recentImports) {
+        recentImports.groupBy { it.batchId }.forEach { (batchId, events) ->
+            val unacknowledged = events.filterNot { it.completionAcknowledged }
+            val hasRemaining = unacknowledged.any {
+                it.status in setOf(ShareImportStatus.ENQUEUED, ShareImportStatus.COPYING, ShareImportStatus.IMPORTING)
             }
-            if (audioData != null) {
-                addPodcastViewModel.addAudioUrl(audioData.urlOrUri, audioData.title) {
-                    libraryRefreshKey += 1
-                }
-            } else {
+            val hasSuccess = unacknowledged.any { it.status == ShareImportStatus.DONE }
+            if (!hasRemaining && hasSuccess && batchId !in handledBatchIds) {
+                handledBatchIds = handledBatchIds + batchId
+                coroutineScope.launch { shareImportManager.acknowledgeBatch(batchId) }
                 libraryRefreshKey += 1
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                }
             }
         }
+    }
+    androidx.compose.runtime.LaunchedEffect(latestBatchId, shareBannerType, shareBatchClosed) {
+        val batchId = latestBatchId ?: return@LaunchedEffect
+        if (shareBatchClosed && failedImports.isEmpty() && successfulImports > 0) {
+            delay(3000L)
+            dismissedShareBatchIds = dismissedShareBatchIds + batchId
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(unsupportedShareMessage) {
+        if (unsupportedShareMessage != null) unsupportedShareDismissed = false
     }
 
     Box(
@@ -202,22 +259,27 @@ fun AppNavigation(
                     },
                     onAddUrl = { url ->
                         val trimmed = url.trim()
-                        if (trimmed.isBlank() || !addPodcastViewModel.isHttpUrl(trimmed)) {
-                            if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
+                        val isAudio = addPodcastState.mode == AddPodcastMode.AudioUrl
+                        val isValid = if (isAudio) {
+                            AudioSourceValidator.isSupportedAudioSource(trimmed)
+                        } else {
+                            AudioSourceValidator.isHttpUrl(trimmed)
+                        }
+                        if (trimmed.isBlank() || !isValid) {
+                            if (isAudio) {
                                 addPodcastViewModel.addAudioUrl(url) {}
                             } else {
                                 addPodcastViewModel.addRssFeed(url) {}
                             }
                         } else {
                             navController.popBackStack()
-                            if (addPodcastState.mode == AddPodcastMode.AudioUrl) {
-                                addPodcastViewModel.addAudioUrl(trimmed) {
-                                    libraryRefreshKey += 1
-                                    navController.navigate(Screen.Home.route) {
-                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                        launchSingleTop = true
-                                    }
-                                }
+                            if (isAudio) {
+                                shareImportManager.submitFromActivity(
+                                    payload = trimmed,
+                                    title = null,
+                                    sourceUri = null,
+                                    fingerprint = shareImportManager.fingerprint(trimmed)
+                                )
                             } else {
                                 addPodcastViewModel.addRssFeed(trimmed) {
                                     libraryRefreshKey += 1
@@ -259,37 +321,67 @@ fun AppNavigation(
         }
     }
 
-    bannerState?.let { banner ->
+    val showUnsupportedShare = unsupportedShareMessage != null && !unsupportedShareDismissed
+    val showShareBanner = shareBannerType != null && (
+        activeSubmissionCount > 0 ||
+            (latestBatchId != null && latestBatchId !in dismissedShareBatchIds)
+        )
+    if (showUnsupportedShare || showShareBanner) {
+        val isUnsupported = showUnsupportedShare
         MpodStatusBanner(
-            message = banner.message,
-            type = banner.type,
-            actionLabel = banner.actionLabel,
-            onAction = if (banner.actionLabel != null) {
-                {
-                    if (banner.actionLabel == "Details") {
-                        navController.navigate(Screen.AddPodcast.route)
-                    } else {
-                        addPodcastViewModel.retryLastAction(
-                            onRssSuccess = { libraryRefreshKey += 1 },
-                            onAudioSuccess = {
-                                libraryRefreshKey += 1
-                                navController.navigate(Screen.Home.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                }
-                            },
-                            onOpmlSuccess = { libraryRefreshKey += 1 }
-                        )
-                    }
-                }
+            message = if (isUnsupported) unsupportedShareMessage.orEmpty() else shareBannerMessage.orEmpty(),
+            type = if (isUnsupported) StatusBannerType.Error else shareBannerType!!,
+            actionLabel = if (!isUnsupported && failedImports.isNotEmpty()) "Try again" else null,
+            onAction = if (!isUnsupported && failedImports.isNotEmpty() && latestBatchId != null) {
+                { coroutineScope.launch { shareImportManager.retryFailed(latestBatchId!!) } }
             } else null,
-            onDismiss = { addPodcastViewModel.dismissBanner() },
+            onDismiss = {
+                if (isUnsupported) {
+                    unsupportedShareDismissed = true
+                    shareImportManager.dismissUnsupportedShare()
+                } else {
+                    latestBatchId?.let { dismissedShareBatchIds = dismissedShareBatchIds + it }
+                }
+            },
             modifier = Modifier
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp)
                 .padding(top = 10.dp)
                 .align(Alignment.TopCenter)
         )
+    } else {
+        bannerState?.let { banner ->
+            MpodStatusBanner(
+                message = banner.message,
+                type = banner.type,
+                actionLabel = banner.actionLabel,
+                onAction = if (banner.actionLabel != null) {
+                    {
+                        if (banner.actionLabel == "Details") {
+                            navController.navigate(Screen.AddPodcast.route)
+                        } else {
+                            addPodcastViewModel.retryLastAction(
+                                onRssSuccess = { libraryRefreshKey += 1 },
+                                onAudioSuccess = {
+                                    libraryRefreshKey += 1
+                                    navController.navigate(Screen.Home.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onOpmlSuccess = { libraryRefreshKey += 1 }
+                            )
+                        }
+                    }
+                } else null,
+                onDismiss = { addPodcastViewModel.dismissBanner() },
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp)
+                    .align(Alignment.TopCenter)
+            )
+        }
     }
 }
 }

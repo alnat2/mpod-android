@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URI
 import java.net.URLEncoder
+import java.io.File
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,7 +46,14 @@ open class SingleTrackRepository @Inject constructor(
         )
     }
 
-    open suspend fun playSingleTrack(urlOrUri: String, title: String? = null): Long = withContext(Dispatchers.IO) {
+    open suspend fun playSingleTrack(urlOrUri: String, title: String? = null): Long =
+        playSingleTrack(urlOrUri, title, ownedLocalFilePath = null)
+
+    open suspend fun playSingleTrack(
+        urlOrUri: String,
+        title: String?,
+        ownedLocalFilePath: String? = null
+    ): Long = withContext(Dispatchers.IO) {
         val cleanUrl = urlOrUri.trim()
 
         val resolved = audioLinkResolver.resolve(cleanUrl).getOrElse { error ->
@@ -108,13 +116,18 @@ open class SingleTrackRepository @Inject constructor(
             ?: episodeDao.getEpisodeByPodcastIdAndGuid(podcastId, cleanUrl)
 
         val episodeId = if (existingEpisode != null) {
-            if (existingEpisode.audioUrl != directUrl || (existingEpisode.title.isBlank() && finalTitle.isNotBlank())) {
+            if (existingEpisode.audioUrl != directUrl ||
+                (existingEpisode.title.isBlank() && finalTitle.isNotBlank()) ||
+                (!ownedLocalFilePath.isNullOrBlank() && existingEpisode.localFilePath != ownedLocalFilePath)
+            ) {
                 episodeDao.update(
                     existingEpisode.copy(
                         title = finalTitle,
                         audioUrl = directUrl,
                         durationSeconds = if (duration > 0) duration else existingEpisode.durationSeconds,
-                        description = if (description.isNotBlank()) description else existingEpisode.description
+                        description = if (description.isNotBlank()) description else existingEpisode.description,
+                        isDownloaded = if (ownedLocalFilePath != null) true else existingEpisode.isDownloaded,
+                        localFilePath = ownedLocalFilePath ?: existingEpisode.localFilePath
                     )
                 )
             }
@@ -128,7 +141,9 @@ open class SingleTrackRepository @Inject constructor(
                     description = description,
                     audioUrl = directUrl,
                     durationSeconds = duration,
-                    publishedAt = System.currentTimeMillis()
+                    publishedAt = System.currentTimeMillis(),
+                    isDownloaded = !ownedLocalFilePath.isNullOrBlank(),
+                    localFilePath = ownedLocalFilePath
                 )
             )
         }
@@ -141,6 +156,55 @@ open class SingleTrackRepository @Inject constructor(
 
         queueInvalidator.invalidate()
 
+        episodeId
+    }
+
+    suspend fun findOwnedShareCopy(sourceUri: String): String? = withContext(Dispatchers.IO) {
+        val podcast = podcastDao.getPodcastByFeedUrl(SINGLE_TRACKS_FEED_URL) ?: return@withContext null
+        episodeDao.getEpisodeByPodcastIdAndGuid(podcast.id, sourceUri)
+            ?.localFilePath
+            ?.takeIf { path -> path.isNotBlank() && File(path).isFile }
+    }
+
+    suspend fun registerCopiedAudio(
+        sourceUri: String,
+        title: String?,
+        copyPath: String
+    ): Long = withContext(Dispatchers.IO) {
+        val podcastId = getOrCreateSingleTracksPodcastId()
+        val existing = episodeDao.getEpisodeByPodcastIdAndGuid(podcastId, sourceUri)
+        val reusablePath = existing?.localFilePath?.takeIf { it.isNotBlank() && File(it).isFile }
+            ?: copyPath
+        if (existing != null && reusablePath != copyPath) {
+            File(copyPath).delete()
+        }
+        val episodeId = if (existing == null) {
+            episodeDao.insertEpisode(
+                EpisodeEntity(
+                    podcastId = podcastId,
+                    guid = sourceUri,
+                    title = title?.takeIf { it.isNotBlank() } ?: File(reusablePath).nameWithoutExtension,
+                    audioUrl = sourceUri,
+                    isDownloaded = true,
+                    localFilePath = reusablePath,
+                    publishedAt = System.currentTimeMillis()
+                )
+            )
+        } else {
+            val updated = existing.copy(
+                title = title?.takeIf { it.isNotBlank() } ?: existing.title,
+                isListened = false,
+                playbackPositionMs = if (existing.isListened) 0L else existing.playbackPositionMs,
+                isDownloaded = true,
+                localFilePath = reusablePath
+            )
+            episodeDao.update(updated)
+            existing.id
+        }
+        val wasEmpty = playlistDao.getMaxPosition() == null
+        playlistDao.appendEpisodeIfMissing(episodeId)
+        if (wasEmpty) appSettingsDataStore.setActiveEpisodeId(episodeId)
+        queueInvalidator.invalidate()
         episodeId
     }
 

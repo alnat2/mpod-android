@@ -20,6 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.lang.reflect.Proxy
+import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SingleTrackRepositoryTest {
@@ -90,6 +91,50 @@ class SingleTrackRepositoryTest {
         // Calling it again returns the same ID
         val secondId = repository.getOrCreateSingleTracksPodcastId()
         assertEquals(id, secondId)
+    }
+
+    @Test
+    fun registerCopiedAudio_reusesExistingEpisodeAndOwnedCopy() = runTest {
+        val originalCopy = File.createTempFile("share-import-original", ".audio")
+        val duplicateCopy = File.createTempFile("share-import-duplicate", ".audio")
+        try {
+            val sourceUri = "content://media/external/audio/episode-1"
+            val firstId = repository.registerCopiedAudio(sourceUri, "Shared episode", originalCopy.absolutePath)
+            val secondId = repository.registerCopiedAudio(sourceUri, "Updated title", duplicateCopy.absolutePath)
+
+            assertEquals(firstId, secondId)
+            assertEquals(1, episodes.size)
+            assertEquals("Updated title", episodes.getValue(firstId).title)
+            assertEquals(originalCopy.absolutePath, episodes.getValue(firstId).localFilePath)
+            assertTrue(episodes.getValue(firstId).isDownloaded)
+            assertTrue(originalCopy.exists())
+            assertTrue(!duplicateCopy.exists())
+            assertEquals(1, playlistItems.count { it.episode.id == firstId })
+        } finally {
+            originalCopy.delete()
+            duplicateCopy.delete()
+        }
+    }
+
+    @Test
+    fun registerCopiedAudio_reimportOfListenedEpisodeRestartsAtZero() = runTest {
+        val ownedCopy = File.createTempFile("share-import-replay", ".mp3")
+        try {
+            val sourceUri = "content://media/external/audio/replay"
+            val episodeId = repository.registerCopiedAudio(sourceUri, "Replay episode", ownedCopy.absolutePath)
+            val listened = episodes.getValue(episodeId).copy(isListened = true, playbackPositionMs = 123_000L)
+            episodes[episodeId] = listened
+            playlistItems.removeAll { it.episode.id == episodeId }
+
+            val reimportedId = repository.registerCopiedAudio(sourceUri, "Replay episode", ownedCopy.absolutePath)
+
+            assertEquals(episodeId, reimportedId)
+            assertEquals(false, episodes.getValue(episodeId).isListened)
+            assertEquals(0L, episodes.getValue(episodeId).playbackPositionMs)
+            assertEquals(1, playlistItems.count { it.episode.id == episodeId })
+        } finally {
+            ownedCopy.delete()
+        }
     }
 
     @Test

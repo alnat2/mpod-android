@@ -1,8 +1,11 @@
 package com.example.mpod.util
 
+import android.content.Intent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 
 class SharedIntentParserTest {
 
@@ -28,5 +31,24 @@ class SharedIntentParserTest {
     fun extractUrl_noUrlInText_returnsNull() {
         val text = "Just some random text without any links"
         assertNull(SharedIntentParser.extractUrl(text))
+    }
+
+    @Test
+    fun parse_contentUriSharedAsTextIsUnsupported() {
+        val intent = mock(Intent::class.java)
+        `when`(intent.action).thenReturn(Intent.ACTION_SEND)
+        `when`(intent.type).thenReturn("text/plain")
+        `when`(intent.getStringExtra(Intent.EXTRA_TEXT)).thenReturn("content://media/external/audio/1")
+
+        assertNull(SharedIntentParser.parse(intent))
+    }
+
+    @Test
+    fun parse_sendMultipleIsUnsupported() {
+        val intent = mock(Intent::class.java)
+        `when`(intent.action).thenReturn(Intent.ACTION_SEND_MULTIPLE)
+
+        assertNull(SharedIntentParser.parse(intent))
+        assertEquals(true, SharedIntentParser.isShareIntent(intent))
     }
 }

@@ -46,7 +46,6 @@ class HomePlaybackIntentTest {
                 durationSeconds = 1800,
                 playbackPositionSeconds = 620,
                 isListened = false,
-                isCurrent = true,
                 downloaded = false,
                 summary = null
             )

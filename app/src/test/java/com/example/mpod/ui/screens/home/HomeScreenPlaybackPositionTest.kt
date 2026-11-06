@@ -14,7 +14,8 @@ class HomeScreenPlaybackPositionTest {
             durationSeconds = 3600,
             playbackPositionSeconds = 0,
             isListened = false,
-            downloaded = false
+            downloaded = false,
+            summary = null
         ),
         HomeEpisodeUi(
             id = 102L,
@@ -23,7 +24,8 @@ class HomeScreenPlaybackPositionTest {
             durationSeconds = 9119,
             playbackPositionSeconds = 2700, // 45 minutes saved progress
             isListened = false,
-            downloaded = false
+            downloaded = false,
+            summary = null
         )
     )
 
@@ -79,4 +81,3 @@ class HomeScreenPlaybackPositionTest {
         assertEquals(0L, seekPosMs)
     }
 }
-

@@ -9,6 +9,7 @@ import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.AutoRefreshScheduler
 import com.example.mpod.playback.SmartListeningManager
+import com.example.mpod.share.ShareImportManager
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,7 @@ class MpodApplication : Application(), ImageLoaderFactory, Configuration.Provide
     @Inject lateinit var appSettingsDataStore: AppSettingsStore
     @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var autoRefreshScheduler: AutoRefreshScheduler
+    @Inject lateinit var shareImportManager: ShareImportManager
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -37,6 +39,7 @@ class MpodApplication : Application(), ImageLoaderFactory, Configuration.Provide
         super.onCreate()
         proxyHttpClientFactory.configure(appSettingsDataStore, appScope)
         appScope.launch { smartListeningManager.startObserving() }
+        shareImportManager.resumePendingImports()
     }
 
     override fun newImageLoader(): ImageLoader =

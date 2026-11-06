@@ -149,7 +149,8 @@ class AddPodcastViewModelAudioUrlTest {
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
         assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
 
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.advanceTimeBy(3000L)
+        testDispatcher.scheduler.runCurrent()
         assertNull(viewModel.bannerState.value)
     }
 
@@ -222,7 +223,8 @@ class AddPodcastViewModelAudioUrlTest {
         assertEquals("Resolving audio link...", viewModel.bannerState.value?.message)
         assertTrue(viewModel.state.value.isSubmitting)
 
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.advanceTimeBy(5000L)
+        testDispatcher.scheduler.runCurrent()
         assertTrue(resolveStarted)
         assertEquals(StatusBannerType.Info, viewModel.bannerState.value?.type)
         assertEquals("Audio track added to playlist", viewModel.bannerState.value?.message)
@@ -501,7 +503,7 @@ class AddPodcastViewModelAudioUrlTest {
         viewModel.addAudioUrl("https://example.com/track1.mp3") { success1Called = true }
         viewModel.addAudioUrl("https://example.com/track2.mp3") { success2Called = true }
 
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertTrue(success1Called)
         assertTrue(success2Called)
@@ -553,7 +555,7 @@ class AddPodcastViewModelAudioUrlTest {
         viewModel.addAudioUrl("https://example.com/bad2.mp3", "Bad Track 2") { success2Called = true }
         viewModel.addAudioUrl("https://example.com/good3.mp3", "Good Track 3") { success3Called = true }
 
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertFalse(success1Called)
         assertFalse(success2Called)
@@ -567,7 +569,7 @@ class AddPodcastViewModelAudioUrlTest {
         var retrySuccessCount = 0
         viewModel.retryLastAction(onAudioSuccess = { retrySuccessCount++ })
 
-        testDispatcher.scheduler.advanceUntilIdle()
+        testDispatcher.scheduler.runCurrent()
 
         assertEquals(2, retrySuccessCount)
         assertEquals(

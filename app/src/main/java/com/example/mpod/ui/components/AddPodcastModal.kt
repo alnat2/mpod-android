@@ -41,12 +41,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.mpod.util.AudioSourceValidator
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import com.example.mpod.R
 import com.example.mpod.ui.theme.InterFontFamily
 import com.example.mpod.ui.theme.MpodTheme
-import java.net.URI
 
 enum class AddPodcastMode {
     RssFeedUrl,
@@ -78,8 +78,8 @@ fun AddPodcastModal(
         val trimmedUrl = url.trim()
         inputError = when {
             trimmedUrl.isBlank() -> if (mode == AddPodcastMode.AudioUrl) "Paste podcast link." else "Paste RSS feed URL."
-            mode == AddPodcastMode.AudioUrl && !trimmedUrl.isSupportedAudioSource() -> "Enter a valid audio link or file."
-            mode != AddPodcastMode.AudioUrl && !trimmedUrl.isHttpUrl() -> "Enter a valid http or https RSS feed URL."
+            mode == AddPodcastMode.AudioUrl && !AudioSourceValidator.isSupportedAudioSource(trimmedUrl) -> "Enter a valid audio link or file."
+            mode != AddPodcastMode.AudioUrl && !AudioSourceValidator.isHttpUrl(trimmedUrl) -> "Enter a valid http or https RSS feed URL."
             else -> null
         }
         if (inputError == null) {
@@ -551,18 +551,3 @@ private fun ModalTab(
         )
     }
 }
-
-private fun String.isSupportedAudioSource(): Boolean = runCatching {
-    val uri = URI(this.trim())
-    val scheme = uri.scheme?.lowercase(java.util.Locale.ROOT)
-    when (scheme) {
-        "http", "https" -> !uri.host.isNullOrBlank()
-        "content", "file" -> !uri.schemeSpecificPart.isNullOrBlank()
-        else -> false
-    }
-}.getOrDefault(false)
-
-private fun String.isHttpUrl(): Boolean = runCatching {
-    val uri = URI(this)
-    uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
-}.getOrDefault(false)

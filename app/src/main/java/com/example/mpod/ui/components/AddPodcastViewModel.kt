@@ -7,9 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.data.repository.SingleTrackRepository
+import com.example.mpod.util.AudioSourceValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -18,8 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URI
-import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 @HiltViewModel
@@ -37,6 +38,7 @@ class AddPodcastViewModel @Inject constructor(
     )
 
     private val audioIngestionChannel = Channel<AudioIngestionTask>(Channel.UNLIMITED)
+    private val pendingAudioTaskCount = AtomicInteger(0)
 
     init {
         viewModelScope.launch {
@@ -143,7 +145,7 @@ class AddPodcastViewModel @Inject constructor(
             )
             return
         }
-        if (!trimmedUrl.isHttpUrl()) {
+        if (!AudioSourceValidator.isHttpUrl(trimmedUrl)) {
             val errorMsg = "Enter a valid http or https RSS feed URL."
             _state.value = _state.value.copy(errorMessage = errorMsg)
             _bannerState.value = AddPodcastBannerUiState(
@@ -196,7 +198,7 @@ class AddPodcastViewModel @Inject constructor(
             )
             return
         }
-        if (!isSupportedAudioSource(trimmedUrl)) {
+        if (!AudioSourceValidator.isSupportedAudioSource(trimmedUrl)) {
             val errorMsg = "Enter a valid audio link or file."
             _state.value = _state.value.copy(errorMessage = errorMsg)
             _bannerState.value = AddPodcastBannerUiState(
@@ -206,7 +208,17 @@ class AddPodcastViewModel @Inject constructor(
             return
         }
 
-        audioIngestionChannel.trySend(AudioIngestionTask(trimmedUrl, title, onSuccess))
+        pendingAudioTaskCount.incrementAndGet()
+        val result = audioIngestionChannel.trySend(AudioIngestionTask(trimmedUrl, title, onSuccess))
+        if (result.isSuccess) {
+            _state.value = _state.value.copy(isSubmitting = true, errorMessage = null)
+            _bannerState.value = AddPodcastBannerUiState(
+                message = "Resolving audio link...",
+                type = StatusBannerType.Loading
+            )
+        } else {
+            pendingAudioTaskCount.decrementAndGet()
+        }
     }
 
     private suspend fun processAudioIngestionTask(task: AudioIngestionTask) {
@@ -215,7 +227,7 @@ class AddPodcastViewModel @Inject constructor(
             message = "Resolving audio link...",
             type = StatusBannerType.Loading
         )
-        val result = runCatching {
+        val result = cancellableResult {
             singleTrackRepository.playSingleTrack(task.url, task.title)
         }
         if (result.isSuccess) {
@@ -234,7 +246,7 @@ class AddPodcastViewModel @Inject constructor(
             )
         }
 
-        val hasMoreInQueue = !audioIngestionChannel.isEmpty
+        val hasMoreInQueue = pendingAudioTaskCount.decrementAndGet() > 0
         if (!hasMoreInQueue) {
             if (pendingBatchFailures.isNotEmpty()) {
                 val failuresToReport = pendingBatchFailures.toList()
@@ -272,7 +284,7 @@ class AddPodcastViewModel @Inject constructor(
         )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching {
+                cancellableResult {
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         podcastRepository.importOpml(stream)
                     } ?: Result.failure(IllegalStateException("Could not open file stream"))
@@ -320,22 +332,14 @@ class AddPodcastViewModel @Inject constructor(
         }
     }
 
-    internal fun isSupportedAudioSource(url: String): Boolean = runCatching {
-        val uri = URI(url.trim())
-        val scheme = uri.scheme?.lowercase(Locale.ROOT)
-        when (scheme) {
-            "http", "https" -> !uri.host.isNullOrBlank()
-            "content", "file" -> !uri.schemeSpecificPart.isNullOrBlank()
-            else -> false
-        }
-    }.getOrDefault(false)
+}
 
-    internal fun isHttpUrl(url: String): Boolean = runCatching {
-        val uri = URI(url)
-        uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()
-    }.getOrDefault(false)
-
-    private fun String.isHttpUrl(): Boolean = isHttpUrl(this)
+private suspend fun <T> cancellableResult(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (error: Throwable) {
+    Result.failure(error)
 }
 
 data class AddPodcastUiState(

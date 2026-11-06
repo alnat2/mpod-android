@@ -60,6 +60,8 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var savePositionJob: Job? = null
     private var previousEpisodeId: Long? = null
+    private var lastSignificantEpisodeId: Long? = null
+    private var lastSignificantPositionMs: Long = 0L
     internal val completedEpisodeTracker = CompletedEpisodeTracker()
     private var applyingSettingsSpeed = false
     private val queueReconciliationMutex = Mutex()
@@ -120,7 +122,11 @@ class PlaybackService : MediaSessionService() {
     override fun onDestroy() {
         savePositionJob?.cancel()
         currentEpisodeId()?.let { episodeId ->
-            val pos = player.currentPosition.coerceAtLeast(0L)
+            val pos = resolveMeaningfulPlaybackPosition(
+                currentPositionMs = player.currentPosition,
+                lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantEpisodeId == episodeId },
+                allowExplicitZero = lastSignificantEpisodeId == episodeId && lastSignificantPositionMs == 0L
+            ) ?: return@let
             runCatching {
                 runBlocking(Dispatchers.IO) {
                     episodeDao.updatePlaybackPosition(episodeId, pos)
@@ -256,6 +262,7 @@ class PlaybackService : MediaSessionService() {
                 saveCurrentPosition(force = true)
             }
             player.removeListener(playerListener)
+            rememberSignificantPosition(target.episodeId, target.positionMs)
             player.setMediaItems(playlistItems.map { it.toMediaItem() }, targetIndex, target.positionMs)
             previousEpisodeId = target.episodeId
             player.prepare()
@@ -286,7 +293,7 @@ class PlaybackService : MediaSessionService() {
             } else {
                 savePositionJob?.cancel()
                 savePositionJob = null
-                if (player.playbackState != Player.STATE_ENDED) {
+                if (!player.playWhenReady && player.playbackState != Player.STATE_ENDED) {
                     serviceScope.launch { saveCurrentPosition(force = true) }
                 }
             }
@@ -308,7 +315,7 @@ class PlaybackService : MediaSessionService() {
         ) {
             if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                 if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex) {
-                    serviceScope.launch { saveCurrentPosition(force = true) }
+                    serviceScope.launch { saveCurrentPosition(force = true, allowExplicitZero = true) }
                     currentEpisodeId()?.let { episodeId ->
                         completedEpisodeTracker.reset(episodeId)
                     }
@@ -336,6 +343,7 @@ class PlaybackService : MediaSessionService() {
 
             if (nextEpisodeId != null) {
                 completedEpisodeTracker.reset(nextEpisodeId)
+                rememberSignificantPosition(nextEpisodeId, player.currentPosition)
             }
 
             if (nextEpisodeId != null && player.playWhenReady) {
@@ -368,6 +376,11 @@ class PlaybackService : MediaSessionService() {
     private var lastSavedPositionSec: Long = -1L
     private var lastSavedEpisodeId: Long? = null
 
+    private fun rememberSignificantPosition(episodeId: Long, positionMs: Long) {
+        lastSignificantEpisodeId = episodeId
+        lastSignificantPositionMs = positionMs.coerceAtLeast(0L)
+    }
+
     private fun startPeriodicSave() {
         savePositionJob?.cancel()
         savePositionJob = serviceScope.launch {
@@ -378,9 +391,13 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    private suspend fun saveCurrentPosition(force: Boolean = false) {
+    private suspend fun saveCurrentPosition(force: Boolean = false, allowExplicitZero: Boolean = false) {
         val episodeId = currentEpisodeId() ?: return
-        val pos = player.currentPosition.coerceAtLeast(0L)
+        val pos = resolveMeaningfulPlaybackPosition(
+            currentPositionMs = player.currentPosition,
+            lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantEpisodeId == episodeId },
+            allowExplicitZero = allowExplicitZero
+        ) ?: return
         val posSec = pos / 1000L
         if (!force && episodeId == lastSavedEpisodeId && posSec == lastSavedPositionSec) {
             return
@@ -389,12 +406,13 @@ class PlaybackService : MediaSessionService() {
         val durSec = if (durMs > 0L) durMs / 1000L else 0L
         withContext(Dispatchers.IO) {
             episodeDao.updatePlaybackPosition(episodeId, pos)
-            lastSavedPositionSec = posSec
-            lastSavedEpisodeId = episodeId
             if (durSec > 0L) {
                 episodeDao.updateDurationIfMissing(episodeId, durSec)
             }
         }
+        rememberSignificantPosition(episodeId, pos)
+        lastSavedPositionSec = posSec
+        lastSavedEpisodeId = episodeId
     }
 
     private suspend fun completeEpisode(episodeId: Long) {
@@ -461,6 +479,16 @@ class PlaybackService : MediaSessionService() {
 }
 
 internal fun buildEpisodeCustomCacheKey(episodeId: Long): String = "episode_$episodeId"
+
+internal fun resolveMeaningfulPlaybackPosition(
+    currentPositionMs: Long,
+    lastSignificantPositionMs: Long?,
+    allowExplicitZero: Boolean
+): Long? = when {
+    currentPositionMs > 0L -> currentPositionMs
+    allowExplicitZero -> 0L
+    else -> lastSignificantPositionMs?.takeIf { it > 0L }
+}
 
 @UnstableApi
 private class PlayPauseOnlyMediaNotificationProvider(

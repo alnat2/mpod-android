@@ -7,6 +7,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.mpod.data.local.entity.PendingShareImportEntity
+import com.example.mpod.data.local.entity.ShareImportStatus
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -14,7 +17,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Baseline for future migrations: version 1 is archived and must reopen without data loss. */
+/** Version 1 data survives the first Share-import schema migration. */
 @RunWith(AndroidJUnit4::class)
 class MpodDatabaseMigrationTest {
     @get:Rule
@@ -32,21 +35,31 @@ class MpodDatabaseMigrationTest {
     }
 
     @Test
-    fun exportedVersion1Schema_reopensWithExistingData() {
+    fun version1Schema_migratesToVersion2WithoutLosingExistingData() = runBlocking {
         helper.createDatabase(TEST_DATABASE, 1).apply {
             insertVersion1Fixture()
             close()
         }
 
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            2,
+            true,
+            MpodDatabaseMigrations.MIGRATION_1_2
+        ).close()
+
         database = Room.databaseBuilder(
             ApplicationProvider.getApplicationContext(),
             MpodDatabase::class.java,
             TEST_DATABASE
-        ).build()
+        ).addMigrations(MpodDatabaseMigrations.MIGRATION_1_2).build()
 
         val podcast = database!!.podcastDao().getPodcastById(PODCAST_ID)
         val episode = database!!.episodeDao().getEpisodeById(EPISODE_ID)
         val playlist = database!!.playlistDao().getAllPlaylistItems()
+        val pendingImports = database!!.pendingShareImportDao().getByStatuses(
+            listOf(ShareImportStatus.ENQUEUED, ShareImportStatus.COPYING, ShareImportStatus.IMPORTING)
+        )
 
         assertNotNull(podcast)
         assertEquals("Migration fixture", podcast!!.title)
@@ -54,6 +67,52 @@ class MpodDatabaseMigrationTest {
         assertEquals("Fixture episode", episode!!.title)
         assertEquals(PODCAST_ID, episode.podcastId)
         assertEquals(listOf(EPISODE_ID), playlist.map { it.episodeId })
+        assertEquals(emptyList<Any>(), pendingImports)
+
+        val pendingShare = PendingShareImportEntity(
+            token = "migration-share-token",
+            payload = "content://test/audio/1",
+            title = "Shared audio",
+            status = ShareImportStatus.COPYING,
+            sourceUri = "content://test/audio/1",
+            copyPath = "/data/user/0/com.prod.mpod/files/share-imports/migration-share-token.audio",
+            attempts = 1,
+            batchId = "migration-batch",
+            fingerprint = "migration-fingerprint",
+            progressBytes = 512,
+            totalBytes = 1024,
+            createdAt = 100L,
+            updatedAt = 200L
+        )
+        database!!.pendingShareImportDao().insertIfMissing(pendingShare)
+        database!!.close()
+        database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MpodDatabase::class.java,
+            TEST_DATABASE
+        ).addMigrations(MpodDatabaseMigrations.MIGRATION_1_2).build()
+        val restoredShare = database!!.pendingShareImportDao().getByToken(pendingShare.token)
+        assertEquals(ShareImportStatus.COPYING, restoredShare?.status)
+        assertEquals(pendingShare.copyPath, restoredShare?.copyPath)
+        assertEquals(512L, restoredShare?.progressBytes)
+        database!!.pendingShareImportDao().updateStatus(
+            token = pendingShare.token,
+            status = ShareImportStatus.FAILED,
+            error = "Import cancelled.",
+            attempts = pendingShare.attempts,
+            updatedAt = 300L
+        )
+        val lateProgressUpdate = database!!.pendingShareImportDao().updateCopyProgress(
+            token = pendingShare.token,
+            status = ShareImportStatus.IMPORTING,
+            copyPath = pendingShare.copyPath,
+            progressBytes = 1024L,
+            totalBytes = 1024L,
+            error = null,
+            updatedAt = 400L
+        )
+        assertEquals(0, lateProgressUpdate)
+        assertEquals(ShareImportStatus.FAILED, database!!.pendingShareImportDao().getByToken(pendingShare.token)?.status)
     }
 
     private fun SupportSQLiteDatabase.insertVersion1Fixture() {

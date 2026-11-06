@@ -3,6 +3,7 @@ package com.example.mpod.data.local.di
 import android.content.Context
 import androidx.room.Room
 import com.example.mpod.data.local.MpodDatabase
+import com.example.mpod.data.local.MpodDatabaseMigrations
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.dao.PodcastDao
@@ -25,6 +26,7 @@ object DatabaseModule {
             MpodDatabase::class.java,
             "mpoddy.db"
         )
+        .addMigrations(MpodDatabaseMigrations.MIGRATION_1_2)
         .build()
     }
 
@@ -36,4 +38,7 @@ object DatabaseModule {
 
     @Provides
     fun providePlaylistDao(database: MpodDatabase): PlaylistDao = database.playlistDao()
+
+    @Provides
+    fun providePendingShareImportDao(database: MpodDatabase) = database.pendingShareImportDao()
 }
