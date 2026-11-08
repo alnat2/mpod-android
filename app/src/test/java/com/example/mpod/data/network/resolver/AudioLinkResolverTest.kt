@@ -86,6 +86,90 @@ class AudioLinkResolverTest {
     }
 
     @Test
+    fun itunesLookupResponse_withEscapedQuotesAndUnicodeInTitle_preservesFullTitle() {
+        val sampleJson = """
+            {
+              "resultCount": 1,
+              "results": [
+                {
+                  "wrapperType": "podcastEpisode",
+                  "trackId": 1000163075141,
+                  "trackName": "Леонид Каганов\u00a0— \"Когда меня отпустит\" (Часть\u00a01) (239)",
+                  "collectionName": "Модель \"Для Сборки\"",
+                  "artistName": "Влад Копп",
+                  "episodeUrl": "http://mds.podfm.ru/251/file/001.mp3",
+                  "trackTimeMillis": 2617000
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = resolver.parseItunesLookupResponse(sampleJson, "1000163075141")
+
+        assertNotNull(parsed)
+        assertEquals("http://mds.podfm.ru/251/file/001.mp3", parsed?.directAudioUrl)
+        assertEquals("Леонид Каганов — \"Когда меня отпустит\" (Часть 1) (239)", parsed?.title)
+        assertEquals("Модель \"Для Сборки\"", parsed?.podcastTitle)
+        assertEquals(2617, parsed?.durationSeconds)
+    }
+
+    @Test
+    fun applePodcastsHtmlContent_withEscapedQuotesInTitle_preservesFullTitle() {
+        val sampleHtml = """
+            <html>
+            <head>
+              <meta property="og:title" content="Леонид Каганов — &quot;Когда меня отпустит&quot; (Часть 1) - Single by Модель &quot;Для Сборки&quot;" />
+            </head>
+            <body>
+              <script id="embedded-data">
+                {"streamUrl":"https://audio.example.com/episode.mp3","title":"Леонид Каганов — \"Когда меня отпустит\" (Часть 1)","showOffer":{"title":"Модель \"Для Сборки\""},"duration":2617}
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val parsed = resolver.parseApplePodcastsHtmlContent(sampleHtml)
+
+        assertNotNull(parsed)
+        assertEquals("https://audio.example.com/episode.mp3", parsed?.directAudioUrl)
+        assertEquals("Леонид Каганов — \"Когда меня отпустит\" (Часть 1)", parsed?.title)
+        assertEquals("Модель \"Для Сборки\"", parsed?.podcastTitle)
+        assertEquals(2617, parsed?.durationSeconds)
+    }
+
+    @Test
+    fun applePodcastsHtmlContent_withPageDetailsAndEscapedQuotes_preservesFullTitle() {
+        val sampleHtml = """
+            <html>
+            <body>
+              <script id="embedded-data">
+                {"streamUrl":"https://audio.example.com/episode.mp3","pageDetails":{"title":"Леонид Каганов — \"Когда меня отпустит\" (Часть 1)"},"showOffer":{"title":"Модель \"Для Сборки\""},"duration":2617}
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val parsed = resolver.parseApplePodcastsHtmlContent(sampleHtml)
+
+        assertNotNull(parsed)
+        assertEquals("Леонид Каганов — \"Когда меня отпустит\" (Часть 1)", parsed?.title)
+    }
+
+    @Test
+    fun unescapeJson_handlesQuotesBackslashesAndUnicode() {
+        val raw = """Hello \"World\" \\ with \u0026 and \u0427"""
+        val unescaped = resolver.unescapeJson(raw)
+        assertEquals("""Hello "World" \ with & and Ч""", unescaped)
+    }
+
+    @Test
+    fun unescapeJson_doesNotReEscapeEscapedBackslashesFollowedByControlLetters() {
+        val raw = """C:\\new_folder\\track\\read.me \t tab \n newline"""
+        val unescaped = resolver.unescapeJson(raw)
+        assertEquals("C:\\new_folder\\track\\read.me \t tab \n newline", unescaped)
+    }
+
+    @Test
     fun applePodcastsHtmlContent_parsesEmbeddedStreamUrl() {
         val sampleHtml = """
             <html>

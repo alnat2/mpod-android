@@ -28,6 +28,7 @@ class DefaultAudioLinkResolver @Inject constructor(
 
         private val APPLE_PODCASTS_EPISODE_ID_REGEX = Regex("""[?&]i=(\d+)""")
         private val APPLE_PODCASTS_PODCAST_ID_REGEX = Regex("""(?:id|/podcast/[^/]+/id)(\d+)""")
+        private val JSON_ESCAPE_REGEX = Regex("""\\(["\\/bfnrt]|u[0-9a-fA-F]{4})""")
     }
 
     override suspend fun resolve(rawUrl: String): Result<ResolvedAudioMetadata> = withContext(Dispatchers.IO) {
@@ -185,9 +186,7 @@ class DefaultAudioLinkResolver @Inject constructor(
     }
 
     internal fun extractFeedUrlFromItunesResponse(json: String): String? {
-        return Regex(""""feedUrl"\s*:\s*"([^"]+)"""").find(json)?.groupValues?.get(1)?.let {
-            cleanDirectUrl(unescapeJson(it))
-        }
+        return extractJsonStringField(json, "feedUrl")?.let { cleanDirectUrl(it) }
     }
 
     internal fun resolveFromPodcastRssFeed(
@@ -281,17 +280,18 @@ class DefaultAudioLinkResolver @Inject constructor(
                     if (!hasEpisodeMatch) continue
                 }
 
-                val directAudioUrl = Regex(""""episodeUrl"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1)
-                    ?: Regex(""""previewUrl"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1)
+                val directAudioUrl = extractJsonStringField(block, "episodeUrl")
+                    ?: extractJsonStringField(block, "previewUrl")
                     ?: continue
 
-                val title = unescapeJson(Regex(""""trackName"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1) ?: "")
-                val collectionName = unescapeJson(Regex(""""collectionName"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1) ?: "")
-                val artistName = unescapeJson(Regex(""""artistName"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1) ?: "")
-                val artworkUrl = Regex(""""artworkUrl600"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1)
-                    ?: Regex(""""artworkUrl160"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1)
+                val title = extractJsonStringField(block, "trackName").orEmpty()
+                val collectionName = extractJsonStringField(block, "collectionName").orEmpty()
+                val artistName = extractJsonStringField(block, "artistName").orEmpty()
+                val artworkUrl = extractJsonStringField(block, "artworkUrl600")
+                    ?: extractJsonStringField(block, "artworkUrl160")
                 val durationMs = Regex(""""trackTimeMillis"\s*:\s*(\d+)""").find(block)?.groupValues?.get(1)?.toLongOrNull()
-                val description = unescapeJson(Regex(""""(?:shortDescription|description)"\s*:\s*"([^"]+)"""").find(block)?.groupValues?.get(1) ?: "")
+                val description = extractJsonStringField(block, "shortDescription")
+                    ?: extractJsonStringField(block, "description")
 
                 return ResolvedAudioMetadata(
                     directAudioUrl = cleanDirectUrl(directAudioUrl),
@@ -300,7 +300,7 @@ class DefaultAudioLinkResolver @Inject constructor(
                     podcastTitle = collectionName.ifBlank { artistName },
                     artworkUrl = artworkUrl,
                     durationSeconds = durationMs?.let { (it / 1000).toInt() },
-                    description = description.ifBlank { null }
+                    description = description?.ifBlank { null }
                 )
             }
             null
@@ -326,23 +326,23 @@ class DefaultAudioLinkResolver @Inject constructor(
     }
 
     internal fun parseApplePodcastsHtmlContent(html: String): ResolvedAudioMetadata? {
-        val streamUrl = Regex(""""streamUrl"\s*:\s*"([^"]+)"""").find(html)?.groupValues?.get(1)
-            ?: Regex(""""actionUrl"\s*:\s*"(http[^"]+\.mp3[^"]*)"""").find(html)?.groupValues?.get(1)
+        val streamUrl = extractJsonStringField(html, "streamUrl")
+            ?: Regex(""""actionUrl"\s*:\s*"(http(?:\\.|[^"\\])+\.mp3[^"]*)"""").find(html)?.groupValues?.get(1)?.let { unescapeJson(it) }
             ?: return null
 
-        val rawTitle = Regex(""""pageDetails"\s*:\s*\{[^}]*"title"\s*:\s*"([^"]+)"""").find(html)?.groupValues?.get(1)
-            ?: Regex("""<meta\s+property="og:title"\s+content="([^"]+)"""").find(html)?.groupValues?.get(1)?.substringBefore(" - ")
-            ?: Regex(""""title"\s*:\s*"([^"]+)"""").find(html)?.groupValues?.get(1)
+        val pageDetailsBlock = Regex(""""pageDetails"\s*:\s*\{([^}]+)\}""").find(html)?.groupValues?.get(1)
+        val rawTitle = (pageDetailsBlock?.let { extractJsonStringField(it, "title") })
+            ?: findMetaContent(html, "og:title")?.substringBefore(" - ")
+            ?: extractJsonStringField(html, "title")
             ?: "Episode"
-        val title = unescapeJson(rawTitle)
+        val title = rawTitle
 
-        val showTitle = unescapeJson(
-            Regex(""""showOffer"[^}]*"title"\s*:\s*"([^"]+)"""").find(html)?.groupValues?.get(1) ?: ""
-        ).ifBlank {
-            Regex("""<meta\s+property="og:site_name"\s+content="([^"]+)"""").find(html)?.groupValues?.get(1)
-        }
+        val showOfferBlock = Regex(""""showOffer"\s*:\s*\{([^}]+)\}""").find(html)?.groupValues?.get(1)
+        val showTitle = (showOfferBlock?.let { extractJsonStringField(it, "title") })
+            ?.ifBlank { null }
+            ?: findMetaContent(html, "og:site_name")
 
-        val artworkUrl = Regex("""<meta\s+property="og:image"\s+content="([^"]+)"""").find(html)?.groupValues?.get(1)
+        val artworkUrl = findMetaContent(html, "og:image")
         val duration = Regex(""""duration"\s*:\s*(\d+)""").find(html)?.groupValues?.get(1)?.toIntOrNull()
 
         return ResolvedAudioMetadata(
@@ -648,13 +648,30 @@ class DefaultAudioLinkResolver @Inject constructor(
         return url.replace("\\/", "/").trim()
     }
 
-    private fun unescapeJson(str: String): String {
-        return str
-            .replace("\\\"", "\"")
-            .replace("\\/", "/")
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
+    internal fun extractJsonStringField(json: String, fieldName: String): String? {
+        val pattern = Regex(""""$fieldName"\s*:\s*"((?:\\.|[^"\\])*)"""")
+        val match = pattern.find(json)?.groupValues?.get(1) ?: return null
+        return unescapeJson(match)
+    }
+
+    internal fun unescapeJson(str: String): String {
+        if (!str.contains('\\')) return str
+        return JSON_ESCAPE_REGEX.replace(str) { match ->
+            when (val escape = match.groupValues[1]) {
+                "\"" -> "\""
+                "\\" -> "\\"
+                "/" -> "/"
+                "n" -> "\n"
+                "r" -> "\r"
+                "t" -> "\t"
+                "b" -> "\b"
+                "f" -> "\u000C"
+                else -> {
+                    val hex = escape.substring(1).toInt(16)
+                    hex.toChar().toString()
+                }
+            }
+        }
     }
 
     private fun unescapeHtml(str: String): String {
@@ -670,6 +687,8 @@ class DefaultAudioLinkResolver @Inject constructor(
             .replace("&#8216;", "‘")
             .replace("&#8220;", "“")
             .replace("&#8221;", "”")
+            .replace("&nbsp;", " ")
+            .replace("&#160;", " ")
     }
 
     internal fun extractJsonObjectsFromArray(resultsJson: String): List<String> {
