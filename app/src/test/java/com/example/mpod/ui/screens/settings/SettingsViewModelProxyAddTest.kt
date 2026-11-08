@@ -291,6 +291,23 @@ class SettingsViewModelProxyAddTest {
         assertEquals("10.0.0.3", added.host)
     }
 
+    @Test
+    fun init_whenProxyEnabled_verifiesConnectionAndSetsIpGeo() {
+        val proxyStore = FakeAppSettingsStore(
+            AppSettings(
+                isProxyEnabled = true,
+                proxyServers = listOf(server1),
+                selectedProxyServerId = server1.id
+            )
+        )
+        val vm = buildViewModel(proxyStore)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Current IP: 0.0.0.0 • Geo: XX", vm.state.value.currentIpGeoText)
+        assertNull(vm.state.value.activeProxyError)
+        vm.viewModelScope.cancel()
+    }
+
     // ----------------------------------------------------------------
     // Helpers
     // ----------------------------------------------------------------

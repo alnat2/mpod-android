@@ -55,6 +55,24 @@ class IpGeoServiceTest {
     }
 
     @Test
+    fun parseIpGeoJson_parsesIpifyFormatWithDefaultUnknownGeo() {
+        val json = """{"ip":"1.2.3.4"}"""
+        val result = parseIpGeoJson(json)
+        assertNotNull(result)
+        assertEquals("1.2.3.4", result?.first)
+        assertEquals("Unknown", result?.second)
+    }
+
+    @Test
+    fun parseIpGeoJson_parsesIpInfoFormatCorrectly() {
+        val json = """{"ip":"161.0.17.196","country":"US","city":"New York"}"""
+        val result = parseIpGeoJson(json)
+        assertNotNull(result)
+        assertEquals("161.0.17.196", result?.first)
+        assertEquals("US", result?.second)
+    }
+
+    @Test
     fun parseIpGeoJson_returnsNullForInvalidJson() {
         val json = """{"error":"not found"}"""
         val result = parseIpGeoJson(json)

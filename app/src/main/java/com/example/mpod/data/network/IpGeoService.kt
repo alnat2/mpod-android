@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,27 +13,33 @@ open class IpGeoService @Inject constructor(
     private val proxyHttpClientFactory: ProxyHttpClientFactory
 ) {
     open suspend fun fetchCurrentIpGeo(client: OkHttpClient? = null): Result<Pair<String, String>> = withContext(Dispatchers.IO) {
-        val httpClient = client ?: proxyHttpClientFactory.createClient()
+        val baseClient = client ?: proxyHttpClientFactory.createClient()
+        val httpClient = baseClient.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(8, TimeUnit.SECONDS)
+            .build()
+
         runCatching {
-            val request = Request.Builder()
-                .url("https://api.country.is")
-                .header("User-Agent", NetworkModule.USER_AGENT)
-                .build()
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) error("HTTP ${response.code}")
-                val body = response.body?.string().orEmpty()
-                parseIpGeoJson(body) ?: error("Failed to parse IP/Geo from response: $body")
-            }
+            executeIpRequest(httpClient, "https://ipinfo.io/json")
         }.recoverCatching {
-            val fallbackRequest = Request.Builder()
-                .url("http://ip-api.com/json/?fields=query,countryCode,status")
-                .header("User-Agent", NetworkModule.USER_AGENT)
-                .build()
-            httpClient.newCall(fallbackRequest).execute().use { response ->
-                if (!response.isSuccessful) error("HTTP ${response.code}")
-                val body = response.body?.string().orEmpty()
-                parseIpGeoJson(body) ?: error("Failed to parse IP/Geo from fallback: $body")
-            }
+            executeIpRequest(httpClient, "https://api.country.is")
+        }.recoverCatching {
+            executeIpRequest(httpClient, "http://ip-api.com/json/?fields=query,countryCode,status")
+        }.recoverCatching {
+            executeIpRequest(httpClient, "https://api.ipify.org?format=json")
+        }
+    }
+
+    private fun executeIpRequest(client: OkHttpClient, url: String): Pair<String, String> {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", NetworkModule.USER_AGENT)
+            .build()
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("HTTP ${response.code} from $url")
+            val body = response.body?.string().orEmpty()
+            parseIpGeoJson(body) ?: error("Failed to parse IP/Geo from response: $body")
         }
     }
 }

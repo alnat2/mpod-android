@@ -63,6 +63,21 @@ class SettingsViewModel @Inject constructor(
             }
         }
 
+        viewModelScope.launch {
+            val initial = appSettingsDataStore.settingsFlow.first()
+            val active = initial.activeProxyServer
+            if (initial.isProxyEnabled && active != null) {
+                _state.value = _state.value.copy(
+                    isProxyChecking = true,
+                    currentIpGeoText = "Current IP: Checking...",
+                    activeProxyError = null
+                )
+                verifyProxyConnection(active, isBackgroundAddOrEdit = false)
+            } else {
+                loadCurrentIpGeo()
+            }
+        }
+
         proxyHttpClientFactory.setProxyConnectFailedListener { _, _ ->
             viewModelScope.launch {
                 val current = _state.value
@@ -78,8 +93,6 @@ class SettingsViewModel @Inject constructor(
                 }
             }
         }
-
-        loadCurrentIpGeo()
     }
 
     fun loadCurrentIpGeo() {
@@ -88,7 +101,9 @@ class SettingsViewModel @Inject constructor(
             val result = ipGeoService.fetchCurrentIpGeo()
             _state.value = _state.value.copy(
                 currentIpGeoText = result.fold(
-                    onSuccess = { (ip, geo) -> "Current IP: $ip • Geo: $geo" },
+                    onSuccess = { (ip, geo) ->
+                        if (geo.isNotBlank() && geo != "Unknown") "Current IP: $ip • Geo: $geo" else "Current IP: $ip"
+                    },
                     onFailure = { "Current IP: Unavailable" }
                 )
             )
@@ -310,50 +325,61 @@ class SettingsViewModel @Inject constructor(
     }
 
     private suspend fun verifyProxyConnection(server: ProxyServerConfig, isBackgroundAddOrEdit: Boolean) {
-        val checkResult = proxyHealthService.checkProxy(server)
-        val current = _state.value
-        val isActive = current.activeProxyServer?.id == server.id
+        try {
+            val checkResult = proxyHealthService.checkProxy(server)
+            val current = _state.value
+            val isActive = !isBackgroundAddOrEdit || (current.activeProxyServer?.id == server.id)
 
-        when (checkResult) {
-            is ProxyCheckResult.Success -> {
-                if (isActive) {
+            when (checkResult) {
+                is ProxyCheckResult.Success -> {
+                    val ipGeoDisplay = if (checkResult.geo.isNotBlank() && checkResult.geo != "Unknown") {
+                        "Current IP: ${checkResult.ip} • Geo: ${checkResult.geo}"
+                    } else {
+                        "Current IP: ${checkResult.ip}"
+                    }
                     _state.value = _state.value.copy(
                         isProxyChecking = false,
-                        activeProxyError = null,
-                        currentIpGeoText = "Current IP: ${checkResult.ip} • Geo: ${checkResult.geo}"
+                        activeProxyError = if (isActive) null else current.activeProxyError,
+                        currentIpGeoText = if (isActive) ipGeoDisplay else current.currentIpGeoText
+                    )
+                    if (current.topProxyNotification?.serverId == server.id) {
+                        _state.value = _state.value.copy(topProxyNotification = null)
+                    }
+                }
+                is ProxyCheckResult.ProxyFailed -> {
+                    val errorText = "${server.name} cant connect to proxy"
+                    _state.value = _state.value.copy(
+                        isProxyChecking = false,
+                        currentIpGeoText = if (isActive) "Current IP: Unavailable" else current.currentIpGeoText,
+                        activeProxyError = if (isActive) errorText else current.activeProxyError,
+                        topProxyNotification = if (isBackgroundAddOrEdit) {
+                            ProxyErrorNotification(
+                                serverId = server.id,
+                                serverName = server.name,
+                                message = errorText
+                            )
+                        } else current.topProxyNotification
                     )
                 }
-                if (current.topProxyNotification?.serverId == server.id) {
-                    _state.value = _state.value.copy(topProxyNotification = null)
+                is ProxyCheckResult.NoInternet -> {
+                    val errorText = "No internet connection"
+                    _state.value = _state.value.copy(
+                        isProxyChecking = false,
+                        currentIpGeoText = if (isActive) "Current IP: Unavailable" else current.currentIpGeoText,
+                        activeProxyError = if (isActive) errorText else current.activeProxyError,
+                        topProxyNotification = if (isBackgroundAddOrEdit) {
+                            ProxyErrorNotification(
+                                serverId = server.id,
+                                serverName = server.name,
+                                message = errorText
+                            )
+                        } else current.topProxyNotification
+                    )
                 }
             }
-            is ProxyCheckResult.ProxyFailed -> {
-                val errorText = "${server.name} cant connect to proxy"
-                _state.value = _state.value.copy(
-                    isProxyChecking = false,
-                    activeProxyError = if (isActive) errorText else current.activeProxyError,
-                    topProxyNotification = if (isBackgroundAddOrEdit) {
-                        ProxyErrorNotification(
-                            serverId = server.id,
-                            serverName = server.name,
-                            message = errorText
-                        )
-                    } else current.topProxyNotification
-                )
-            }
-            is ProxyCheckResult.NoInternet -> {
-                val errorText = "No internet connection"
-                _state.value = _state.value.copy(
-                    isProxyChecking = false,
-                    activeProxyError = if (isActive) errorText else current.activeProxyError,
-                    topProxyNotification = if (isBackgroundAddOrEdit) {
-                        ProxyErrorNotification(
-                            serverId = server.id,
-                            serverName = server.name,
-                            message = errorText
-                        )
-                    } else current.topProxyNotification
-                )
+        } finally {
+            if (!isBackgroundAddOrEdit) {
+                _state.value = _state.value.copy(isProxyChecking = false)
             }
         }
     }

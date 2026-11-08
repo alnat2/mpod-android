@@ -63,25 +63,13 @@ open class ProxyHealthService @Inject constructor(
         val testClient = clientBuilder.build()
 
         val probeResult = runCatching {
-            val request = Request.Builder()
-                .url("https://api.country.is")
-                .header("User-Agent", NetworkModule.USER_AGENT)
-                .build()
-            testClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) error("HTTP ${response.code}")
-                val body = response.body?.string().orEmpty()
-                parseIpGeoJson(body) ?: error("Failed to parse response: $body")
-            }
+            executeProbe(testClient, "https://ipinfo.io/json")
         }.recoverCatching {
-            val fallbackRequest = Request.Builder()
-                .url("http://ip-api.com/json/?fields=query,countryCode,status")
-                .header("User-Agent", NetworkModule.USER_AGENT)
-                .build()
-            testClient.newCall(fallbackRequest).execute().use { response ->
-                if (!response.isSuccessful) error("HTTP ${response.code}")
-                val body = response.body?.string().orEmpty()
-                parseIpGeoJson(body) ?: error("Failed to parse fallback: $body")
-            }
+            executeProbe(testClient, "https://api.country.is")
+        }.recoverCatching {
+            executeProbe(testClient, "http://ip-api.com/json/?fields=query,countryCode,status")
+        }.recoverCatching {
+            executeProbe(testClient, "https://api.ipify.org?format=json")
         }
 
         probeResult.fold(
@@ -94,5 +82,17 @@ open class ProxyHealthService @Inject constructor(
                 }
             }
         )
+    }
+
+    private fun executeProbe(client: OkHttpClient, url: String): Pair<String, String> {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", NetworkModule.USER_AGENT)
+            .build()
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("HTTP ${response.code} from $url")
+            val body = response.body?.string().orEmpty()
+            parseIpGeoJson(body) ?: error("Failed to parse response: $body")
+        }
     }
 }

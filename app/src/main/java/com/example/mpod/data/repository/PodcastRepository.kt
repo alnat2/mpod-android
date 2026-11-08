@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.InputStream
 import java.util.Collections
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -333,7 +334,12 @@ class PodcastRepository @Inject constructor(
         url: String,
         lastBuildDate: String? = null
     ): ParsedPodcastFeed? {
-        val client = proxyHttpClientFactory.createClient()
+        val baseClient = proxyHttpClientFactory.createClient()
+        val client = baseClient.newBuilder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(25, TimeUnit.SECONDS)
+            .build()
         val requestBuilder = Request.Builder()
             .url(url)
             .header("User-Agent", NetworkModule.USER_AGENT)
@@ -348,7 +354,7 @@ class PodcastRepository @Inject constructor(
         }
 
         val request = requestBuilder.build()
-        val maxAttempts = 3
+        val maxAttempts = 2
         var lastException: Exception? = null
 
         for (attempt in 1..maxAttempts) {
