@@ -197,6 +197,26 @@ Notification and alert banners are rendered at the top of the screen (with statu
 | SET-10 | View application version | Settings displays `Current app build: <versionName>` derived from `BuildConfig.VERSION_NAME` | U,E,R | Verified |
 | SET-11 | Toggle 48dp MpodSwitch | Switch toggle meets 48dp accessibility touch target | C,U | Verified |
 
+## P1 — audiobooks and local media library
+
+| ID | User scenario | Expected result | Evidence | Status |
+|---|---|---|---|---|
+| ABK-01 | Select audiobooks directory via system picker | App launches system document tree picker (`OpenDocumentTree`), user grants directory, app takes persistable URI permission and saves tree URI; empty state transitions to library view | — | Specified |
+| ABK-02 | Scan multi-file audiobook folder | Fast non-blocking scan using low-level `ContentResolver.query` on `Dispatchers.IO` identifies book folder, parent as author, filters supported extensions (`.mp3`, `.m4b`, `.m4a`), and sorts tracks via natural sort (`1, 2, ... 10`) into `audiobook_tracks` | — | Specified |
+| ABK-03 | Extract cover art | Scanner checks directory for `cover.jpg` / `folder.jpg` / `.png`; falls back to embedded ID3v2 APIC or MP4 `covr` via `MediaMetadataRetriever`, and finally to approved fallback audio art | — | Specified |
+| ABK-04 | Standalone single-file audiobook | Single audio file (`.m4b`/`.mp3`) selected via picker is registered as standalone book entity without subfolder requirements | — | Specified |
+| ABK-05 | Manual Rescan library | Rescan button re-queries directory structure without touching active queue or `audiobook_playlist_tracks`; marks removed files as missing; adds new files to catalog without inserting them into existing queue | — | Specified |
+| ABK-05b | Missing or removed audiobook file during playback | If a track file becomes inaccessible (`FileNotFoundException`), playback does not crash; surfaces `MpodStatusBanner` ("File not found: <filename>"), marks track unavailable in UI, and auto-skips to next selected track during continuous playback | — | Specified |
+| ABK-06 | Add book to queue ("1 book = 1 queue item") | Adding an audiobook creates exactly one row in `playlist_items` displaying `Chapter X of Y • mm:ss / mm:ss`; duplicate additions merge selected chapters seamlessly | — | Specified |
+| ABK-07 | Select chapters in file manager modal | Tapping book folder in Abooks library opens modal with chapter names, lengths, and playlist add/remove toggles (`hugeicons/play-list-add`/`remove`) without Play/Pause controls | — | Specified |
+| ABK-08 | Open Show chapters modal in Player | Tapping Show chapters on playing book opens `Chapters Mobile` modal displaying playing chapter with timer and Pause/Play, unlistened with Play, and listened with Replay | — | Specified |
+| ABK-09 | Continuous playback and gapless transition | Media3 ExoPlayer dynamic 2-track sliding window (`[Current, Next]`) buffers next selected track; transitions automatically without silence or click upon `STATE_ENDED` | — | Specified |
+| ABK-10 | Complete audiobook and queue removal | When final selected chapter completes, book is removed from `playlist_items`, all chapter playback positions and `is_listened` flags are atomically reset to 0 in Room, and player advances to next queue item | — | Specified |
+| ABK-11 | Strictly Read-Only asset protection | Audiobooks and chapter files on disk are permanent library assets; `SmartListeningManager` lifecycle never deletes or alters audiobook files upon completion or queue removal | — | Specified |
+| ABK-12 | Unified seek step (-15s / +30s) | Rewind 15s and Fast-forward 30s are applied uniformly across the entire app for both podcasts and audiobooks | — | Specified |
+| ABK-13 | Separate playback speed settings | Audiobooks default to 1.0x and podcasts to 1.3x; speed changes for audiobooks persist in DataStore (`audiobookPlaybackSpeed`) without altering podcast speed | — | Specified |
+| ABK-14 | Go to time numeric input | Tapping elapsed time label in Player opens `PlayerMobileTimeInput` custom numpad dialog; typing shifts digits into HH:MM:SS; tapping Done seeks ExoPlayer directly to target position | — | Specified |
+
 ## P0/P1 — cross-cutting reliability and delivery
 
 | ID | User scenario | Expected result | Evidence | Status |
@@ -239,6 +259,15 @@ The following decisions define the standalone `mpoddy` product:
 13. Time and duration formatting throughout the app (Player elapsed and remaining time labels, episode card durations, and playlist queue summary) follows a unified standard: `mm:ss` (e.g., `23:14`, `05:03`) when duration is under 1 hour, and `h:mm:ss` (e.g., `1:25:39`) when duration is 1 hour or more. Player labels show elapsed time on the left and `max(duration - position, 0)` remaining time on the right.
 14. Settings displays only `Current app build: <versionName>` for build identity. New handoff APKs increment both patch `versionName` and monotonically increasing `versionCode`.
 15. Release acceptance uses the minified `com.prod.mpod` APK and validates local persistence, real feeds, Smart Listening, proxy modes, Media3 lifecycle, and process recreation without any production-server switch.
+16. Audiobooks support standalone offline playback directly from local device storage using Android Storage Access Framework (`OpenDocumentTree`). File scanning uses direct `ContentResolver.query` with a library limit of 2,000 files and max directory depth of 3 levels (`Root` -> `Author` -> `Book` -> `Files`).
+17. Strictly Read-Only policy: `SmartListeningManager` and playback completion handlers must never delete or modify local audiobook files or folders on disk.
+18. Unified seek step is -15s rewind and +30s fast-forward for both podcasts and audiobooks across all player controls.
+19. Separate default playback speed: Audiobooks default to 1.0x; podcasts default to 1.3x. Changes persist independently in DataStore.
+20. Bottom navigation exposes 5 destinations: `Player`, `Podcasts`, `Abooks`, `Settings`, `Add`.
+21. Player secondary actions: Podcasts display "Show notes"; multi-file audiobooks display "Show chapters"; single-file audiobooks hide both secondary actions.
+22. Dynamic 2-track sliding window (`[Current, Next]`) in Media3 ExoPlayer provides gapless chapter transitions and bounded memory footprint.
+23. Room v3 schema with polymorphic `playlist_items` (`CHECK ((episode_id IS NOT NULL AND audiobook_id IS NULL) OR (episode_id IS NULL AND audiobook_id IS NOT NULL))`), `audiobooks`, `audiobook_tracks`, and `audiobook_playlist_tracks`.
+24. UI components and screens for audiobooks strictly use the `mpoddy dark mode` palette (`DarkBackground` #1C1F24, `DarkCard` #25292C, `DarkMuted` #2D3237, `DarkForeground` #F7FFFA, `DarkPrimary` #077B50 / `DarkRing` #16A26A).
 
 There are no known unanswered product questions blocking the functional scenario audit.
 

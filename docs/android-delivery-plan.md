@@ -42,25 +42,26 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 
 | Area | Confirmed decision |
 |---|---|
-| Architecture | Standalone native Android podcast player (`mpoddy`) without backend dependency |
+| Architecture | Standalone native Android podcast and audiobook player (`mpoddy`) without backend dependency |
 | Distribution | APK, outside Google Play for the current scope |
 | Minimum OS | Android 8.0+ (API 26) |
 | UI language | English |
 | Release package | One release APK with package `com.prod.mpod`; debug package `com.prod.mpod.test` |
-| Local Database | Room database (`MpodDatabase`) storing `podcasts`, `episodes`, and `playlist_items` |
-| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, playback speed, Auto refresh, and SOCKS5 proxy profiles |
+| Local Database | Room database v3 (`MpodDatabase`) storing `podcasts`, `episodes`, `audiobooks`, `audiobook_tracks`, `audiobook_playlist_tracks`, and polymorphic `playlist_items` |
+| Preferences | Jetpack DataStore (`AppSettingsDataStore`) for Theme, podcast & audiobook playback speeds (1.3x / 1.0x defaults), Auto refresh, and SOCKS5 proxy profiles |
 | Feed & OPML Engines | Direct RSS 2.0 / Atom parser (`RssFeedParser`) and OPML import/export (`OpmlParser`) |
+| Audiobook Engine | Standalone SAF scanner (`OpenDocumentTree` via direct `ContentResolver.query`) with natural sort, cover extraction, dynamic 2-track sliding window Media3 gapless playback, and strictly read-only asset guarantee |
 | Network & Proxy | OkHttp with HTTP/HTTPS cleartext support (e.g. for Radio-T) and configurable Direct/SOCKS5 proxy (`ProxyHttpClientFactory`) supporting multiple saved profiles and credentials |
-| Smart Listening | Fully automatic background downloading and cleanup through `SmartListeningManager`; no user-facing toggle, limit, network, or cleanup settings |
-| Default start route | Subscriptions |
-| Primary navigation | Player (Home/Now playing), Subscriptions, Settings, Add podcast modal |
-| Theme | Follow system by default; Settings exposes Light/Dark/System switch backed by DataStore |
-| Active episode | Stored in Room database and restored without autoplay |
+| Smart Listening | Fully automatic background downloading and cleanup through `SmartListeningManager`; strictly prohibited from deleting or modifying local audiobook files |
+| Default start route | Podcasts (Subscriptions) |
+| Primary navigation | Player (Home/Now playing), Podcasts, Abooks, Settings, Add |
+| Theme | Follow system by default; Settings exposes Light/Dark/System switch backed by DataStore; audiobooks UI strictly conforms to `mpoddy dark mode` palette |
+| Active item | Stored in Room database and restored without autoplay |
 | Mark all listened | Executes immediately on local Room DB and updates playlist/queue atomically |
-| Episode actions | Player playlist and Subscriptions episode actions are inline on the episode card |
-| Bottom sheets/modals | Bottom sheets for playback speed; Add podcast modal for direct RSS URL and OPML import |
-| Design & Icons | Material 3 tokens, Hugeicons vector drawables (`menu-09` drag handles), Figma mobile components |
-| Player time labels | Left is elapsed position; right is remaining time, clamped as `max(durationSeconds - positionSeconds, 0)` |
+| Episode & Track actions | Player playlist, Podcasts, and Abooks track actions are inline / modal according to Figma mobile specs |
+| Bottom sheets/modals | Bottom sheets for playback speed; Add podcast modal; Chapters modal (`1309:12489`); Go to time numeric input (`1346:15503`) |
+| Design & Icons | Material 3 tokens, Hugeicons vector drawables, Figma mobile components, `mpoddy dark mode` palette |
+| Player time labels & Seek | Left is elapsed position (tap opens Go to time dialog); right is remaining time; unified seek step is -15s / +30s across all media |
 
 Delivery order decision confirmed on 2026-07-16: a complete, reliable working application takes priority over visual polish and extended accessibility work. Figma fine-tuning, exhaustive font/display scaling, TalkBack review, and performance profiling do not block the working test build unless they make a core action unreadable, unreachable, or unusable.
 
@@ -72,6 +73,11 @@ Figma references:
 - Subscription episode item v2: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1213-4634>
 - Player playlist item states: `playlistitem-playing`, `playlistitem-inqueue`, and `playlistitem-inqueue-downloaded` in the mobile screens page
 - Podcast fallback artwork: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=757-6696>
+- Audiobooks section ("for abooks"): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1309-12604>
+- Audiobooks mobile screen: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1304-10573>
+- Audiobooks mobile chapters modal: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1309-11982>
+- Player statuses (audiobook with chapters vs single audiofile): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1353-15629>
+- Go to time numeric input (PlayerMobileTimeInput): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1346-15503>
 
 Icon-source decision confirmed on 2026-07-29: every Android UI icon must come from Hugeicons. Use the exact named asset from `@hugeicons/core-free-icons` or an exact Hugeicons export supplied through Figma; do not substitute Material Icons or a visually similar hand-authored icon. If the exact Hugeicons name or asset cannot be identified, implementation pauses for product-owner clarification. Branding, podcast artwork, and the approved fallback illustration are not UI icons.
 

@@ -6,9 +6,27 @@
 
 ## Активные задачи
 
-**Нет. Все задачи текущего списка закрыты.**
+### MPOD-ABK-01 (Этап 0) — Документация и контракты для аудиокниг
+- **Статус:** `CLOSED — PASS`, 12.11.2026.
+- **Что сделано:**
+  - В `docs/android-user-scenarios.md` зафиксированы сценарии `ABK-01` … `ABK-14` (включая `ABK-05b` для защиты при удалении файла и `ABK-14` для ввода точного времени).
+  - В `docs/android-delivery-plan.md` актуализированы решения:
+    - Автономный движок аудиокниг (SAF `OpenDocumentTree`, прямой `ContentResolver.query`, лимит 2000 файлов).
+    - Strictly Read-Only гарантия: защита от удаления файлов модулем `SmartListeningManager`.
+    - Унификация перемотки: -15с / +30с для всех типов медиа.
+    - Независимая скорость воспроизведения: `audiobookPlaybackSpeed` (1.0x default) в DataStore.
+    - Нижняя навигация на 5 вкладок (`Player`, `Podcasts`, `Abooks`, `Settings`, `Add`).
+    - Схема Room v3 с полиморфной очередью и таблицами `audiobooks`, `audiobook_tracks`, `audiobook_playlist_tracks`.
+    - Динамическое скользящее окно ExoPlayer (2-track) для бесшовного воспроизведения.
+    - Привязка макетов Figma (`1309:12604`) и палитры `mpoddy dark mode`.
 
-Новый QA-прогон, сборку или публикацию не запускать без новой задачи либо обнаруженного дефекта. Пользовательский `AGENTS.md` не относится к release-изменениям.
+### Очередь следующих этапов (MPOD-ABK)
+1. **`MPOD-ABK-02` (Этап 1):** Унификация перемотки (-15с / +30с) в `PlaybackService`/`PlayerViewModel` и настройка `audiobookPlaybackSpeed` в `AppSettingsStore`.
+2. **`MPOD-ABK-03` (Этап 2):** Схема Room v3, DDL, миграция 2->3, сущности (`AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`, полиморфный `PlaylistItemEntity`), атомарный сброс прогресса и Read-Only защита от SmartListening.
+3. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
+4. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
+5. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
+6. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
 
 ## Последняя закрытая задача — MPOD-REL-02
 
