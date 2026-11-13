@@ -72,6 +72,9 @@ interface PlaylistDao {
     @Query("SELECT EXISTS(SELECT 1 FROM playlist_items WHERE episodeId = :episodeId)")
     fun isEpisodeInPlaylist(episodeId: Long): Boolean
 
+    @Query("SELECT EXISTS(SELECT 1 FROM playlist_items WHERE audiobookId = :audiobookId)")
+    fun isAudiobookInPlaylist(audiobookId: Long): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertPlaylistItem(item: PlaylistItemEntity): Long
 
@@ -81,14 +84,32 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_items WHERE episodeId = :episodeId")
     fun removeFromPlaylist(episodeId: Long)
 
+    @Query("DELETE FROM playlist_items WHERE audiobookId = :audiobookId")
+    fun removeAudiobookFromPlaylist(audiobookId: Long)
+
     @Query("DELETE FROM playlist_items")
     fun clearPlaylist()
 
     @Query("UPDATE playlist_items SET position = :position WHERE episodeId = :episodeId")
     fun updatePosition(episodeId: Long, position: Int): Int
 
+    @Query("UPDATE playlist_items SET position = :position WHERE audiobookId = :audiobookId")
+    fun updateAudiobookPosition(audiobookId: Long, position: Int): Int
+
     @Query("DELETE FROM playlist_items WHERE episodeId NOT IN (:episodeIds)")
     fun deleteNotIn(episodeIds: List<Long>)
+
+    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
+    fun deleteEpisodesNotIn(episodeIds: List<Long>)
+
+    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL")
+    fun deleteEpisodeItems()
+
+    @Query("DELETE FROM playlist_items WHERE audiobookId IS NOT NULL AND audiobookId NOT IN (:audiobookIds)")
+    fun deleteAudiobooksNotIn(audiobookIds: List<Long>)
+
+    @Query("DELETE FROM playlist_items WHERE audiobookId IS NOT NULL")
+    fun deleteAudiobookItems()
 
     @Transaction
     fun appendEpisodeIfMissing(episodeId: Long): Boolean {
@@ -99,15 +120,37 @@ interface PlaylistDao {
     }
 
     @Transaction
+    fun appendAudiobookIfMissing(audiobookId: Long): Boolean {
+        if (isAudiobookInPlaylist(audiobookId)) return false
+        val nextPos = (getMaxPosition() ?: -1) + 1
+        insertPlaylistItem(PlaylistItemEntity(audiobookId = audiobookId, position = nextPos))
+        return true
+    }
+
+    @Transaction
     fun reorderPlaylist(items: List<PlaylistItemEntity>) {
         if (items.isEmpty()) {
             clearPlaylist()
             return
         }
-        val targetEpisodeIds = items.map { it.episodeId }
-        deleteNotIn(targetEpisodeIds)
+        val targetEpisodeIds = items.mapNotNull { it.episodeId }
+        if (targetEpisodeIds.isNotEmpty()) {
+            deleteEpisodesNotIn(targetEpisodeIds)
+        } else {
+            deleteEpisodeItems()
+        }
+        val targetAudiobookIds = items.mapNotNull { it.audiobookId }
+        if (targetAudiobookIds.isNotEmpty()) {
+            deleteAudiobooksNotIn(targetAudiobookIds)
+        } else {
+            deleteAudiobookItems()
+        }
         for (item in items) {
-            val updated = updatePosition(item.episodeId, item.position)
+            val updated = when {
+                item.episodeId != null -> updatePosition(item.episodeId, item.position)
+                item.audiobookId != null -> updateAudiobookPosition(item.audiobookId, item.position)
+                else -> 0
+            }
             if (updated == 0) {
                 insertPlaylistItem(item)
             }

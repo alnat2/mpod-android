@@ -28,12 +28,23 @@
   - В `AppSettingsDataStore.kt` и `FakeAppSettingsStore.kt` добавлен ключ `audiobookPlaybackSpeed: Float = 1.0f` и метод `setAudiobookPlaybackSpeed(speed: Float)`.
   - Обновлены тесты `HomeScreenTest.kt` и `AppSettingsDataStoreTest.kt`.
 
+### MPOD-ABK-03 (Этап 2) — Схема Room v3, сущности, DAO и миграция 2->3
+- **Статус:** `CLOSED — PASS`, 13.11.2026.
+- **Что сделано:**
+  - Созданы Room-сущности: `AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`.
+  - Модифицирован `PlaylistItemEntity`: добавлены `audiobookId: Long?`, внешний ключ с `CASCADE`, уникальный индекс, Kotlin runtime `require` и SQLite `CHECK ((episodeId IS NOT NULL AND audiobookId IS NULL) OR (episodeId IS NULL AND audiobookId IS NOT NULL))` для строгой полиморфности.
+  - Реализован `AudiobookDao`: CRUD для книг и глав, выборка глав для плейлиста, выборка текущей главы по инварианту (`ABK-06`), атомарный `@Transaction` сброс прогресса книги (`ABK-10`).
+  - В `PlaylistDao` добавлены методы проверки, добавления, удаления и перемещения для аудиокниг.
+  - В `MpodDatabaseMigrations` реализована `MIGRATION_2_3`: создание таблиц аудиокниг и пересоздание `playlist_items` с новыми связями.
+  - `DatabaseModule` обновлён: зарегистрирована миграция 2->3, добавлен `provideAudiobookDao`.
+  - Подтверждена Read-Only гарантия (`ABK-11`): `SmartListeningManager` изолирован от аудиокниг и оперирует исключительно `filesDir/podcasts` и `episodeId`.
+  - Добавлены тесты `AudiobookDaoTest.kt` и обновлён `MpodDatabaseMigrationTest.kt`.
+
 ### Очередь следующих этапов (MPOD-ABK)
-1. **`MPOD-ABK-03` (Этап 2):** Схема Room v3, DDL, миграция 2->3, сущности (`AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`, полиморфный `PlaylistItemEntity`), атомарный сброс прогресса и Read-Only защита от SmartListening.
-2. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
-3. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
-4. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
-5. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
+1. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
+2. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
+3. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
+4. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
 
 ## Последняя закрытая задача — MPOD-REL-02
 

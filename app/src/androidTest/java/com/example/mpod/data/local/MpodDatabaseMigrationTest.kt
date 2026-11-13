@@ -7,12 +7,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.mpod.data.local.entity.AudiobookEntity
+import com.example.mpod.data.local.entity.AudiobookTrackEntity
 import com.example.mpod.data.local.entity.PendingShareImportEntity
 import com.example.mpod.data.local.entity.ShareImportStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -113,6 +116,62 @@ class MpodDatabaseMigrationTest {
         )
         assertEquals(0, lateProgressUpdate)
         assertEquals(ShareImportStatus.FAILED, database!!.pendingShareImportDao().getByToken(pendingShare.token)?.status)
+    }
+
+    @Test
+    fun version2Schema_migratesToVersion3WithoutLosingExistingData() = runBlocking {
+        helper.createDatabase(TEST_DATABASE, 2).apply {
+            insertVersion1Fixture()
+            close()
+        }
+
+        helper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            3,
+            true,
+            MpodDatabaseMigrations.MIGRATION_2_3
+        ).close()
+
+        database = Room.databaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            MpodDatabase::class.java,
+            TEST_DATABASE
+        ).addMigrations(
+            MpodDatabaseMigrations.MIGRATION_1_2,
+            MpodDatabaseMigrations.MIGRATION_2_3
+        ).build()
+
+        val podcast = database!!.podcastDao().getPodcastById(PODCAST_ID)
+        val episode = database!!.episodeDao().getEpisodeById(EPISODE_ID)
+        val playlist = database!!.playlistDao().getAllPlaylistItems()
+
+        assertNotNull(podcast)
+        assertEquals("Migration fixture", podcast!!.title)
+        assertNotNull(episode)
+        assertEquals("Fixture episode", episode!!.title)
+        assertEquals(1, playlist.size)
+        assertEquals(EPISODE_ID, playlist[0].episodeId)
+        assertNull(playlist[0].audiobookId)
+
+        val bookId = database!!.audiobookDao().insertAudiobook(
+            AudiobookEntity(
+                title = "Migrated Book",
+                author = "Author",
+                folderUri = "content://audiobooks/migrated"
+            )
+        )
+        database!!.audiobookDao().insertTrack(
+            AudiobookTrackEntity(
+                audiobookId = bookId,
+                title = "Chapter 1",
+                fileUri = "content://audiobooks/migrated/1.mp3",
+                trackNumber = 1
+            )
+        )
+        database!!.playlistDao().appendAudiobookIfMissing(bookId)
+        val updatedPlaylist = database!!.playlistDao().getAllPlaylistItems()
+        assertEquals(2, updatedPlaylist.size)
+        assertEquals(bookId, updatedPlaylist[1].audiobookId)
     }
 
     private fun SupportSQLiteDatabase.insertVersion1Fixture() {
