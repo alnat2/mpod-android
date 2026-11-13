@@ -38,6 +38,8 @@ class AudiobookStorageScanner @Inject constructor(
     private val metadataExtractor: AudioMetadataExtractor
 ) {
 
+    internal var treeHelper: DocumentTreeHelper = DefaultDocumentTreeHelper()
+
     companion object {
         const val MAX_FILES_LIMIT = 2000
         private val SUPPORTED_AUDIO_EXTENSIONS = setOf(
@@ -46,7 +48,7 @@ class AudiobookStorageScanner @Inject constructor(
         private val COVER_FILE_NAMES = setOf(
             "cover.jpg", "folder.jpg", "cover.png", "folder.png", "cover.jpeg", "folder.jpeg"
         )
-        private val DISC_FOLDER_PATTERN = Regex("^(cd|disc|disk)\\s*\\d+$", RegexOption.IGNORE_CASE)
+        internal val DISC_FOLDER_PATTERN = Regex("^(cd|disc|disk)\\s*\\d+$", RegexOption.IGNORE_CASE)
     }
 
     suspend fun scanFolder(treeUri: Uri): ScanSummary = withContext(Dispatchers.IO) {
@@ -57,8 +59,8 @@ class AudiobookStorageScanner @Inject constructor(
         var limitExceeded = false
 
         try {
-            val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
-            val rootChildren = queryChildren(contentResolver, treeUri, rootDocId)
+            val rootDocId = treeHelper.getTreeDocumentId(treeUri)
+            val rootChildren = treeHelper.queryChildren(contentResolver, treeUri, rootDocId)
 
             // 1. Check for standalone single-file audiobooks placed directly in the root directory
             val rootAudioFiles = rootChildren.filter { isAudioFile(it) }
@@ -68,7 +70,7 @@ class AudiobookStorageScanner @Inject constructor(
                     break
                 }
                 totalFilesCount++ // Guaranteed increment for every candidate file evaluated
-                val trackUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, audioFile.docId)
+                val trackUri = treeHelper.buildDocumentUri(treeUri, audioFile.docId)
                 val book = scanSingleTrackAsBook(
                     fileUri = trackUri,
                     displayName = audioFile.name,
@@ -96,11 +98,13 @@ class AudiobookStorageScanner @Inject constructor(
                     break
                 }
 
-                val dirChildren = queryChildren(contentResolver, treeUri, dir.docId)
-                val dirAudioFiles = dirChildren.filter { isAudioFile(it) }
+                val dirChildren = treeHelper.queryChildren(contentResolver, treeUri, dir.docId)
+                val isBookFolder = dirChildren.any {
+                    isAudioFile(it) || (it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name))
+                }
 
-                if (dirAudioFiles.isNotEmpty()) {
-                    // This directory is a Book folder (Pattern: Root / Book / Chapters)
+                if (isBookFolder) {
+                    // This directory is a Book folder (Pattern: Root / Book / Chapters or Root / Book / CD1..)
                     val bookResult = processBookFolder(
                         contentResolver = contentResolver,
                         treeUri = treeUri,
@@ -124,9 +128,11 @@ class AudiobookStorageScanner @Inject constructor(
                             limitExceeded = true
                             break
                         }
-                        val bookDirChildren = queryChildren(contentResolver, treeUri, bookDir.docId)
-                        val bookAudioFiles = bookDirChildren.filter { isAudioFile(it) }
-                        if (bookAudioFiles.isNotEmpty()) {
+                        val bookDirChildren = treeHelper.queryChildren(contentResolver, treeUri, bookDir.docId)
+                        val isSubBookFolder = bookDirChildren.any {
+                            isAudioFile(it) || (it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name))
+                        }
+                        if (isSubBookFolder) {
                             val bookResult = processBookFolder(
                                 contentResolver = contentResolver,
                                 treeUri = treeUri,
@@ -176,7 +182,7 @@ class AudiobookStorageScanner @Inject constructor(
         )
     }
 
-    private suspend fun processBookFolder(
+    internal suspend fun processBookFolder(
         contentResolver: ContentResolver,
         treeUri: Uri,
         bookDir: DocumentItem,
@@ -190,7 +196,7 @@ class AudiobookStorageScanner @Inject constructor(
         val discFolders = directChildren.filter { it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name) }
         val discChildrenMap = mutableMapOf<DocumentItem, List<DocumentItem>>()
         for (discDir in discFolders) {
-            val discChildren = queryChildren(contentResolver, treeUri, discDir.docId)
+            val discChildren = treeHelper.queryChildren(contentResolver, treeUri, discDir.docId)
             discChildrenMap[discDir] = discChildren
             audioFiles.addAll(discChildren.filter { isAudioFile(it) })
         }
@@ -220,11 +226,11 @@ class AudiobookStorageScanner @Inject constructor(
 
         var coverUriString: String? = null
         if (coverFile != null) {
-            coverUriString = DocumentsContract.buildDocumentUriUsingTree(treeUri, coverFile.docId).toString()
+            coverUriString = treeHelper.buildDocumentUri(treeUri, coverFile.docId).toString()
         }
 
         // Extract metadata from first track. Only request embedded picture if no folder cover exists
-        val firstTrackDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, sortedAudioFiles[0].docId)
+        val firstTrackDocUri = treeHelper.buildDocumentUri(treeUri, sortedAudioFiles[0].docId)
         val needPicture = (coverUriString == null)
         val firstMetadata = metadataExtractor.extract(firstTrackDocUri, includePicture = needPicture)
 
@@ -237,7 +243,7 @@ class AudiobookStorageScanner @Inject constructor(
         val bookAuthor = firstMetadata?.artist?.takeIf { it.isNotBlank() }
             ?: authorFallback
 
-        val bookFolderUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, bookDir.docId).toString()
+        val bookFolderUri = treeHelper.buildDocumentUri(treeUri, bookDir.docId).toString()
 
         val bookEntity = AudiobookEntity(
             title = bookTitle,
@@ -257,7 +263,7 @@ class AudiobookStorageScanner @Inject constructor(
         var totalBookDuration = 0L
 
         sortedAudioFiles.forEachIndexed { index, audioItem ->
-            val trackUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, audioItem.docId)
+            val trackUri = treeHelper.buildDocumentUri(treeUri, audioItem.docId)
             val trackUriString = trackUri.toString()
             processedFileUris.add(trackUriString)
 
@@ -370,43 +376,6 @@ class AudiobookStorageScanner @Inject constructor(
         return bookEntity.copy(id = bookId)
     }
 
-    private fun queryChildren(
-        contentResolver: ContentResolver,
-        treeUri: Uri,
-        parentDocId: String
-    ): List<DocumentItem> {
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE
-        )
-        val items = mutableListOf<DocumentItem>()
-        try {
-            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-
-                while (cursor.moveToNext()) {
-                    val docId = if (idIdx >= 0) cursor.getString(idIdx) else ""
-                    val name = if (nameIdx >= 0) cursor.getString(nameIdx) ?: "" else ""
-                    val mime = if (mimeIdx >= 0) cursor.getString(mimeIdx) ?: "" else ""
-                    val size = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
-                    val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
-                    if (docId.isNotBlank()) {
-                        items.add(DocumentItem(docId, name, mime, size, isDir))
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            // Permission lost or directory inaccessible
-        }
-        return items
-    }
-
     private fun queryDisplayName(contentResolver: ContentResolver, uri: Uri): String? {
         val projection = arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
         return try {
@@ -463,8 +432,61 @@ class AudiobookStorageScanner @Inject constructor(
         return item.name.lowercase() in COVER_FILE_NAMES
     }
 
-    private data class BookProcessResult(
+    internal data class BookProcessResult(
         val tracksProcessed: Int,
         val limitExceeded: Boolean
     )
+}
+
+internal interface DocumentTreeHelper {
+    fun getTreeDocumentId(treeUri: Uri): String
+    fun queryChildren(contentResolver: ContentResolver, treeUri: Uri, parentDocId: String): List<DocumentItem>
+    fun buildDocumentUri(treeUri: Uri, docId: String): Uri
+}
+
+internal class DefaultDocumentTreeHelper : DocumentTreeHelper {
+    override fun getTreeDocumentId(treeUri: Uri): String {
+        return DocumentsContract.getTreeDocumentId(treeUri)
+    }
+
+    override fun queryChildren(
+        contentResolver: ContentResolver,
+        treeUri: Uri,
+        parentDocId: String
+    ): List<DocumentItem> {
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE
+        )
+        val items = mutableListOf<DocumentItem>()
+        try {
+            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+
+                while (cursor.moveToNext()) {
+                    val docId = if (idIdx >= 0) cursor.getString(idIdx) else ""
+                    val name = if (nameIdx >= 0) cursor.getString(nameIdx) ?: "" else ""
+                    val mime = if (mimeIdx >= 0) cursor.getString(mimeIdx) ?: "" else ""
+                    val size = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
+                    val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
+                    if (docId.isNotBlank()) {
+                        items.add(DocumentItem(docId, name, mime, size, isDir))
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Permission lost or directory inaccessible
+        }
+        return items
+    }
+
+    override fun buildDocumentUri(treeUri: Uri, docId: String): Uri {
+        return DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+    }
 }
