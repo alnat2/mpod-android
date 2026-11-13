@@ -20,9 +20,16 @@
     - Динамическое скользящее окно ExoPlayer (2-track) для бесшовного воспроизведения.
     - Привязка макетов Figma (`1309:12604`) и палитры `mpoddy dark mode`.
 
+### MPOD-ABK-02 (Этап 1) — Унификация перемотки (-15с / +30с) и DataStore скорость аудиокниг
+- **Статус:** `CLOSED — PASS`, 13.11.2026.
+- **Что сделано:**
+  - В `PlayerView.kt` и `HomeScreen.kt` шаг перемотки унифицирован на -15с / +30с (кнопки, подписи, accessibility content descriptions, вызовы `onSeekBy(-15)` и `onSeekBy(30)`).
+  - В `PlaybackService.kt` в конфигурацию `ExoPlayer.Builder` добавлены `setSeekBackIncrementMs(15_000L)` и `setSeekForwardIncrementMs(30_000L)`.
+  - В `AppSettingsDataStore.kt` и `FakeAppSettingsStore.kt` добавлен ключ `audiobookPlaybackSpeed: Float = 1.0f` и метод `setAudiobookPlaybackSpeed(speed: Float)`.
+  - Обновлены тесты `HomeScreenTest.kt` и `AppSettingsDataStoreTest.kt`.
+
 ### Очередь следующих этапов (MPOD-ABK)
-1. **`MPOD-ABK-02` (Этап 1):** Унификация перемотки (-15с / +30с) в `PlaybackService`/`PlayerViewModel` и настройка `audiobookPlaybackSpeed` в `AppSettingsStore`.
-2. **`MPOD-ABK-03` (Этап 2):** Схема Room v3, DDL, миграция 2->3, сущности (`AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`, полиморфный `PlaylistItemEntity`), атомарный сброс прогресса и Read-Only защита от SmartListening.
+1. **`MPOD-ABK-03` (Этап 2):** Схема Room v3, DDL, миграция 2->3, сущности (`AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`, полиморфный `PlaylistItemEntity`), атомарный сброс прогресса и Read-Only защита от SmartListening.
 3. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
 4. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
 5. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).

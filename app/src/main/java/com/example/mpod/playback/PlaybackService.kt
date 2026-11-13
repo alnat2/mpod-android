@@ -80,6 +80,8 @@ class PlaybackService : MediaSessionService() {
             .setMediaSourceFactory(DefaultMediaSourceFactory(cacheDataSourceFactory))
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
+            .setSeekBackIncrementMs(15_000L)
+            .setSeekForwardIncrementMs(30_000L)
             .build()
             .also { it.addListener(playerListener) }
 

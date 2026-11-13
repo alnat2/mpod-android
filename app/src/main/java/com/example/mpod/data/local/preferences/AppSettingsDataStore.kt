@@ -27,6 +27,7 @@ data class AppSettings(
     val themeMode: String = "System",
     val activeEpisodeId: Long? = null,
     val playbackSpeed: Float = 1.0f,
+    val audiobookPlaybackSpeed: Float = 1.0f,
     val lastRefreshTimeFormatted: String = ""
 ) {
     val activeProxyServer: ProxyServerConfig?
@@ -62,6 +63,7 @@ interface AppSettingsStore {
     suspend fun setActiveEpisodeId(episodeId: Long?)
     suspend fun getActiveEpisodeId(): Long?
     suspend fun setPlaybackSpeed(speed: Float)
+    suspend fun setAudiobookPlaybackSpeed(speed: Float)
     suspend fun setLastRefreshTime(formatted: String)
 }
 
@@ -83,6 +85,7 @@ class AppSettingsDataStore @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val ACTIVE_EPISODE_ID = longPreferencesKey("active_episode_id")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
+        val AUDIOBOOK_PLAYBACK_SPEED = floatPreferencesKey("audiobook_playback_speed")
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
     }
 
@@ -105,6 +108,7 @@ class AppSettingsDataStore @Inject constructor(
             themeMode = prefs[Keys.THEME_MODE] ?: "System",
             activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
+            audiobookPlaybackSpeed = prefs[Keys.AUDIOBOOK_PLAYBACK_SPEED] ?: 1.0f,
             lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
         )
         val active = baseSettings.activeProxyServer
@@ -268,6 +272,10 @@ class AppSettingsDataStore @Inject constructor(
 
     override suspend fun setPlaybackSpeed(speed: Float) {
         dataStore.edit { it[Keys.PLAYBACK_SPEED] = speed }
+    }
+
+    override suspend fun setAudiobookPlaybackSpeed(speed: Float) {
+        dataStore.edit { it[Keys.AUDIOBOOK_PLAYBACK_SPEED] = speed }
     }
 
     override suspend fun setLastRefreshTime(formatted: String) {

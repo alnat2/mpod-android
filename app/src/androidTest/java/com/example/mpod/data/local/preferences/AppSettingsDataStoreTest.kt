@@ -48,6 +48,7 @@ class AppSettingsDataStoreTest {
             password = "secret"
         )
         first.setPlaybackSpeed(1.5f)
+        first.setAudiobookPlaybackSpeed(1.25f)
         first.setActiveEpisodeId(42L)
 
         val firstSettings = first.settingsFlow.first()
@@ -64,6 +65,7 @@ class AppSettingsDataStoreTest {
             assertEquals("127.0.0.1", settings.proxyHost)
             assertEquals(1080, settings.proxyPort)
             assertEquals(1.5f, settings.playbackSpeed)
+            assertEquals(1.25f, settings.audiobookPlaybackSpeed)
             assertEquals(42L, settings.activeEpisodeId)
             assertEquals(firstSettings, settings)
 

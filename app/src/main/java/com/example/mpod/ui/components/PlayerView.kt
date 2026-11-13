@@ -293,15 +293,15 @@ fun PlayerView(
 
                         PlayerLabelControl(
                             icon = R.drawable.ic_huge_forward_02_wide,
-                            label = "-10",
-                            contentDescription = "Rewind 10 seconds",
+                            label = "-15",
+                            contentDescription = "Rewind 15 seconds",
                             onClick = onSeekBackward
                         )
 
                         PlayerLabelControl(
                             icon = R.drawable.ic_huge_forward_02_wide,
-                            label = "+15",
-                            contentDescription = "Forward 15 seconds",
+                            label = "+30",
+                            contentDescription = "Forward 30 seconds",
                             iconModifier = Modifier.rotate(180f),
                             onClick = onSeekForward
                         )

@@ -107,6 +107,10 @@ open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSetti
         stateFlow.value = stateFlow.value.copy(playbackSpeed = speed)
     }
 
+    override suspend fun setAudiobookPlaybackSpeed(speed: Float) {
+        stateFlow.value = stateFlow.value.copy(audiobookPlaybackSpeed = speed)
+    }
+
     override suspend fun setLastRefreshTime(formatted: String) {
         stateFlow.value = stateFlow.value.copy(lastRefreshTimeFormatted = formatted)
     }

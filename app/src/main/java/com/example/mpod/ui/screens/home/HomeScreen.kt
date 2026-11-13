@@ -377,8 +377,8 @@ fun HomeScreen(
                             playbackStateProvider = playbackStateProvider,
                             onSpeedChange = onSpeedChange,
                             onPlayClick = onPlayToggle,
-                            onSeekBackward = { onSeekBy(-10) },
-                            onSeekForward = { onSeekBy(15) },
+                            onSeekBackward = { onSeekBy(-15) },
+                            onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
                             onNotesClick = playerNotesClick
                         )
