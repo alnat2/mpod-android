@@ -92,6 +92,9 @@ object MpodDatabaseMigrations {
                 )""".trimIndent()
             )
             database.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_audiobook_playlist_tracks_audiobookId` ON `audiobook_playlist_tracks` (`audiobookId`)"
+            )
+            database.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_audiobook_playlist_tracks_trackId` ON `audiobook_playlist_tracks` (`trackId`)"
             )
 

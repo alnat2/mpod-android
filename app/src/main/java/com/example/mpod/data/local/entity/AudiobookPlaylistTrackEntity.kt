@@ -22,6 +22,7 @@ import androidx.room.Index
         )
     ],
     indices = [
+        Index(value = ["audiobookId"]),
         Index(value = ["trackId"])
     ]
 )

@@ -121,7 +121,7 @@ class MpodDatabaseMigrationTest {
     @Test
     fun version2Schema_migratesToVersion3WithoutLosingExistingData() = runBlocking {
         helper.createDatabase(TEST_DATABASE, 2).apply {
-            insertVersion1Fixture()
+            insertVersion2Fixture()
             close()
         }
 
@@ -144,6 +144,7 @@ class MpodDatabaseMigrationTest {
         val podcast = database!!.podcastDao().getPodcastById(PODCAST_ID)
         val episode = database!!.episodeDao().getEpisodeById(EPISODE_ID)
         val playlist = database!!.playlistDao().getAllPlaylistItems()
+        val pendingShare = database!!.pendingShareImportDao().getByToken("v2-token")
 
         assertNotNull(podcast)
         assertEquals("Migration fixture", podcast!!.title)
@@ -152,6 +153,8 @@ class MpodDatabaseMigrationTest {
         assertEquals(1, playlist.size)
         assertEquals(EPISODE_ID, playlist[0].episodeId)
         assertNull(playlist[0].audiobookId)
+        assertNotNull(pendingShare)
+        assertEquals(ShareImportStatus.COPYING, pendingShare?.status)
 
         val bookId = database!!.audiobookDao().insertAudiobook(
             AudiobookEntity(
@@ -172,6 +175,20 @@ class MpodDatabaseMigrationTest {
         val updatedPlaylist = database!!.playlistDao().getAllPlaylistItems()
         assertEquals(2, updatedPlaylist.size)
         assertEquals(bookId, updatedPlaylist[1].audiobookId)
+    }
+
+    private fun SupportSQLiteDatabase.insertVersion2Fixture() {
+        insertVersion1Fixture()
+        execSQL(
+            """INSERT INTO pending_share_imports
+               (token, payload, title, status, sourceUri, copyPath, error, attempts, batchId,
+                fingerprint, progressBytes, totalBytes, completionAcknowledged, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            arrayOf(
+                "v2-token", "content://test/share", "V2 Share", "COPYING", "content://test/share",
+                "/tmp/v2.audio", null, 1, "v2-batch", "v2-fp", 256L, 1024L, 0, 100L, 200L
+            )
+        )
     }
 
     private fun SupportSQLiteDatabase.insertVersion1Fixture() {

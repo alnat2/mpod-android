@@ -96,7 +96,8 @@ interface PlaylistDao {
     @Query("UPDATE playlist_items SET position = :position WHERE audiobookId = :audiobookId")
     fun updateAudiobookPosition(audiobookId: Long, position: Int): Int
 
-    @Query("DELETE FROM playlist_items WHERE episodeId NOT IN (:episodeIds)")
+    @Deprecated("Use deleteEpisodesNotIn instead. deleteNotIn is kept for backward compatibility.")
+    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
     fun deleteNotIn(episodeIds: List<Long>)
 
     @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
@@ -134,17 +135,17 @@ interface PlaylistDao {
             return
         }
         val targetEpisodeIds = items.mapNotNull { it.episodeId }
+        val targetAudiobookIds = items.mapNotNull { it.audiobookId }
+
+        // Only prune unreferenced entries for types present in the reorder batch,
+        // preventing accidental deletion of episodes when reordering audiobooks (and vice versa).
         if (targetEpisodeIds.isNotEmpty()) {
             deleteEpisodesNotIn(targetEpisodeIds)
-        } else {
-            deleteEpisodeItems()
         }
-        val targetAudiobookIds = items.mapNotNull { it.audiobookId }
         if (targetAudiobookIds.isNotEmpty()) {
             deleteAudiobooksNotIn(targetAudiobookIds)
-        } else {
-            deleteAudiobookItems()
         }
+
         for (item in items) {
             val updated = when {
                 item.episodeId != null -> updatePosition(item.episodeId, item.position)

@@ -17,14 +17,24 @@ interface AudiobookDao {
 
     // --- Audiobooks ---
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAudiobook(audiobook: AudiobookEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAudiobooks(audiobooks: List<AudiobookEntity>): List<Long>
 
     @Update
     suspend fun updateAudiobook(audiobook: AudiobookEntity)
+
+    @Transaction
+    suspend fun upsertAudiobook(audiobook: AudiobookEntity): Long {
+        val id = insertAudiobook(audiobook)
+        if (id != -1L) return id
+        val existing = getAudiobookByFolderUri(audiobook.folderUri)
+            ?: error("Audiobook with folderUri ${audiobook.folderUri} must exist on conflict")
+        updateAudiobook(audiobook.copy(id = existing.id))
+        return existing.id
+    }
 
     @Delete
     suspend fun deleteAudiobook(audiobook: AudiobookEntity)
@@ -52,14 +62,27 @@ interface AudiobookDao {
 
     // --- Tracks ---
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTrack(track: AudiobookTrackEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTracks(tracks: List<AudiobookTrackEntity>): List<Long>
 
     @Update
     suspend fun updateTrack(track: AudiobookTrackEntity)
+
+    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId AND fileUri = :fileUri")
+    suspend fun getTrackByFileUri(audiobookId: Long, fileUri: String): AudiobookTrackEntity?
+
+    @Transaction
+    suspend fun upsertTrack(track: AudiobookTrackEntity): Long {
+        val id = insertTrack(track)
+        if (id != -1L) return id
+        val existing = getTrackByFileUri(track.audiobookId, track.fileUri)
+            ?: error("Track with fileUri ${track.fileUri} must exist on conflict")
+        updateTrack(track.copy(id = existing.id))
+        return existing.id
+    }
 
     @Query("UPDATE audiobook_tracks SET playbackPositionMs = :positionMs, isListened = :isListened WHERE id = :trackId")
     suspend fun updateTrackProgress(trackId: Long, positionMs: Long, isListened: Boolean)
@@ -139,6 +162,7 @@ interface AudiobookDao {
     """)
     suspend fun getFirstSelectedTrack(audiobookId: Long): AudiobookTrackEntity?
 
+    @Transaction
     suspend fun getCurrentTrackForAudiobook(audiobookId: Long): AudiobookTrackEntity? {
         return getFirstUnlistenedSelectedTrack(audiobookId) ?: getFirstSelectedTrack(audiobookId)
     }
@@ -146,10 +170,5 @@ interface AudiobookDao {
     // --- Atomic Progress Reset (ABK-10) ---
 
     @Query("UPDATE audiobook_tracks SET playbackPositionMs = 0, isListened = 0 WHERE audiobookId = :audiobookId")
-    suspend fun resetAudiobookTracksProgress(audiobookId: Long)
-
-    @Transaction
-    suspend fun resetAudiobookProgress(audiobookId: Long) {
-        resetAudiobookTracksProgress(audiobookId)
-    }
+    suspend fun resetAudiobookProgress(audiobookId: Long)
 }

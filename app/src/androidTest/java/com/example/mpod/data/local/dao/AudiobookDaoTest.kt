@@ -217,8 +217,10 @@ class AudiobookDaoTest {
 
         val items = playlistDao.getAllPlaylistItems()
         assertEquals(2, items.size)
+        assertEquals(0, items[0].position)
         assertEquals(episodeId, items[0].episodeId)
         assertNull(items[0].audiobookId)
+        assertEquals(1, items[1].position)
         assertEquals(bookId, items[1].audiobookId)
         assertNull(items[1].episodeId)
 
@@ -229,6 +231,66 @@ class AudiobookDaoTest {
         playlistDao.removeAudiobookFromPlaylist(bookId)
         assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
         assertTrue(playlistDao.isEpisodeInPlaylist(episodeId))
+    }
+
+    @Test
+    fun upsertAudiobook_preservesTracksAndPlaylistOnConflict() = runBlocking {
+        val folderUri = "content://audiobooks/persistent"
+        val bookId = audiobookDao.upsertAudiobook(
+            AudiobookEntity(title = "Initial Title", author = "Author", folderUri = folderUri)
+        )
+        val trackId = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Ch 1", fileUri = "1.mp3", trackNumber = 1)
+        )
+        audiobookDao.insertPlaylistTrack(AudiobookPlaylistTrackEntity(audiobookId = bookId, trackId = trackId))
+        playlistDao.appendAudiobookIfMissing(bookId)
+
+        // Rescan / re-import with updated title
+        val reimportedId = audiobookDao.upsertAudiobook(
+            AudiobookEntity(title = "Updated Title", author = "Author", folderUri = folderUri)
+        )
+
+        assertEquals(bookId, reimportedId)
+        val updatedBook = audiobookDao.getAudiobookById(bookId)
+        assertEquals("Updated Title", updatedBook?.title)
+
+        // Tracks, playlist tracks, and queue items are preserved!
+        assertEquals(1, audiobookDao.getTracksForAudiobook(bookId).size)
+        assertEquals(1, audiobookDao.getSelectedTracksForAudiobook(bookId).size)
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+    }
+
+    @Test
+    fun reorderPlaylist_episodesOnly_doesNotPruneAudiobooks() = runBlocking {
+        val podcastId = podcastDao.insertPodcast(
+            PodcastEntity(feedUrl = "https://example.com/feed.xml", title = "Podcast")
+        )
+        val ep1 = episodeDao.insertEpisode(
+            EpisodeEntity(podcastId = podcastId, guid = "ep-1", title = "Ep 1", audioUrl = "ep1.mp3")
+        )
+        val ep2 = episodeDao.insertEpisode(
+            EpisodeEntity(podcastId = podcastId, guid = "ep-2", title = "Ep 2", audioUrl = "ep2.mp3")
+        )
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Book", folderUri = "content://audiobooks/book")
+        )
+
+        playlistDao.appendEpisodeIfMissing(ep1)
+        playlistDao.appendAudiobookIfMissing(bookId)
+        playlistDao.appendEpisodeIfMissing(ep2)
+
+        // Reorder only episodes (as existing podcast code does)
+        playlistDao.reorderPlaylist(
+            listOf(
+                PlaylistItemEntity(episodeId = ep2, position = 0),
+                PlaylistItemEntity(episodeId = ep1, position = 2)
+            )
+        )
+
+        // The audiobook must STILL be in the playlist!
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+        val items = playlistDao.getAllPlaylistItems()
+        assertTrue(items.any { it.audiobookId == bookId })
     }
 
     @Test
