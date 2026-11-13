@@ -79,7 +79,7 @@ class HomeScreenTest {
     @Test
     fun playerDispatchesPlaybackControlsAndOpensNotes() {
         var playCount = 0
-        var seekTotal = 0
+        val seekEvents = mutableListOf<Int>()
         var absoluteSeek = 0f
         var absoluteSeekCount = 0
         var speed: String? = null
@@ -96,7 +96,7 @@ class HomeScreenTest {
                         )
                     },
                     onPlayToggle = { playCount += 1 },
-                    onSeekBy = { seekTotal += it },
+                    onSeekBy = { seekEvents.add(it) },
                     onSeekTo = {
                         absoluteSeek = it
                         absoluteSeekCount += 1
@@ -122,7 +122,7 @@ class HomeScreenTest {
         composeRule.onNodeWithContentDescription("Close show notes").assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals(1, playCount)
-            assertEquals(15, seekTotal)
+            assertEquals(listOf(-15, 30), seekEvents)
             assertEquals(0.75f, absoluteSeek, 0.02f)
             assertEquals(1, absoluteSeekCount)
             assertEquals("2.0", speed)

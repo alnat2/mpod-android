@@ -76,6 +76,24 @@ class AppSettingsDataStoreTest {
         }
     }
 
+    @Test
+    fun audiobookPlaybackSpeedDefaultsToOneAndIsIsolatedFromPodcastSpeed() = runTest {
+        val store = newStore()
+        val initial = store.settingsFlow.first()
+        assertEquals(1.0f, initial.audiobookPlaybackSpeed)
+        assertEquals(1.0f, initial.playbackSpeed)
+
+        store.setPlaybackSpeed(2.0f)
+        val afterPodcastSpeed = store.settingsFlow.first()
+        assertEquals(2.0f, afterPodcastSpeed.playbackSpeed)
+        assertEquals(1.0f, afterPodcastSpeed.audiobookPlaybackSpeed)
+
+        store.setAudiobookPlaybackSpeed(1.75f)
+        val afterBookSpeed = store.settingsFlow.first()
+        assertEquals(2.0f, afterBookSpeed.playbackSpeed)
+        assertEquals(1.75f, afterBookSpeed.audiobookPlaybackSpeed)
+    }
+
     private fun newStore(): AppSettingsDataStore = AppSettingsDataStore(
         PreferenceDataStoreFactory.create(scope = scope) { file }
     )

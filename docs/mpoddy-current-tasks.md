@@ -30,10 +30,10 @@
 
 ### Очередь следующих этапов (MPOD-ABK)
 1. **`MPOD-ABK-03` (Этап 2):** Схема Room v3, DDL, миграция 2->3, сущности (`AudiobookEntity`, `AudiobookTrackEntity`, `AudiobookPlaylistTrackEntity`, полиморфный `PlaylistItemEntity`), атомарный сброс прогресса и Read-Only защита от SmartListening.
-3. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
-4. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
-5. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
-6. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
+2. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
+3. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
+4. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
+5. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
 
 ## Последняя закрытая задача — MPOD-REL-02
 
