@@ -40,11 +40,25 @@
   - Подтверждена Read-Only гарантия (`ABK-11`): `SmartListeningManager` изолирован от аудиокниг и оперирует исключительно `filesDir/podcasts` и `episodeId`.
   - Добавлены тесты `AudiobookDaoTest.kt` и обновлён `MpodDatabaseMigrationTest.kt`.
 
+### MPOD-ABK-04 (Этап 3) — Движок SAF-сканирования, Natural Sort, обложки и Rescan
+- **Статус:** `CLOSED — PASS`, 13.11.2026.
+- **Что сделано:**
+  - Реализован `NaturalOrderComparator` с поддержкой числовых и текстовых чанков для естественной сортировки глав (1, 2 ... 10).
+  - Реализован `AudiobookStorageScanner`:
+    - Прямые низкоуровневые запросы к `ContentResolver.query` по `DocumentsContract` на `Dispatchers.IO` без оверхеда `DocumentFile`.
+    - Распознавание структур каталогов (Корень -> Автор -> Книга -> Главы, Корень -> Книга -> Главы, вложенные папки CD1/CD2/Disc1, а также одиночные аудиофайлы).
+    - Извлечение обложек: файлы `cover.jpg` / `folder.jpg` / `.png` в каталоге, fallback на встроенный APIC/covr фрейм через `MediaMetadataRetriever` с кэшированием в `cacheDir/audiobook_covers/`.
+    - Извлечение метаданных (длительность, название трека, автор, альбом).
+    - Ограничение глубины сканирования до 3 уровней и лимит на 2000 файлов.
+    - Логика Rescan (`ABK-05`): сохранение позиций и прогресса существующих треков, добавление новых, отметка недоступных (`isAvailable = false`) без сброса активной очереди `playlist_items` и `audiobook_playlist_tracks`.
+  - В `AppSettingsDataStore` и `FakeAppSettingsStore` добавлено поле `audiobooksFolderUri` и метод `setAudiobooksFolderUri`.
+  - Создан `AudiobookRepository` для координации сканирования, сохранения настроек и доступа к книгам/главам.
+  - Добавлены тесты `NaturalOrderComparatorTest`, `AudiobookRepositoryTest`, расширен `AppSettingsDataStoreTest`.
+
 ### Очередь следующих этапов (MPOD-ABK)
-1. **`MPOD-ABK-04` (Этап 3):** Движок SAF-сканирования (прямой `ContentResolver.query`, natural sort, парсер обложек, лимит 2000, Rescan).
-2. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
-3. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
-4. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
+1. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
+2. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
+3. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
 
 ## Последняя закрытая задача — MPOD-REL-02
 

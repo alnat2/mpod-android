@@ -28,6 +28,7 @@ data class AppSettings(
     val activeEpisodeId: Long? = null,
     val playbackSpeed: Float = 1.0f,
     val audiobookPlaybackSpeed: Float = 1.0f,
+    val audiobooksFolderUri: String? = null,
     val lastRefreshTimeFormatted: String = ""
 ) {
     val activeProxyServer: ProxyServerConfig?
@@ -64,6 +65,7 @@ interface AppSettingsStore {
     suspend fun getActiveEpisodeId(): Long?
     suspend fun setPlaybackSpeed(speed: Float)
     suspend fun setAudiobookPlaybackSpeed(speed: Float)
+    suspend fun setAudiobooksFolderUri(uri: String?)
     suspend fun setLastRefreshTime(formatted: String)
 }
 
@@ -86,6 +88,7 @@ class AppSettingsDataStore @Inject constructor(
         val ACTIVE_EPISODE_ID = longPreferencesKey("active_episode_id")
         val PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
         val AUDIOBOOK_PLAYBACK_SPEED = floatPreferencesKey("audiobook_playback_speed")
+        val AUDIOBOOKS_FOLDER_URI = stringPreferencesKey("audiobooks_folder_uri")
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
     }
 
@@ -109,6 +112,7 @@ class AppSettingsDataStore @Inject constructor(
             activeEpisodeId = prefs[Keys.ACTIVE_EPISODE_ID],
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
             audiobookPlaybackSpeed = prefs[Keys.AUDIOBOOK_PLAYBACK_SPEED] ?: 1.0f,
+            audiobooksFolderUri = prefs[Keys.AUDIOBOOKS_FOLDER_URI],
             lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
         )
         val active = baseSettings.activeProxyServer
@@ -276,6 +280,16 @@ class AppSettingsDataStore @Inject constructor(
 
     override suspend fun setAudiobookPlaybackSpeed(speed: Float) {
         dataStore.edit { it[Keys.AUDIOBOOK_PLAYBACK_SPEED] = speed }
+    }
+
+    override suspend fun setAudiobooksFolderUri(uri: String?) {
+        dataStore.edit { prefs ->
+            if (uri != null) {
+                prefs[Keys.AUDIOBOOKS_FOLDER_URI] = uri
+            } else {
+                prefs.remove(Keys.AUDIOBOOKS_FOLDER_URI)
+            }
+        }
     }
 
     override suspend fun setLastRefreshTime(formatted: String) {

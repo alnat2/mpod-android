@@ -94,6 +94,22 @@ class AppSettingsDataStoreTest {
         assertEquals(1.75f, afterBookSpeed.audiobookPlaybackSpeed)
     }
 
+    @Test
+    fun audiobooksFolderUri_persistsAndClearsCorrectly() = runTest {
+        val store = newStore()
+        val initial = store.settingsFlow.first()
+        assertNull(initial.audiobooksFolderUri)
+
+        val sampleUri = "content://com.android.externalstorage.documents/tree/primary%3AAudiobooks"
+        store.setAudiobooksFolderUri(sampleUri)
+        val afterSet = store.settingsFlow.first()
+        assertEquals(sampleUri, afterSet.audiobooksFolderUri)
+
+        store.setAudiobooksFolderUri(null)
+        val afterClear = store.settingsFlow.first()
+        assertNull(afterClear.audiobooksFolderUri)
+    }
+
     private fun newStore(): AppSettingsDataStore = AppSettingsDataStore(
         PreferenceDataStoreFactory.create(scope = scope) { file }
     )
