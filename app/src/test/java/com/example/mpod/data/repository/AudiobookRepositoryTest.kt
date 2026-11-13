@@ -15,6 +15,7 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argThat
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -41,6 +42,18 @@ class AudiobookRepositoryTest {
     }
 
     @Test
+    fun rescanLibrary_whenUriConfigured_callsScanner() = runBlocking {
+        appSettingsStore.setAudiobooksFolderUri("content://audiobooks/my_books")
+        val summary = ScanSummary(booksScanned = 2, tracksScanned = 10)
+        whenever(scanner.scanFolder(any())).thenReturn(summary)
+
+        val result = repository.rescanLibrary()
+
+        assertEquals(summary, result)
+        verify(scanner).scanFolder(argThat { toString() == "content://audiobooks/my_books" })
+    }
+
+    @Test
     fun scanDirectory_savesFolderUriAndDelegatesToScanner() = runBlocking {
         val uri = mock<Uri>()
         whenever(uri.toString()).thenReturn("content://audiobooks/tree")
@@ -55,9 +68,31 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun setSelectedTracks_delegatesToDao() = runBlocking {
+    fun setSelectedTracks_clearsAndInsertsPlaylistTracks() = runBlocking {
         repository.setSelectedTracks(42L, listOf(1L, 2L, 3L))
-        verify(audiobookDao).setSelectedTracksForBook(42L, listOf(1L, 2L, 3L))
+        verify(audiobookDao).clearPlaylistTracksForBook(42L)
+        verify(audiobookDao).insertPlaylistTracks(argThat {
+            size == 3 && all { it.audiobookId == 42L } && map { it.trackId } == listOf(1L, 2L, 3L)
+        })
+    }
+
+    @Test
+    fun getCurrentTrackForAudiobook_prefersUnlistenedTrack() = runBlocking {
+        val unlistened = AudiobookTrackEntity(id = 1L, audiobookId = 10L, title = "Unlistened", fileUri = "u.mp3", trackNumber = 1)
+        whenever(audiobookDao.getFirstUnlistenedSelectedTrack(10L)).thenReturn(unlistened)
+
+        val result = repository.getCurrentTrackForAudiobook(10L)
+        assertEquals(unlistened, result)
+    }
+
+    @Test
+    fun getCurrentTrackForAudiobook_fallbackToFirstSelectedTrackWhenAllListened() = runBlocking {
+        val firstTrack = AudiobookTrackEntity(id = 1L, audiobookId = 10L, title = "First", fileUri = "1.mp3", trackNumber = 1)
+        whenever(audiobookDao.getFirstUnlistenedSelectedTrack(10L)).thenReturn(null)
+        whenever(audiobookDao.getFirstSelectedTrack(10L)).thenReturn(firstTrack)
+
+        val result = repository.getCurrentTrackForAudiobook(10L)
+        assertEquals(firstTrack, result)
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.example.mpod.data.audiobook.AudiobookStorageScanner
 import com.example.mpod.data.audiobook.ScanSummary
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.entity.AudiobookEntity
+import com.example.mpod.data.local.entity.AudiobookPlaylistTrackEntity
 import com.example.mpod.data.local.entity.AudiobookTrackEntity
 import com.example.mpod.data.local.preferences.AppSettingsStore
 import kotlinx.coroutines.flow.Flow
@@ -39,7 +40,15 @@ class AudiobookRepository @Inject constructor(
         audiobookDao.getSelectedTracksForAudiobookFlow(id)
 
     suspend fun setSelectedTracks(audiobookId: Long, trackIds: List<Long>) {
-        audiobookDao.setSelectedTracksForBook(audiobookId, trackIds)
+        audiobookDao.clearPlaylistTracksForBook(audiobookId)
+        val now = System.currentTimeMillis()
+        val entries = trackIds.map { AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now) }
+        audiobookDao.insertPlaylistTracks(entries)
+    }
+
+    suspend fun getCurrentTrackForAudiobook(audiobookId: Long): AudiobookTrackEntity? {
+        return audiobookDao.getFirstUnlistenedSelectedTrack(audiobookId)
+            ?: audiobookDao.getFirstSelectedTrack(audiobookId)
     }
 
     suspend fun scanDirectory(treeUri: Uri): ScanSummary {

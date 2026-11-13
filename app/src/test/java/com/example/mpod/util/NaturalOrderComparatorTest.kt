@@ -57,6 +57,14 @@ class NaturalOrderComparatorTest {
     }
 
     @Test
+    fun handlesMixedDigitAndNonDigitChunksDeterministically() {
+        val input = listOf("track-1", "track1", "track-2", "track2")
+        val sorted = input.sortedWith(NaturalOrderComparator.INSTANCE)
+        // Digits sort before symbols/letters
+        assertEquals(listOf("track1", "track2", "track-1", "track-2"), sorted)
+    }
+
+    @Test
     fun handlesIdenticalAndEmptyStrings() {
         assertEquals(0, NaturalOrderComparator.compareStrings("same", "same"))
         assertEquals(0, NaturalOrderComparator.compareStrings("", ""))

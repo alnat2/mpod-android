@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,6 +67,7 @@ class AudiobookStorageScanner @Inject constructor(
                     limitExceeded = true
                     break
                 }
+                totalFilesCount++ // Guaranteed increment for every candidate file evaluated
                 val trackUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, audioFile.docId)
                 val book = scanSingleTrackAsBook(
                     fileUri = trackUri,
@@ -75,7 +77,6 @@ class AudiobookStorageScanner @Inject constructor(
                 if (book != null) {
                     totalBooksCount++
                     totalTracksCount++
-                    totalFilesCount++
                 }
             }
 
@@ -90,7 +91,7 @@ class AudiobookStorageScanner @Inject constructor(
             // 2. Traverse first-level subdirectories
             val subDirs = rootChildren.filter { it.isDirectory }
             for (dir in subDirs) {
-                if (totalFilesCount >= MAX_FILES_LIMIT) {
+                if (limitExceeded || totalFilesCount >= MAX_FILES_LIMIT) {
                     limitExceeded = true
                     break
                 }
@@ -143,6 +144,9 @@ class AudiobookStorageScanner @Inject constructor(
                             }
                         }
                     }
+                    if (limitExceeded) {
+                        break
+                    }
                 }
             }
 
@@ -182,10 +186,12 @@ class AudiobookStorageScanner @Inject constructor(
     ): BookProcessResult {
         val audioFiles = directChildren.filter { isAudioFile(it) }.toMutableList()
 
-        // Handle CD1 / CD2 subfolders if present
+        // Handle CD1 / CD2 subfolders if present, and check for covers inside disc folders
         val discFolders = directChildren.filter { it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name) }
+        val discChildrenMap = mutableMapOf<DocumentItem, List<DocumentItem>>()
         for (discDir in discFolders) {
             val discChildren = queryChildren(contentResolver, treeUri, discDir.docId)
+            discChildrenMap[discDir] = discChildren
             audioFiles.addAll(discChildren.filter { isAudioFile(it) })
         }
 
@@ -200,16 +206,27 @@ class AudiobookStorageScanner @Inject constructor(
         // Sort audio files using Natural Sort
         val sortedAudioFiles = filesToProcess.sortedWith(NaturalOrderComparator.comparing { it.name })
 
-        // Check for standalone cover image in book directory
-        val coverFile = directChildren.firstOrNull { isCoverFile(it) }
+        // Check for standalone cover image in book directory, fallback to disc subfolders
+        var coverFile = directChildren.firstOrNull { isCoverFile(it) }
+        if (coverFile == null) {
+            for ((_, discChildren) in discChildrenMap) {
+                val discCover = discChildren.firstOrNull { isCoverFile(it) }
+                if (discCover != null) {
+                    coverFile = discCover
+                    break
+                }
+            }
+        }
+
         var coverUriString: String? = null
         if (coverFile != null) {
             coverUriString = DocumentsContract.buildDocumentUriUsingTree(treeUri, coverFile.docId).toString()
         }
 
-        // Extract metadata from first track for title, artist, and embedded cover fallback
+        // Extract metadata from first track. Only request embedded picture if no folder cover exists
         val firstTrackDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, sortedAudioFiles[0].docId)
-        val firstMetadata = metadataExtractor.extract(firstTrackDocUri)
+        val needPicture = (coverUriString == null)
+        val firstMetadata = metadataExtractor.extract(firstTrackDocUri, includePicture = needPicture)
 
         if (coverUriString == null && firstMetadata?.embeddedPicture != null) {
             coverUriString = saveCoverToCache(bookDir.docId, firstMetadata.embeddedPicture)
@@ -227,7 +244,7 @@ class AudiobookStorageScanner @Inject constructor(
             author = bookAuthor,
             folderUri = bookFolderUri,
             coverUri = coverUriString,
-            durationSeconds = 0L, // will be updated after summing track durations
+            durationSeconds = 0L,
             isSingleFile = sortedAudioFiles.size == 1,
             addedAt = System.currentTimeMillis()
         )
@@ -244,7 +261,8 @@ class AudiobookStorageScanner @Inject constructor(
             val trackUriString = trackUri.toString()
             processedFileUris.add(trackUriString)
 
-            val trackMetadata = if (index == 0) firstMetadata else metadataExtractor.extract(trackUri)
+            // For tracks 1..N, never request embedded picture to avoid OOM
+            val trackMetadata = if (index == 0) firstMetadata else metadataExtractor.extract(trackUri, includePicture = false)
             val trackDuration = trackMetadata?.durationSeconds ?: 0L
             val trackTitle = trackMetadata?.title?.takeIf { it.isNotBlank() }
                 ?: audioItem.name.substringBeforeLast('.')
@@ -300,7 +318,7 @@ class AudiobookStorageScanner @Inject constructor(
         displayName: String,
         authorFallback: String
     ): AudiobookEntity? {
-        val metadata = metadataExtractor.extract(fileUri)
+        val metadata = metadataExtractor.extract(fileUri, includePicture = true)
         val title = metadata?.title?.takeIf { it.isNotBlank() }
             ?: metadata?.album?.takeIf { it.isNotBlank() }
             ?: displayName.substringBeforeLast('.')
@@ -405,13 +423,32 @@ class AudiobookStorageScanner @Inject constructor(
     private fun saveCoverToCache(key: String, pictureBytes: ByteArray): String? {
         return try {
             val cacheDir = File(context.cacheDir, "audiobook_covers").apply { if (!exists()) mkdirs() }
-            val fileName = "cover_${key.hashCode().toUInt()}.jpg"
+            val hash = sha256(key)
+            val ext = detectImageExtension(pictureBytes)
+            val fileName = "cover_$hash.$ext"
             val file = File(cacheDir, fileName)
             file.writeBytes(pictureBytes)
             Uri.fromFile(file).toString()
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun sha256(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun detectImageExtension(bytes: ByteArray): String {
+        if (bytes.size >= 8 &&
+            bytes[0] == 0x89.toByte() &&
+            bytes[1] == 0x50.toByte() &&
+            bytes[2] == 0x4E.toByte() &&
+            bytes[3] == 0x47.toByte()
+        ) {
+            return "png"
+        }
+        return "jpg"
     }
 
     private fun isAudioFile(item: DocumentItem): Boolean {

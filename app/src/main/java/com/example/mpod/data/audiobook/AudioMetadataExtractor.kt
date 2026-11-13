@@ -17,7 +17,7 @@ data class ExtractedAudioMetadata(
 )
 
 interface AudioMetadataExtractor {
-    fun extract(uri: Uri): ExtractedAudioMetadata?
+    fun extract(uri: Uri, includePicture: Boolean = false): ExtractedAudioMetadata?
 }
 
 @Singleton
@@ -25,7 +25,11 @@ class DefaultAudioMetadataExtractor @Inject constructor(
     @ApplicationContext private val context: Context
 ) : AudioMetadataExtractor {
 
-    override fun extract(uri: Uri): ExtractedAudioMetadata? {
+    companion object {
+        private const val MAX_PICTURE_BYTES = 5 * 1024 * 1024 // 5 MB cap to guard against OOM
+    }
+
+    override fun extract(uri: Uri, includePicture: Boolean): ExtractedAudioMetadata? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, uri)
@@ -34,7 +38,9 @@ class DefaultAudioMetadataExtractor @Inject constructor(
             val artist = (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
                 ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST))?.takeIf { it.isNotBlank() }
             val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)?.takeIf { it.isNotBlank() }
-            val picture = retriever.embeddedPicture
+            val picture = if (includePicture) {
+                retriever.embeddedPicture?.takeIf { it.size <= MAX_PICTURE_BYTES }
+            } else null
 
             ExtractedAudioMetadata(
                 durationSeconds = durationMs / 1000L,

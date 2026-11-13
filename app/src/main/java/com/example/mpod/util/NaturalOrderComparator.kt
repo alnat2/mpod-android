@@ -47,6 +47,9 @@ class NaturalOrderComparator<T> private constructor(
                 if (isC1Digit && isC2Digit) {
                     val numCompare = compareNumericChunks(c1, c2)
                     if (numCompare != 0) return numCompare
+                } else if (isC1Digit != isC2Digit) {
+                    // Deterministic order for mixed chunks: digits sort before non-digits
+                    return if (isC1Digit) -1 else 1
                 } else {
                     val textCompare = c1.compareTo(c2, ignoreCase = true)
                     if (textCompare != 0) return textCompare

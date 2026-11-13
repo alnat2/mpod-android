@@ -112,7 +112,13 @@ class AudiobookDaoTest {
         )
 
         // Select chapters 1 and 3 only
-        audiobookDao.setSelectedTracksForBook(bookId, listOf(t1, t3))
+        audiobookDao.clearPlaylistTracksForBook(bookId)
+        audiobookDao.insertPlaylistTracks(
+            listOf(
+                AudiobookPlaylistTrackEntity(audiobookId = bookId, trackId = t1),
+                AudiobookPlaylistTrackEntity(audiobookId = bookId, trackId = t3)
+            )
+        )
 
         val selected = audiobookDao.getSelectedTracksForAudiobook(bookId)
         assertEquals(2, selected.size)
