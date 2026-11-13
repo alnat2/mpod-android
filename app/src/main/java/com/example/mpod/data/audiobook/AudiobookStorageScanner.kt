@@ -190,32 +190,48 @@ class AudiobookStorageScanner @Inject constructor(
         authorFallback: String,
         currentFileCount: Int
     ): BookProcessResult {
-        val audioFiles = directChildren.filter { isAudioFile(it) }.toMutableList()
+        // 1. Collect direct root audio files and sort naturally
+        val directAudioFiles = directChildren
+            .filter { isAudioFile(it) }
+            .sortedWith(NaturalOrderComparator.comparing { it.name })
 
-        // Handle CD1 / CD2 subfolders if present, and check for covers inside disc folders
-        val discFolders = directChildren.filter { it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name) }
+        // 2. Discover and sort disc folders naturally (CD1, CD2, etc.)
+        val discFolders = directChildren
+            .filter { it.isDirectory && DISC_FOLDER_PATTERN.matches(it.name) }
+            .sortedWith(NaturalOrderComparator.comparing { it.name })
+
         val discChildrenMap = mutableMapOf<DocumentItem, List<DocumentItem>>()
+        val discAudioFiles = mutableListOf<DocumentItem>()
+
         for (discDir in discFolders) {
             val discChildren = treeHelper.queryChildren(contentResolver, treeUri, discDir.docId)
             discChildrenMap[discDir] = discChildren
-            audioFiles.addAll(discChildren.filter { isAudioFile(it) })
+            val sortedChildrenAudio = discChildren
+                .filter { isAudioFile(it) }
+                .sortedWith(NaturalOrderComparator.comparing { it.name })
+            discAudioFiles.addAll(sortedChildrenAudio)
         }
 
-        if (audioFiles.isEmpty()) {
+        // Ordered audio files: direct root tracks first, then tracks ordered by disc sequence
+        val allAudioFiles = directAudioFiles + discAudioFiles
+
+        if (allAudioFiles.isEmpty()) {
             return BookProcessResult(tracksProcessed = 0, limitExceeded = false)
         }
 
-        val availableCapacity = MAX_FILES_LIMIT - currentFileCount
-        val limitExceeded = audioFiles.size > availableCapacity
-        val filesToProcess = if (limitExceeded) audioFiles.take(availableCapacity) else audioFiles
+        val availableCapacity = (MAX_FILES_LIMIT - currentFileCount).coerceAtLeast(0)
+        val limitExceeded = allAudioFiles.size > availableCapacity
+        val sortedAudioFiles = if (limitExceeded) allAudioFiles.take(availableCapacity) else allAudioFiles
 
-        // Sort audio files using Natural Sort
-        val sortedAudioFiles = filesToProcess.sortedWith(NaturalOrderComparator.comparing { it.name })
+        if (sortedAudioFiles.isEmpty()) {
+            return BookProcessResult(tracksProcessed = 0, limitExceeded = limitExceeded)
+        }
 
-        // Check for standalone cover image in book directory, fallback to disc subfolders
+        // Check for standalone cover image in book directory, fallback to disc subfolders (in natural disc order)
         var coverFile = directChildren.firstOrNull { isCoverFile(it) }
         if (coverFile == null) {
-            for ((_, discChildren) in discChildrenMap) {
+            for (discDir in discFolders) {
+                val discChildren = discChildrenMap[discDir] ?: continue
                 val discCover = discChildren.firstOrNull { isCoverFile(it) }
                 if (discCover != null) {
                     coverFile = discCover

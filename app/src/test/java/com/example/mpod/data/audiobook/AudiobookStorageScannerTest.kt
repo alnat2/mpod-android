@@ -237,6 +237,109 @@ class AudiobookStorageScannerTest {
         assertEquals("J. R. R. Tolkien", bookCaptor.firstValue.author)
     }
 
+    @Test
+    fun processBookFolder_withDuplicateTrackNamesAcrossDiscs_preservesDiscSequenceWithoutInterleaving() = runBlocking {
+        val bookDir = DocumentItem(
+            docId = "book_lotr",
+            name = "The Fellowship of the Ring",
+            mimeType = "vnd.android.document/directory",
+            size = 0L,
+            isDirectory = true
+        )
+        // Discs in reverse order in SAF cursor to verify natural sorting of disc folders
+        val directChildren = listOf(
+            DocumentItem("intro", "00-intro.mp3", "audio/mpeg", 500L, isDirectory = false),
+            DocumentItem("cd2", "CD2", "vnd.android.document/directory", 0L, isDirectory = true),
+            DocumentItem("cd1", "CD1", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+
+        // Duplicate file names across discs (01.mp3, 02.mp3)
+        fakeTreeHelper.childrenMap["cd1"] = listOf(
+            DocumentItem("cd1_t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("cd1_t2", "02.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+        fakeTreeHelper.childrenMap["cd2"] = listOf(
+            DocumentItem("cd2_t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("cd2_t2", "02.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val result = scanner.processBookFolder(
+            contentResolver = contentResolver,
+            treeUri = treeUri,
+            bookDir = bookDir,
+            directChildren = directChildren,
+            authorFallback = "J. R. R. Tolkien",
+            currentFileCount = 0
+        )
+
+        assertEquals(5, result.tracksProcessed)
+        assertFalse(result.limitExceeded)
+
+        val trackCaptor = argumentCaptor<AudiobookTrackEntity>()
+        verify(audiobookDao, times(5)).insertTrack(trackCaptor.capture())
+        val tracks = trackCaptor.allValues
+
+        // Expected sequence: direct root -> CD1/01 -> CD1/02 -> CD2/01 -> CD2/02 (NO interleaving)
+        assertEquals("00-intro", tracks[0].title)
+        assertEquals("content://tree/intro", tracks[0].fileUri)
+
+        assertEquals("01", tracks[1].title)
+        assertEquals("content://tree/cd1_t1", tracks[1].fileUri)
+
+        assertEquals("02", tracks[2].title)
+        assertEquals("content://tree/cd1_t2", tracks[2].fileUri)
+
+        assertEquals("01", tracks[3].title)
+        assertEquals("content://tree/cd2_t1", tracks[3].fileUri)
+
+        assertEquals("02", tracks[4].title)
+        assertEquals("content://tree/cd2_t2", tracks[4].fileUri)
+    }
+
+    @Test
+    fun processBookFolder_whenLimitReached_truncatesFromSequentialOrder() = runBlocking {
+        val bookDir = DocumentItem(
+            docId = "book_1",
+            name = "Book Over Capacity",
+            mimeType = "vnd.android.document/directory",
+            size = 0L,
+            isDirectory = true
+        )
+        val directChildren = listOf(
+            DocumentItem("cd1", "CD1", "vnd.android.document/directory", 0L, isDirectory = true),
+            DocumentItem("cd2", "CD2", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["cd1"] = listOf(
+            DocumentItem("cd1_t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("cd1_t2", "02.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+        fakeTreeHelper.childrenMap["cd2"] = listOf(
+            DocumentItem("cd2_t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("cd2_t2", "02.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        // MAX_FILES_LIMIT is 2000; set currentFileCount = 1998, leaving capacity = 2
+        val result = scanner.processBookFolder(
+            contentResolver = contentResolver,
+            treeUri = treeUri,
+            bookDir = bookDir,
+            directChildren = directChildren,
+            authorFallback = "Author",
+            currentFileCount = 1998
+        )
+
+        assertEquals(2, result.tracksProcessed)
+        assertTrue(result.limitExceeded)
+
+        val trackCaptor = argumentCaptor<AudiobookTrackEntity>()
+        verify(audiobookDao, times(2)).insertTrack(trackCaptor.capture())
+        val tracks = trackCaptor.allValues
+
+        // Only first 2 tracks in sequential order are processed
+        assertEquals("content://tree/cd1_t1", tracks[0].fileUri)
+        assertEquals("content://tree/cd1_t2", tracks[1].fileUri)
+    }
+
     class FakeDocumentTreeHelper : DocumentTreeHelper {
         val childrenMap = mutableMapOf<String, List<DocumentItem>>()
 
