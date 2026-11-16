@@ -80,7 +80,7 @@ fun AppNavigation(
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Settings.route)
+    val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Audiobooks.route, Screen.Settings.route)
 
     val latestBatchId = selectVisibleShareBatchId(recentImports)
     val latestBatch = remember(recentImports, latestBatchId) {
@@ -199,6 +199,9 @@ fun AppNavigation(
                         navController.navigate(Screen.AddPodcast.route)
                     }
                 )
+            }
+            composable(Screen.Audiobooks.route) {
+                com.example.mpod.ui.screens.audiobooks.AudiobooksRoute()
             }
             composable(Screen.Settings.route) {
                 SettingsRoute(

@@ -91,13 +91,14 @@ class MpodAccessibilityTest {
         }
 
         composeRule.onNodeWithText("Player").performClick()
-        composeRule.onNodeWithText("Subscriptions").performClick()
+        composeRule.onNodeWithText("Podcasts").performClick()
+        composeRule.onNodeWithText("Abooks").performClick()
         composeRule.onNodeWithText("Settings").performClick()
-        composeRule.onNodeWithText("Add podcast").performClick()
+        composeRule.onNodeWithText("Add").performClick()
 
         composeRule.runOnIdle {
             assertEquals(
-                listOf(Screen.Home, Screen.Subscriptions, Screen.Settings, Screen.AddPodcast),
+                listOf(Screen.Home, Screen.Subscriptions, Screen.Audiobooks, Screen.Settings, Screen.AddPodcast),
                 destinations
             )
         }

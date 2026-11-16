@@ -157,6 +157,21 @@ fun HomeRoute(
         }
     }
 
+    var showTimeInputDialog by remember { mutableStateOf(false) }
+    var showChaptersModal by remember { mutableStateOf(false) }
+
+    val currentPlayingEpisode = state.queue.firstOrNull { it.id == playbackSummary.currentEpisodeId }
+        ?: state.queue.firstOrNull()
+
+    val currentAudiobookId = currentPlayingEpisode?.audiobookId
+    val bookTracks by remember(currentAudiobookId) {
+        if (currentAudiobookId != null) {
+            viewModel.getTracksForAudiobook(currentAudiobookId)
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+    }.collectAsStateWithLifecycle(emptyList())
+
     HomeScreen(
         state = state,
         playbackSummary = playbackSummary,
@@ -235,8 +250,49 @@ fun HomeRoute(
         onImportOpml = onImportOpml,
         onRetryLoad = viewModel::refresh,
         onMoveEpisode = viewModel::moveEpisode,
-        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist
+        onRemoveEpisodeFromPlaylist = viewModel::removeEpisodeFromPlaylist,
+        onElapsedTimeClick = { showTimeInputDialog = true },
+        onShowChaptersClick = { showChaptersModal = true }
     )
+
+    if (showTimeInputDialog) {
+        com.example.mpod.ui.components.PlayerMobileTimeInput(
+            onDismiss = { showTimeInputDialog = false },
+            onDone = { seekMs ->
+                showTimeInputDialog = false
+                controller?.seekTo(seekMs)
+            }
+        )
+    }
+
+    if (showChaptersModal && currentPlayingEpisode != null) {
+        com.example.mpod.ui.components.ChaptersModal(
+            title = currentPlayingEpisode.title,
+            author = currentPlayingEpisode.podcastTitle,
+            coverUri = currentPlayingEpisode.coverUri,
+            tracks = bookTracks,
+            currentTrackId = currentPlayingEpisode.currentTrackId,
+            isPlaying = playbackState.isPlaying,
+            mode = com.example.mpod.ui.components.ChaptersModalMode.Player,
+            onDismiss = { showChaptersModal = false },
+            onSelectChapter = { track ->
+                showChaptersModal = false
+                controller?.let { player ->
+                    val targetId = "audiobook:${currentPlayingEpisode.audiobookId}"
+                    val command = androidx.media3.session.SessionCommand(
+                        com.example.mpod.playback.PlaybackService.CUSTOM_COMMAND_PLAY_ITEM,
+                        android.os.Bundle.EMPTY
+                    )
+                    val args = android.os.Bundle().apply {
+                        putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
+                        putLong(com.example.mpod.playback.PlaybackService.EXTRA_PREFERRED_TRACK_ID, track.id)
+                    }
+                    player.sendCustomCommand(command, args)
+                    player.play()
+                }
+            }
+        )
+    }
 }
 
 internal fun resolveEpisodeSeekPositionMs(
@@ -268,7 +324,9 @@ fun HomeScreen(
     onImportOpml: () -> Unit = {},
     onRetryLoad: () -> Unit = {},
     onMoveEpisode: (episodeId: Long, offset: Int) -> Unit = { _, _ -> },
-    onRemoveEpisodeFromPlaylist: (Long) -> Unit = {}
+    onRemoveEpisodeFromPlaylist: (Long) -> Unit = {},
+    onElapsedTimeClick: () -> Unit = {},
+    onShowChaptersClick: () -> Unit = {}
 ) {
     var showNotesEpisode by remember { mutableStateOf<HomeEpisodeUi?>(null) }
     var draggedEpisodeId by remember { mutableStateOf<Long?>(null) }
@@ -399,7 +457,9 @@ fun HomeScreen(
                             onSeekBackward = { onSeekBy(-15) },
                             onSeekForward = { onSeekBy(30) },
                             onSeekTo = onSeekTo,
-                            onNotesClick = playerNotesClick
+                            onNotesClick = playerNotesClick,
+                            onElapsedTimeClick = onElapsedTimeClick,
+                            onShowChaptersClick = onShowChaptersClick
                         )
                     }
 
@@ -537,6 +597,8 @@ private fun HomePlayerCard(
     onSeekForward: () -> Unit,
     onSeekTo: (Float) -> Unit,
     onNotesClick: () -> Unit,
+    onElapsedTimeClick: (() -> Unit)? = null,
+    onShowChaptersClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val playbackState = playbackStateProvider()
@@ -558,7 +620,11 @@ private fun HomePlayerCard(
         onSeekBackward = onSeekBackward,
         onSeekForward = onSeekForward,
         onSeekTo = onSeekTo,
-        onNotesClick = onNotesClick
+        onNotesClick = onNotesClick,
+        isAudiobook = episode.isAudiobook,
+        hasChapters = episode.hasChapters,
+        onShowChaptersClick = onShowChaptersClick,
+        onElapsedTimeClick = onElapsedTimeClick
     )
 }
 

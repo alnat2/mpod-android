@@ -39,7 +39,8 @@ class HomeViewModel @Inject constructor(
     private val appSettingsDataStore: AppSettingsStore,
     private val queueInvalidator: PlaybackQueueInvalidator,
     private val smartListeningManager: SmartListeningManager,
-    private val playbackStatusEvents: PlaybackStatusEvents
+    private val playbackStatusEvents: PlaybackStatusEvents,
+    private val audiobookRepository: com.example.mpod.data.repository.AudiobookRepository? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
@@ -93,7 +94,10 @@ class HomeViewModel @Inject constructor(
                                 summary = null,
                                 isAudiobook = true,
                                 formattedDuration = formattedDuration,
-                                audiobookId = item.audiobook.id
+                                audiobookId = item.audiobook.id,
+                                hasChapters = item.totalChaptersCount > 1,
+                                currentTrackId = curTrack?.id,
+                                coverUri = item.audiobook.coverUri
                             )
                         }
                     }
@@ -188,6 +192,9 @@ class HomeViewModel @Inject constructor(
             queueInvalidator.invalidate()
         }
     }
+
+    fun getTracksForAudiobook(audiobookId: Long): kotlinx.coroutines.flow.Flow<List<com.example.mpod.data.local.entity.AudiobookTrackEntity>> =
+        audiobookRepository?.getTracksForAudiobookFlow(audiobookId) ?: kotlinx.coroutines.flow.flowOf(emptyList())
 }
 
 data class HomeUiState(
@@ -212,7 +219,10 @@ data class HomeEpisodeUi(
     val isAudiobook: Boolean = false,
     val formattedDuration: String? = null,
     val audiobookId: Long? = null,
-    val episodeId: Long? = null
+    val episodeId: Long? = null,
+    val hasChapters: Boolean = false,
+    val currentTrackId: Long? = null,
+    val coverUri: String? = null
 )
 
 internal fun reorderEpisodes(

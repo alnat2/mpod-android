@@ -154,7 +154,7 @@ fun SubscriptionsScreen(
         ) {
             when {
                 state.isLoading || (!state.hasLoadedOnce && state.errorMessage == null) -> {
-                    PageHeader(title = "Subscriptions")
+                    PageHeader(title = "Podcasts")
                     MpodStatusBanner(
                         message = "Loading subscriptions",
                         type = StatusBannerType.Loading
@@ -162,7 +162,7 @@ fun SubscriptionsScreen(
                 }
 
                 state.errorMessage != null -> {
-                    PageHeader(title = "Subscriptions")
+                    PageHeader(title = "Podcasts")
                     MpodStatusBanner(
                         message = state.errorMessage,
                         type = StatusBannerType.Error,
@@ -186,7 +186,7 @@ fun SubscriptionsScreen(
 
                 podcasts.isEmpty() -> {
                     PageHeader(
-                        title = "Subscriptions",
+                        title = "Podcasts",
                         subtitle = subscriptionsHeaderSubtitle(state.podcasts),
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
@@ -203,7 +203,7 @@ fun SubscriptionsScreen(
 
                 else -> {
                     PageHeader(
-                        title = "Subscriptions",
+                        title = "Podcasts",
                         subtitle = if (hasRefreshError) {
                             "Last refresh · today 3:04"
                         } else {

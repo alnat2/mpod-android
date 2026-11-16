@@ -423,10 +423,11 @@ fun MpodBottomNav(
     modifier: Modifier = Modifier
 ) {
     val items = listOf(
-        Triple(Screen.Home, "Player", R.drawable.ic_huge_playlist_02),
-        Triple(Screen.Subscriptions, "Subscriptions", R.drawable.ic_huge_rss),
-        Triple(Screen.Settings, "Settings", R.drawable.ic_huge_settings_05),
-        Triple(Screen.AddPodcast, "Add podcast", R.drawable.ic_huge_plus_sign_square)
+        Triple(Screen.Home, "Player", R.drawable.ic_huge_play),
+        Triple(Screen.Subscriptions, "Podcasts", R.drawable.ic_huge_podcast),
+        Triple(Screen.Audiobooks, "Abooks", R.drawable.ic_huge_audio_book_01),
+        Triple(Screen.Settings, "Settings", R.drawable.ic_huge_setting_01),
+        Triple(Screen.AddPodcast, "Add", R.drawable.ic_huge_dashboard_square_add)
     )
 
     Column(
@@ -438,7 +439,7 @@ fun MpodBottomNav(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(65.dp)
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = 8.dp)
                 .selectableGroup(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
@@ -457,7 +458,7 @@ fun MpodBottomNav(
                             role = Role.Tab,
                             onClick = { onNavigate(screen) }
                         )
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {

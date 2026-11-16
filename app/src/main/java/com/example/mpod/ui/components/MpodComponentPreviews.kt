@@ -232,6 +232,56 @@ private fun ModalScreenMobilePreview() {
     }
 }
 
+@Preview(
+    name = "audiobook components / 360",
+    widthDp = 360,
+    heightDp = 800,
+    showBackground = true
+)
+@Composable
+private fun AudiobookComponentsPreview() {
+    PreviewScaffold {
+        PreviewLabel("FilemanagerItem / Directory")
+        FilemanagerItem(
+            title = "Folder with abooks",
+            type = FilemanagerItemType.Directory,
+            onClick = {}
+        )
+
+        PreviewLabel("FilemanagerItem / AudiobookDirectory")
+        FilemanagerItem(
+            title = "Folder with audiobook chapters",
+            type = FilemanagerItemType.AudiobookDirectory,
+            durationText = "43h 12m",
+            actionIconRes = com.example.mpod.R.drawable.ic_huge_playlist_add,
+            actionContentDescription = "Add to playlist",
+            onActionClick = {},
+            onClick = {}
+        )
+
+        PreviewLabel("FilemanagerItem / AudioFile")
+        FilemanagerItem(
+            title = "A story.mp3",
+            type = FilemanagerItemType.AudioFile,
+            durationText = "1h 24m",
+            actionIconRes = com.example.mpod.R.drawable.ic_huge_playlist_remove,
+            actionContentDescription = "Remove from playlist",
+            onActionClick = {},
+            onClick = {}
+        )
+
+        PreviewLabel("PlayerView / Audiobook")
+        PlayerView(
+            title = "The Fellowship of the Ring",
+            podcastTitle = "J.R.R. Tolkien",
+            isAudiobook = true,
+            hasChapters = true,
+            speedLabel = "1.0",
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
 @Composable
 private fun PreviewLabel(text: String) {
     Text(

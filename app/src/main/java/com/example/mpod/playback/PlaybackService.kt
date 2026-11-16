@@ -146,12 +146,16 @@ class PlaybackService : MediaSessionService() {
         ): ListenableFuture<SessionResult> {
             if (customCommand.customAction == CUSTOM_COMMAND_PLAY_ITEM) {
                 val targetId = args.getString(EXTRA_TARGET_ITEM_ID)
+                val preferredTrackId = if (args.containsKey(EXTRA_PREFERRED_TRACK_ID)) {
+                    args.getLong(EXTRA_PREFERRED_TRACK_ID)
+                } else null
                 val seekPosMs = if (args.containsKey(EXTRA_SEEK_POSITION_MS)) {
                     args.getLong(EXTRA_SEEK_POSITION_MS)
                 } else null
                 serviceScope.launch {
                     reconcileQueueWithDatabase(
                         targetQueueItemId = targetId,
+                        preferredTrackId = preferredTrackId,
                         forcePlayPreferred = true,
                         seekPositionMs = seekPosMs
                     )
@@ -573,6 +577,7 @@ class PlaybackService : MediaSessionService() {
         const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
         const val CUSTOM_COMMAND_PLAY_ITEM = "com.prod.mpod.PLAY_ITEM"
         const val EXTRA_TARGET_ITEM_ID = "com.prod.mpod.target_item_id"
+        const val EXTRA_PREFERRED_TRACK_ID = "com.prod.mpod.preferred_track_id"
         const val EXTRA_SEEK_POSITION_MS = "com.prod.mpod.seek_position_ms"
     }
 }
