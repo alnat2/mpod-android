@@ -78,8 +78,17 @@
   - Unit-тесты `PlayerMobileTimeInputTest`, `AudiobooksViewModelTest`, обновление `MpodAccessibilityTest`.
   - Независимый diff review проведен в Swarm на `Claude Sonnet 4.6 (Thinking)`: все замечания (C1–C3, M2–M5, M7) исправлены и верифицированы.
 
+### MPOD-ABK-07 (Этап 6) — Финализация, версии, регрессионные тесты и релизная готовность
+- **Статус:** `CLOSED — PASS`, 16.11.2026.
+- **Что сделано:**
+  - `versionCode` инкрементирован до 36, `versionName` поднят до `1.0.35` в `app/build.gradle.kts`.
+  - Актуализирован `docs/android-user-scenarios.md`: все сценарии `ABK-01` … `ABK-14` переведены в статус `Verified`.
+  - Верифицированы Room миграции v1 -> v2 и v2 -> v3 в `MpodDatabaseMigrationTest`.
+  - Покрыты unit-тестами парсинг времени, сдвиг цифр, полиморфное скользящее окно, индексация глав и файловый менеджер.
+  - Актуализирован `docs/android-delivery-plan.md` (базовый билд `1.0.35 (36)`).
+
 ### Очередь следующих этапов (MPOD-ABK)
-1. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
+Все этапы эпика `MPOD-ABK` (`MPOD-ABK-01` … `MPOD-ABK-07`) успешно завершены и закрыты.
 
 ## Последняя закрытая задача — MPOD-REL-02
 

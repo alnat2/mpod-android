@@ -38,8 +38,8 @@ android {
         applicationId = "com.prod.mpod"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "1.0.34"
+        versionCode = 36
+        versionName = "1.0.35"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
