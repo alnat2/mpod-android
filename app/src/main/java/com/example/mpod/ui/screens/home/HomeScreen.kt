@@ -205,16 +205,17 @@ fun HomeRoute(
                             null -> mId == episodeId.toString()
                         }
                     }
-                val seekPosMs = resolveEpisodeSeekPositionMs(
-                    episodeId = episodeId,
-                    queue = state.queue,
-                    currentMediaItemIndex = player.currentMediaItemIndex,
-                    targetMediaItemIndex = index ?: 0,
-                    isPlayerIdle = player.playbackState == Player.STATE_IDLE
-                ) ?: 0L
-
                 if (index != null) {
-                    player.seekTo(index, seekPosMs)
+                    val seekPosMs = resolveEpisodeSeekPositionMs(
+                        episodeId = episodeId,
+                        queue = state.queue,
+                        currentMediaItemIndex = player.currentMediaItemIndex,
+                        targetMediaItemIndex = index,
+                        isPlayerIdle = player.playbackState == Player.STATE_IDLE
+                    )
+                    if (seekPosMs != null) {
+                        player.seekTo(index, seekPosMs)
+                    }
                     player.play()
                 } else {
                     val targetId = if (episodeId < 0) "audiobook:${-episodeId}" else "episode:$episodeId"
@@ -224,7 +225,6 @@ fun HomeRoute(
                     )
                     val args = android.os.Bundle().apply {
                         putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
-                        putLong(com.example.mpod.playback.PlaybackService.EXTRA_SEEK_POSITION_MS, seekPosMs)
                     }
                     player.sendCustomCommand(command, args)
                     player.play()

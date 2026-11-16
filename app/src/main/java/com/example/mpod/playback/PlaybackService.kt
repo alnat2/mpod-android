@@ -146,7 +146,9 @@ class PlaybackService : MediaSessionService() {
         ): ListenableFuture<SessionResult> {
             if (customCommand.customAction == CUSTOM_COMMAND_PLAY_ITEM) {
                 val targetId = args.getString(EXTRA_TARGET_ITEM_ID)
-                val seekPosMs = args.getLong(EXTRA_SEEK_POSITION_MS, 0L)
+                val seekPosMs = if (args.containsKey(EXTRA_SEEK_POSITION_MS)) {
+                    args.getLong(EXTRA_SEEK_POSITION_MS)
+                } else null
                 serviceScope.launch {
                     reconcileQueueWithDatabase(
                         targetQueueItemId = targetId,
