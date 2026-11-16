@@ -111,4 +111,23 @@ class AudiobooksViewModelTest {
         assertEquals(FilemanagerItemType.AudiobookDirectory, items[1].type)
         assertEquals(false, items[1].isInPlaylist)
     }
+
+    @Test
+    fun currentChapterIndex_whenCurrentTrackNull_defaultsToOne() {
+        val book = AudiobookEntity(
+            id = 1L,
+            folderUri = "uri://book1",
+            title = "Book",
+            author = "Author",
+            isSingleFile = false
+        )
+        val item = com.example.mpod.data.local.model.PlayableItem.AudiobookItem(
+            playlistItemId = 10L,
+            position = 0,
+            audiobook = book,
+            selectedTracks = emptyList(),
+            currentTrack = null
+        )
+        assertEquals(1, item.currentChapterIndex)
+    }
 }

@@ -94,7 +94,8 @@ class EpisodeManualActionCleanupTest {
             podcastRepository = podcastRepository,
             appSettingsDataStore = appSettingsStore,
             queueInvalidator = queueInvalidator,
-            smartListeningManager = smartListeningManager
+            smartListeningManager = smartListeningManager,
+            audiobookRepository = org.mockito.Mockito.mock(com.example.mpod.data.repository.AudiobookRepository::class.java)
         )
 
         subscriptionsViewModel = SubscriptionsViewModel(

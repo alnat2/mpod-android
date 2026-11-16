@@ -51,7 +51,8 @@ fun PlayerMobileTimeInput(
     ) {
         Box(
             modifier = Modifier
-                .width(320.dp)
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 320.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surface)
                 .border(

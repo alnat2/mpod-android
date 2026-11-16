@@ -63,9 +63,10 @@ fun ChaptersModal(
     ) {
         Box(
             modifier = Modifier
-                .width(320.dp)
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 320.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MaterialTheme.colorScheme.surface)
                 .border(
                     width = 1.dp,
                     color = Color(0x1AFAFAFA),

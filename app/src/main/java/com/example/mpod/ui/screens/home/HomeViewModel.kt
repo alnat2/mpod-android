@@ -39,8 +39,8 @@ class HomeViewModel @Inject constructor(
     private val appSettingsDataStore: AppSettingsStore,
     private val queueInvalidator: PlaybackQueueInvalidator,
     private val smartListeningManager: SmartListeningManager,
-    private val playbackStatusEvents: PlaybackStatusEvents,
-    private val audiobookRepository: com.example.mpod.data.repository.AudiobookRepository? = null
+    private val playbackStatusEvents: PlaybackStatusEvents = PlaybackStatusEvents(),
+    private val audiobookRepository: com.example.mpod.data.repository.AudiobookRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState(isLoading = true))
@@ -194,7 +194,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun getTracksForAudiobook(audiobookId: Long): kotlinx.coroutines.flow.Flow<List<com.example.mpod.data.local.entity.AudiobookTrackEntity>> =
-        audiobookRepository?.getTracksForAudiobookFlow(audiobookId) ?: kotlinx.coroutines.flow.flowOf(emptyList())
+        audiobookRepository.getTracksForAudiobookFlow(audiobookId)
 }
 
 data class HomeUiState(

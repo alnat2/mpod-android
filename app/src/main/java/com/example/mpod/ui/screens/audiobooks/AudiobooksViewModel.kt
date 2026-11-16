@@ -56,6 +56,7 @@ class AudiobooksViewModel @Inject constructor(
     private val _state = MutableStateFlow(AudiobooksUiState(isLoading = true))
     val state: StateFlow<AudiobooksUiState> = _state.asStateFlow()
 
+    private val currentPathFlow = MutableStateFlow<List<String>>(emptyList())
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
     private var playlistAudiobookIds: Set<Long> = emptySet()
 
@@ -64,12 +65,12 @@ class AudiobooksViewModel @Inject constructor(
             combine(
                 appSettingsStore.settingsFlow,
                 audiobookRepository.audiobooksFlow,
-                playlistDao.getPlaylistItemsWithAudiobooksFlow()
-            ) { settings, audiobooks, playlistItems ->
+                playlistDao.getPlaylistItemsWithAudiobooksFlow(),
+                currentPathFlow
+            ) { settings, audiobooks, playlistItems, currentPath ->
                 allAudiobooks = audiobooks
                 playlistAudiobookIds = playlistItems.map { it.audiobook.id }.toSet()
 
-                val currentPath = _state.value.currentPath
                 val items = buildFilemanagerItems(
                     audiobooks = audiobooks,
                     playlistIds = playlistAudiobookIds,
@@ -79,6 +80,7 @@ class AudiobooksViewModel @Inject constructor(
                 _state.value.copy(
                     isLoading = false,
                     audiobooksFolderUri = settings.audiobooksFolderUri,
+                    currentPath = currentPath,
                     items = items
                 )
             }.collect { nextState ->
@@ -88,29 +90,15 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun navigateToFolder(folderName: String) {
-        val nextPath = _state.value.currentPath + folderName
-        updatePath(nextPath)
+        currentPathFlow.value = currentPathFlow.value + folderName
     }
 
     fun navigateToBreadcrumb(index: Int) {
         if (index < 0) {
-            updatePath(emptyList())
+            currentPathFlow.value = emptyList()
         } else {
-            val nextPath = _state.value.currentPath.take(index + 1)
-            updatePath(nextPath)
+            currentPathFlow.value = currentPathFlow.value.take(index + 1)
         }
-    }
-
-    private fun updatePath(path: List<String>) {
-        val items = buildFilemanagerItems(
-            audiobooks = allAudiobooks,
-            playlistIds = playlistAudiobookIds,
-            currentPath = path
-        )
-        _state.value = _state.value.copy(
-            currentPath = path,
-            items = items
-        )
     }
 
     fun onScanFolder(uri: Uri) {

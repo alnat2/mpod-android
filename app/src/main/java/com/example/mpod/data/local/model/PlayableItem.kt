@@ -30,7 +30,7 @@ sealed interface PlayableItem {
 
         val currentChapterIndex: Int
             get() {
-                val curId = currentTrack?.id ?: return 0
+                val curId = currentTrack?.id ?: return 1
                 val idx = selectedTracks.indexOfFirst { it.id == curId }
                 return if (idx >= 0) idx + 1 else 1
             }

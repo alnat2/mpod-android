@@ -347,6 +347,7 @@ private fun AudiobooksEmptyState(
 
             Text(
                 text = title,
+                fontFamily = InterFontFamily,
                 fontSize = 18.sp,
                 lineHeight = 28.sp,
                 fontWeight = FontWeight.Medium,
@@ -359,6 +360,7 @@ private fun AudiobooksEmptyState(
 
             Text(
                 text = description,
+                fontFamily = InterFontFamily,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Normal,

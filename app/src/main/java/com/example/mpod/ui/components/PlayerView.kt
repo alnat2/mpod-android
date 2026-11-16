@@ -388,7 +388,6 @@ fun PlayerView(
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                             color = MaterialTheme.colorScheme.onSurface,
-                            textDecoration = TextDecoration.Underline,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
                                 .clickable { showSpeedSheet = true }
@@ -402,7 +401,6 @@ fun PlayerView(
                                 fontSize = 14.sp,
                                 lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                textDecoration = TextDecoration.Underline,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
                                     .clickable(onClick = onShowChaptersClick)

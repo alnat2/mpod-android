@@ -65,4 +65,26 @@ class PlayerMobileTimeInputTest {
         // 12h 34m 56s = 43200 + 2040 + 56 = 45296s = 45296000ms
         assertEquals(45_296_000L, parseDigitsToMs("123456"))
     }
+
+    @Test
+    fun doubleZeroAppending_onFourDigitBuffer_producesSixDigits() {
+        var digits = "1234"
+        if (digits.isNotEmpty() && digits.length <= 4) {
+            digits += "00"
+        }
+        assertEquals("123400", digits)
+        assertEquals("12:34:00", formatInputDigits(digits))
+        // 12h 34m 00s = 43200 + 2040 = 45240s = 45240000ms
+        assertEquals(45_240_000L, parseDigitsToMs(digits))
+    }
+
+    @Test
+    fun doubleZeroAppending_whenBufferTooLong_isIgnored() {
+        var digits = "12345"
+        if (digits.isNotEmpty() && digits.length <= 4) {
+            digits += "00"
+        }
+        // length 5 > 4, so "00" is rejected to prevent exceeding 6 digits
+        assertEquals("12345", digits)
+    }
 }
