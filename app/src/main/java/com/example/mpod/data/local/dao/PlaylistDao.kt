@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.example.mpod.data.local.entity.PlaylistItemEntity
+import com.example.mpod.data.local.model.PlaylistItemWithAudiobook
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import kotlinx.coroutines.flow.Flow
 
@@ -63,8 +64,47 @@ interface PlaylistDao {
     """)
     fun getPlaylistItemsWithEpisodes(): List<PlaylistItemWithEpisode>
 
+    @Query("""
+        SELECT 
+            p.id AS playlistItemId,
+            p.position AS position,
+            a.id AS id,
+            a.title AS title,
+            a.author AS author,
+            a.folderUri AS folderUri,
+            a.coverUri AS coverUri,
+            a.durationSeconds AS durationSeconds,
+            a.isSingleFile AS isSingleFile,
+            a.addedAt AS addedAt
+        FROM playlist_items p
+        INNER JOIN audiobooks a ON p.audiobookId = a.id
+        ORDER BY p.position ASC
+    """)
+    fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>>
+
+    @Query("""
+        SELECT 
+            p.id AS playlistItemId,
+            p.position AS position,
+            a.id AS id,
+            a.title AS title,
+            a.author AS author,
+            a.folderUri AS folderUri,
+            a.coverUri AS coverUri,
+            a.durationSeconds AS durationSeconds,
+            a.isSingleFile AS isSingleFile,
+            a.addedAt AS addedAt
+        FROM playlist_items p
+        INNER JOIN audiobooks a ON p.audiobookId = a.id
+        ORDER BY p.position ASC
+    """)
+    fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook>
+
     @Query("SELECT * FROM playlist_items ORDER BY position ASC")
     fun getAllPlaylistItems(): List<PlaylistItemEntity>
+
+    @Query("SELECT * FROM playlist_items ORDER BY position ASC")
+    fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>>
 
     @Query("SELECT MAX(position) FROM playlist_items")
     fun getMaxPosition(): Int?

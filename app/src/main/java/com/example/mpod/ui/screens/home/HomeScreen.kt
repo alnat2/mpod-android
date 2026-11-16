@@ -196,7 +196,15 @@ fun HomeRoute(
         onPlayEpisode = { episodeId ->
             controller?.let { player ->
                 val index = (0 until player.mediaItemCount)
-                    .firstOrNull { player.getMediaItemAt(it).mediaId == episodeId.toString() }
+                    .firstOrNull {
+                        val mId = player.getMediaItemAt(it).mediaId
+                        val qId = com.example.mpod.playback.MediaQueueId.fromMediaId(mId)
+                        when (qId) {
+                            is com.example.mpod.playback.MediaQueueId.Episode -> qId.episodeId == episodeId
+                            is com.example.mpod.playback.MediaQueueId.Audiobook -> -qId.audiobookId == episodeId
+                            null -> mId == episodeId.toString()
+                        }
+                    }
                 if (index != null) {
                     val seekPosMs = resolveEpisodeSeekPositionMs(
                         episodeId = episodeId,
@@ -426,7 +434,7 @@ fun HomeScreen(
                         PlayerPlaylistItem(
                             title = episode.title,
                             podcastName = episode.podcastTitle,
-                            duration = formatEpisodeDuration(effectiveDuration),
+                            duration = episode.formattedDuration ?: formatEpisodeDuration(effectiveDuration),
                             isCurrent = episode.id == currentEpisode.id,
                             isPlaying = episode.id == currentEpisode.id && playbackSummary.isPlaying,
                             downloaded = episode.downloaded,
@@ -633,9 +641,12 @@ internal fun Player?.toHomePlaybackUiState(
     activeEpisodeId: Long?,
     queue: List<HomeEpisodeUi>
 ): HomePlaybackUiState {
-    val episodeId = this?.currentMediaItem?.mediaId?.toLongOrNull()
-        ?: activeEpisodeId
-        ?: queue.firstOrNull()?.id
+    val currentQueueId = com.example.mpod.playback.MediaQueueId.fromMediaId(this?.currentMediaItem?.mediaId)
+    val episodeId = when (currentQueueId) {
+        is com.example.mpod.playback.MediaQueueId.Episode -> currentQueueId.episodeId
+        is com.example.mpod.playback.MediaQueueId.Audiobook -> -currentQueueId.audiobookId
+        null -> this?.currentMediaItem?.mediaId?.toLongOrNull()
+    } ?: activeEpisodeId ?: queue.firstOrNull()?.id
     val episode = queue.firstOrNull { it.id == episodeId }
     val durationMs = this?.duration?.takeIf { it > 0 }
         ?: ((episode?.durationSeconds ?: 0) * 1_000L)

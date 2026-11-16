@@ -2,6 +2,7 @@ package com.example.mpod.data.local.model
 
 import androidx.room.Embedded
 import androidx.room.Relation
+import com.example.mpod.data.local.entity.AudiobookEntity
 import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 
@@ -20,4 +21,10 @@ data class PlaylistItemWithEpisode(
     @Embedded val episode: EpisodeEntity,
     val podcastTitle: String,
     val podcastArtworkUrl: String
+)
+
+data class PlaylistItemWithAudiobook(
+    val playlistItemId: Long,
+    val position: Int,
+    @Embedded val audiobook: AudiobookEntity
 )

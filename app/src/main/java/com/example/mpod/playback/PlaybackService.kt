@@ -10,7 +10,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.CommandButton
@@ -18,10 +17,11 @@ import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.example.mpod.BuildConfig
+import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.dao.EpisodeDao
+import com.example.mpod.data.local.model.PlayableItem
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.preferences.AppSettingsStore
-import com.example.mpod.data.network.NetworkModule
 import com.example.mpod.data.repository.PlaylistRepository
 import com.google.common.collect.ImmutableList
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -39,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -50,17 +50,19 @@ class PlaybackService : MediaSessionService() {
 
     @Inject lateinit var playlistRepository: PlaylistRepository
     @Inject lateinit var episodeDao: EpisodeDao
+    @Inject lateinit var audiobookDao: AudiobookDao
     @Inject lateinit var appSettingsDataStore: AppSettingsStore
     @Inject lateinit var smartListeningManager: SmartListeningManager
     @Inject lateinit var queueInvalidator: PlaybackQueueInvalidator
+    @Inject lateinit var playbackStatusEvents: PlaybackStatusEvents
     @Inject @MediaCacheDataSourceFactory lateinit var cacheDataSourceFactory: DataSource.Factory
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
     private var mediaSession: MediaSession? = null
     private var savePositionJob: Job? = null
-    private var previousEpisodeId: Long? = null
-    private var lastSignificantEpisodeId: Long? = null
+    private var previousMediaId: String? = null
+    private var lastSignificantMediaId: String? = null
     private var lastSignificantPositionMs: Long = 0L
     internal val completedEpisodeTracker = CompletedEpisodeTracker()
     private var applyingSettingsSpeed = false
@@ -123,15 +125,19 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         savePositionJob?.cancel()
-        currentEpisodeId()?.let { episodeId ->
+        currentMediaQueueId()?.let { mediaQueueId ->
+            val mediaId = mediaQueueId.toMediaId()
             val pos = resolveMeaningfulPlaybackPosition(
                 currentPositionMs = player.currentPosition,
-                lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantEpisodeId == episodeId },
-                allowExplicitZero = lastSignificantEpisodeId == episodeId && lastSignificantPositionMs == 0L
+                lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantMediaId == mediaId },
+                allowExplicitZero = lastSignificantMediaId == mediaId && lastSignificantPositionMs == 0L
             ) ?: return@let
             runCatching {
                 runBlocking(Dispatchers.IO) {
-                    episodeDao.updatePlaybackPosition(episodeId, pos)
+                    when (mediaQueueId) {
+                        is MediaQueueId.Episode -> episodeDao.updatePlaybackPosition(mediaQueueId.episodeId, pos)
+                        is MediaQueueId.Audiobook -> audiobookDao.updateTrackProgress(mediaQueueId.trackId, positionMs = pos, isListened = false)
+                    }
                 }
             }
         }
@@ -148,133 +154,120 @@ class PlaybackService : MediaSessionService() {
     }
 
     private suspend fun reconcileQueueWithDatabase(
-        preferredEpisodeId: Long? = null,
-        preferFirstEpisode: Boolean = false,
+        targetQueueItemId: String? = null,
+        preferredTrackId: Long? = null,
+        preferFirstItem: Boolean = false,
         forcePlayPreferred: Boolean = false
-    ): Unit {
+    ) {
         queueReconciliationMutex.withLock {
-            val playlistItems = playlistRepository.getPlaylistItems()
-            val settings = appSettingsDataStore.settingsFlow.first()
-            val currentEpisodeId = currentEpisodeId()
-
-            val target = resolveQueuePlaybackTarget(
-                queue = playlistItems.map {
-                    QueueEpisodeState(
-                        episodeId = it.episode.id,
-                        savedPositionMs = it.episode.playbackPositionMs
-                    )
-                },
-                savedActiveEpisodeId = settings.activeEpisodeId,
-                currentEpisodeId = currentEpisodeId,
-                currentPositionMs = player.currentPosition,
-                currentPlayWhenReady = player.playWhenReady,
-                isPlaying = player.isPlaying,
-                preferredEpisodeId = preferredEpisodeId,
-                preferFirstEpisode = preferFirstEpisode,
-                forcePlayPreferred = forcePlayPreferred
-            )
-
-            if (target == null) {
+            val playableItems = playlistRepository.getPlayableItems()
+            if (playableItems.isEmpty()) {
                 if (player.mediaItemCount == 0) return@withLock
                 savePositionJob?.cancel()
                 savePositionJob = null
                 player.removeListener(playerListener)
                 player.stop()
                 player.clearMediaItems()
-                previousEpisodeId = null
+                previousMediaId = null
                 completedEpisodeTracker.resetAll()
                 player.addListener(playerListener)
                 return@withLock
             }
 
-            completedEpisodeTracker.reset(target.episodeId)
+            val settings = appSettingsDataStore.settingsFlow.first()
+            val currentMediaQueueId = currentMediaQueueId()
 
-            val roomQueueEpisodeIds = playlistItems.map { it.episode.id }
-            val currentQueueRawEpisodeIds = (0 until player.mediaItemCount).map { index ->
-                player.getMediaItemAt(index).mediaId.toLongOrNull()
-            }
-            val hasCorruptMediaItems = currentQueueRawEpisodeIds.any { it == null }
-            val currentQueueEpisodeIds = currentQueueRawEpisodeIds.filterNotNull()
+            val effectiveTargetItemId = targetQueueItemId
+                ?: if (preferFirstItem) playableItems.first().queueItemId
+                else settings.activeEpisodeId?.let { "episode:$it" }
 
-            val currentMediaUri = player.currentMediaItem?.localConfiguration?.uri?.toString()
-            val targetMediaUri = playlistItems.find { it.episode.id == target.episodeId }
-                ?.resolveMediaUri()
-                ?.toString()
-
-            val requiresRebuild = hasCorruptMediaItems || requiresPlayerQueueRebuild(
-                currentQueueEpisodeIds = currentQueueEpisodeIds,
-                roomQueueEpisodeIds = roomQueueEpisodeIds,
-                currentEpisodeId = currentEpisodeId,
-                targetEpisodeId = target.episodeId,
-                preferredEpisodeId = preferredEpisodeId,
-                currentMediaUri = currentMediaUri,
-                targetMediaUri = targetMediaUri
+            val window = SlidingWindowResolver.resolveWindow(
+                queue = playableItems,
+                targetQueueItemId = effectiveTargetItemId,
+                preferredTrackId = preferredTrackId,
+                currentMediaQueueId = currentMediaQueueId
             )
 
-            if (!requiresRebuild) {
-                // Incrementally synchronize queue changes without resetting ExoPlayer's buffer or streaming session
-                val currentUris = (0 until player.mediaItemCount).map { index ->
-                    player.getMediaItemAt(index).localConfiguration?.uri?.toString()
-                }
-                val targetUris = playlistItems.map { it.resolveMediaUri().toString() }
+            val currentTrack = window.current
+            if (currentTrack == null) {
+                if (player.mediaItemCount == 0) return@withLock
+                savePositionJob?.cancel()
+                savePositionJob = null
+                player.removeListener(playerListener)
+                player.stop()
+                player.clearMediaItems()
+                previousMediaId = null
+                completedEpisodeTracker.resetAll()
+                player.addListener(playerListener)
+                return@withLock
+            }
 
-                val syncActions = calculateQueueSyncActions(
-                    currentQueueIds = currentQueueEpisodeIds,
-                    roomQueueIds = roomQueueEpisodeIds,
-                    currentUris = currentUris,
-                    targetUris = targetUris,
-                    currentPlayingIndex = player.currentMediaItemIndex
-                )
+            completedEpisodeTracker.resetMedia(currentTrack.toMediaId())
+            if (currentTrack is PlaybackTrack.EpisodeTrack) {
+                completedEpisodeTracker.reset(currentTrack.episode.id)
+            }
 
-                if (syncActions.isNotEmpty()) {
-                    val playlistItemsById = playlistItems.associateBy { it.episode.id }
-                    for (action in syncActions) {
-                        when (action) {
-                            is QueueAction.Remove -> player.removeMediaItem(action.index)
-                            is QueueAction.Move -> player.moveMediaItem(action.fromIndex, action.toIndex)
-                            is QueueAction.Add -> {
-                                val item = playlistItemsById.getValue(action.episodeId)
-                                player.addMediaItem(action.index, item.toMediaItem())
-                            }
-                            is QueueAction.ReplaceUri -> {
-                                val item = playlistItemsById.getValue(action.episodeId)
-                                player.replaceMediaItem(action.index, item.toMediaItem())
-                            }
+            val currentMediaId = player.currentMediaItem?.mediaId
+            val needsRebuild = currentMediaId != currentTrack.toMediaId() ||
+                player.mediaItemCount == 0 ||
+                forcePlayPreferred
+
+            if (!needsRebuild) {
+                // Synchronize index 1 (the 'Next' buffered track in the sliding window)
+                val expectedNext = window.next
+                val currentCount = player.mediaItemCount
+                if (expectedNext != null) {
+                    val nextMediaItem = expectedNext.toMediaItem()
+                    if (currentCount > 1) {
+                        val existingNextMediaId = player.getMediaItemAt(1).mediaId
+                        if (existingNextMediaId != expectedNext.toMediaId()) {
+                            player.replaceMediaItem(1, nextMediaItem)
                         }
+                    } else {
+                        player.addMediaItem(1, nextMediaItem)
                     }
+                } else if (currentCount > 1) {
+                    player.removeMediaItem(1)
                 }
 
-                if (!player.isPlaying && !player.playWhenReady) {
-                    val positionDelta = kotlin.math.abs(player.currentPosition - target.positionMs)
-                    if (positionDelta >= POSITION_SYNC_THRESHOLD_MS) {
-                        player.seekTo(target.positionMs)
-                    }
-                }
-                if (target.playWhenReady) {
-                    startPeriodicSave()
-                } else {
-                    savePositionJob?.cancel()
-                    savePositionJob = null
+                // Apply correct speed if track type changed
+                val targetSpeed = if (currentTrack.isAudiobook) settings.audiobookPlaybackSpeed else settings.playbackSpeed
+                if (player.playbackParameters.speed != targetSpeed) {
+                    applyingSettingsSpeed = true
+                    player.playbackParameters = PlaybackParameters(targetSpeed)
+                    applyingSettingsSpeed = false
                 }
                 return@withLock
             }
 
-            val targetIndex = playlistItems.indexOfFirst { it.episode.id == target.episodeId }
-            if (currentEpisodeId != null && player.playbackState != Player.STATE_IDLE && (player.isPlaying || player.currentPosition > 0L)) {
+            // Rebuild sliding window [Current, Next] in ExoPlayer
+            if (currentMediaQueueId != null && player.playbackState != Player.STATE_IDLE && (player.isPlaying || player.currentPosition > 0L)) {
                 saveCurrentPosition(force = true)
             }
+
             player.removeListener(playerListener)
-            rememberSignificantPosition(target.episodeId, target.positionMs)
-            player.setMediaItems(playlistItems.map { it.toMediaItem() }, targetIndex, target.positionMs)
-            previousEpisodeId = target.episodeId
+            rememberSignificantPosition(currentTrack.toMediaId(), currentTrack.initialPositionMs)
+
+            val mediaItems = listOfNotNull(currentTrack.toMediaItem(), window.next?.toMediaItem())
+            previousMediaId = currentTrack.toMediaId()
+            player.setMediaItems(mediaItems, 0, currentTrack.initialPositionMs)
+
+            val targetSpeed = if (currentTrack.isAudiobook) settings.audiobookPlaybackSpeed else settings.playbackSpeed
+            applyingSettingsSpeed = true
+            player.playbackParameters = PlaybackParameters(targetSpeed)
+            applyingSettingsSpeed = false
+
             player.prepare()
-            player.playWhenReady = target.playWhenReady
+            val shouldPlay = forcePlayPreferred || (player.playWhenReady && player.playbackState != Player.STATE_ENDED)
+            player.playWhenReady = shouldPlay
             player.addListener(playerListener)
 
-            if (target.playWhenReady) {
+            if (shouldPlay) {
                 startPeriodicSave()
-                appSettingsDataStore.setActiveEpisodeId(target.episodeId)
-                smartListeningManager.forceDownloadImmediately(target.episodeId)
+                if (currentTrack is PlaybackTrack.EpisodeTrack) {
+                    appSettingsDataStore.setActiveEpisodeId(currentTrack.episode.id)
+                    smartListeningManager.forceDownloadImmediately(currentTrack.episode.id)
+                }
             } else {
                 savePositionJob?.cancel()
                 savePositionJob = null
@@ -318,19 +311,22 @@ class PlaybackService : MediaSessionService() {
             if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                 if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex) {
                     serviceScope.launch { saveCurrentPosition(force = true, allowExplicitZero = true) }
-                    currentEpisodeId()?.let { episodeId ->
-                        completedEpisodeTracker.reset(episodeId)
+                    currentMediaId()?.let { mediaId ->
+                        completedEpisodeTracker.resetMedia(mediaId)
                     }
                 } else {
-                    val oldEpisodeId = oldPosition.mediaItemIndex
+                    val oldMediaId = oldPosition.mediaItemIndex
                         .takeIf { it in 0 until player.mediaItemCount }
                         ?.let(player::getMediaItemAt)
                         ?.mediaId
-                        ?.toLongOrNull()
-                    if (oldEpisodeId != null) {
+                    val oldQueueId = MediaQueueId.fromMediaId(oldMediaId)
+                    if (oldQueueId != null) {
                         serviceScope.launch {
                             withContext(Dispatchers.IO) {
-                                episodeDao.updatePlaybackPosition(oldEpisodeId, oldPosition.positionMs)
+                                when (oldQueueId) {
+                                    is MediaQueueId.Episode -> episodeDao.updatePlaybackPosition(oldQueueId.episodeId, oldPosition.positionMs)
+                                    is MediaQueueId.Audiobook -> audiobookDao.updateTrackProgress(oldQueueId.trackId, positionMs = oldPosition.positionMs, isListened = false)
+                                }
                             }
                         }
                     }
@@ -339,47 +335,82 @@ class PlaybackService : MediaSessionService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val nextEpisodeId = mediaItem?.mediaId?.toLongOrNull()
-            val finishedEpisodeId = previousEpisodeId
-            previousEpisodeId = nextEpisodeId
+            val nextMediaId = mediaItem?.mediaId
+            val finishedMediaId = previousMediaId
+            previousMediaId = nextMediaId
 
-            if (nextEpisodeId != null) {
-                completedEpisodeTracker.reset(nextEpisodeId)
-                rememberSignificantPosition(nextEpisodeId, player.currentPosition)
-            }
+            if (nextMediaId != null) {
+                completedEpisodeTracker.resetMedia(nextMediaId)
+                rememberSignificantPosition(nextMediaId, player.currentPosition)
 
-            if (nextEpisodeId != null && player.playWhenReady) {
-                smartListeningManager.forceDownloadImmediately(nextEpisodeId)
-            }
+                val nextQueueId = MediaQueueId.fromMediaId(nextMediaId)
+                if (nextQueueId is MediaQueueId.Episode && player.playWhenReady) {
+                    smartListeningManager.forceDownloadImmediately(nextQueueId.episodeId)
+                }
 
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedEpisodeId != null) {
-                handleEpisodeCompleted(finishedEpisodeId, nextEpisodeId)
-            } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextEpisodeId != null) {
+                // Update speed for current media type
                 serviceScope.launch {
-                    appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
+                    val settings = appSettingsDataStore.settingsFlow.first()
+                    val isAbk = nextQueueId is MediaQueueId.Audiobook
+                    val targetSpeed = if (isAbk) settings.audiobookPlaybackSpeed else settings.playbackSpeed
+                    if (player.playbackParameters.speed != targetSpeed) {
+                        applyingSettingsSpeed = true
+                        player.playbackParameters = PlaybackParameters(targetSpeed)
+                        applyingSettingsSpeed = false
+                    }
+                }
+            }
+
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && finishedMediaId != null) {
+                handleTrackCompleted(finishedMediaId, nextMediaId)
+            } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextMediaId != null) {
+                val nextQueueId = MediaQueueId.fromMediaId(nextMediaId)
+                if (nextQueueId is MediaQueueId.Episode) {
+                    serviceScope.launch {
+                        appSettingsDataStore.setActiveEpisodeId(nextQueueId.episodeId)
+                    }
                 }
             }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState != Player.STATE_ENDED) return
-            val episodeId = currentEpisodeId() ?: return
-            handleEpisodeCompleted(episodeId, preferFirstEpisode = true, forcePlayPreferred = true)
+            val mediaId = currentMediaId() ?: return
+            handleTrackCompleted(mediaId, preferFirstItem = true, forcePlayPreferred = true)
         }
 
         override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
             if (applyingSettingsSpeed) return
+            val queueId = currentMediaQueueId()
             serviceScope.launch {
-                appSettingsDataStore.setPlaybackSpeed(playbackParameters.speed)
+                if (queueId is MediaQueueId.Audiobook) {
+                    appSettingsDataStore.setAudiobookPlaybackSpeed(playbackParameters.speed)
+                } else {
+                    appSettingsDataStore.setPlaybackSpeed(playbackParameters.speed)
+                }
+            }
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            val queueId = currentMediaQueueId()
+            if (queueId is MediaQueueId.Audiobook) {
+                serviceScope.launch {
+                    audiobookDao.updateTrackAvailability(queueId.trackId, isAvailable = false)
+                    val track = audiobookDao.getTrackById(queueId.trackId)
+                    val filename = track?.title ?: "audiobook file"
+                    playbackStatusEvents.postError("File not found: $filename")
+                    reconcileQueueWithDatabase(forcePlayPreferred = true)
+                    queueInvalidator.invalidate()
+                }
             }
         }
     }
 
     private var lastSavedPositionSec: Long = -1L
-    private var lastSavedEpisodeId: Long? = null
+    private var lastSavedMediaId: String? = null
 
-    private fun rememberSignificantPosition(episodeId: Long, positionMs: Long) {
-        lastSignificantEpisodeId = episodeId
+    private fun rememberSignificantPosition(mediaId: String, positionMs: Long) {
+        lastSignificantMediaId = mediaId
         lastSignificantPositionMs = positionMs.coerceAtLeast(0L)
     }
 
@@ -394,27 +425,39 @@ class PlaybackService : MediaSessionService() {
     }
 
     private suspend fun saveCurrentPosition(force: Boolean = false, allowExplicitZero: Boolean = false) {
-        val episodeId = currentEpisodeId() ?: return
+        val mediaQueueId = currentMediaQueueId() ?: return
+        val currentMediaId = mediaQueueId.toMediaId()
         val pos = resolveMeaningfulPlaybackPosition(
             currentPositionMs = player.currentPosition,
-            lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantEpisodeId == episodeId },
+            lastSignificantPositionMs = lastSignificantPositionMs.takeIf { lastSignificantMediaId == currentMediaId },
             allowExplicitZero = allowExplicitZero
         ) ?: return
+
         val posSec = pos / 1000L
-        if (!force && episodeId == lastSavedEpisodeId && posSec == lastSavedPositionSec) {
+        if (!force && currentMediaId == lastSavedMediaId && posSec == lastSavedPositionSec) {
             return
         }
+
         val durMs = player.duration
         val durSec = if (durMs > 0L) durMs / 1000L else 0L
+
         withContext(Dispatchers.IO) {
-            episodeDao.updatePlaybackPosition(episodeId, pos)
-            if (durSec > 0L) {
-                episodeDao.updateDurationIfMissing(episodeId, durSec)
+            when (mediaQueueId) {
+                is MediaQueueId.Episode -> {
+                    episodeDao.updatePlaybackPosition(mediaQueueId.episodeId, pos)
+                    if (durSec > 0L) {
+                        episodeDao.updateDurationIfMissing(mediaQueueId.episodeId, durSec)
+                    }
+                }
+                is MediaQueueId.Audiobook -> {
+                    audiobookDao.updateTrackProgress(mediaQueueId.trackId, positionMs = pos, isListened = false)
+                }
             }
         }
-        rememberSignificantPosition(episodeId, pos)
+
+        rememberSignificantPosition(currentMediaId, pos)
         lastSavedPositionSec = posSec
-        lastSavedEpisodeId = episodeId
+        lastSavedMediaId = currentMediaId
     }
 
     private suspend fun completeEpisode(episodeId: Long) {
@@ -425,59 +468,51 @@ class PlaybackService : MediaSessionService() {
         smartListeningManager.cleanupEpisodeFile(episodeId)
     }
 
-    private fun handleEpisodeCompleted(
-        episodeId: Long,
-        nextEpisodeId: Long? = null,
-        preferFirstEpisode: Boolean = false,
+    private suspend fun completeAudiobookTrack(audiobookId: Long, trackId: Long) {
+        withContext(Dispatchers.IO) {
+            audiobookDao.updateTrackProgress(trackId, positionMs = 0L, isListened = true)
+            val unlistened = audiobookDao.getFirstUnlistenedSelectedTrack(audiobookId)
+            if (unlistened == null) {
+                // Entire audiobook complete! (ABK-10)
+                playlistRepository.removeAudiobookFromPlaylist(audiobookId)
+                audiobookDao.resetAudiobookProgress(audiobookId)
+            }
+        }
+    }
+
+    private fun handleTrackCompleted(
+        completedMediaId: String,
+        nextMediaId: String? = null,
+        preferFirstItem: Boolean = false,
         forcePlayPreferred: Boolean = false
     ) {
-        if (!completedEpisodeTracker.markCompleted(episodeId)) return
+        if (!completedEpisodeTracker.markMediaCompleted(completedMediaId)) return
+        val queueId = MediaQueueId.fromMediaId(completedMediaId) ?: return
+
         serviceScope.launch {
-            if (nextEpisodeId != null) appSettingsDataStore.setActiveEpisodeId(nextEpisodeId)
-            completeEpisode(episodeId)
-            reconcileQueueWithDatabase(preferFirstEpisode = preferFirstEpisode, forcePlayPreferred = forcePlayPreferred)
+            when (queueId) {
+                is MediaQueueId.Episode -> completeEpisode(queueId.episodeId)
+                is MediaQueueId.Audiobook -> completeAudiobookTrack(queueId.audiobookId, queueId.trackId)
+            }
+
+            if (nextMediaId != null) {
+                val nextQueueId = MediaQueueId.fromMediaId(nextMediaId)
+                if (nextQueueId is MediaQueueId.Episode) {
+                    appSettingsDataStore.setActiveEpisodeId(nextQueueId.episodeId)
+                }
+            }
+
+            reconcileQueueWithDatabase(
+                preferFirstItem = preferFirstItem,
+                forcePlayPreferred = forcePlayPreferred
+            )
             queueInvalidator.invalidate()
         }
     }
 
-    private fun currentEpisodeId(): Long? = player.currentMediaItem?.mediaId?.toLongOrNull()
-
-    private fun PlaylistItemWithEpisode.resolveMediaUri(): Uri {
-        val ep = this.episode
-        return if (ep.isDownloaded && !ep.localFilePath.isNullOrBlank() && File(ep.localFilePath).exists()) {
-            Uri.fromFile(File(ep.localFilePath))
-        } else {
-            Uri.parse(ep.audioUrl)
-        }
-    }
-
-    @androidx.annotation.OptIn(UnstableApi::class)
-    private fun PlaylistItemWithEpisode.toMediaItem(): MediaItem {
-        val ep = this.episode
-        val uri = resolveMediaUri()
-
-        val extras = android.os.Bundle().apply {
-            putLong(EXTRA_DURATION_SECONDS, ep.durationSeconds)
-        }
-
-        return MediaItem.Builder()
-            .setMediaId(ep.id.toString())
-            .setCustomCacheKey(buildEpisodeCustomCacheKey(ep.id))
-            .setUri(uri)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(ep.title)
-                    .setArtist(this.podcastTitle)
-                    .setArtworkUri(if (this.podcastArtworkUrl.isNotBlank()) Uri.parse(this.podcastArtworkUrl) else null)
-                    .setExtras(extras)
-                    .build()
-            )
-            .build()
-    }
-
-    companion object {
-        const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
-    }
+    private fun currentMediaId(): String? = player.currentMediaItem?.mediaId
+    private fun currentMediaQueueId(): MediaQueueId? = MediaQueueId.fromMediaId(currentMediaId())
+    private fun currentEpisodeId(): Long? = (currentMediaQueueId() as? MediaQueueId.Episode)?.episodeId
 }
 
 internal fun buildEpisodeCustomCacheKey(episodeId: Long): String = "episode_$episodeId"
