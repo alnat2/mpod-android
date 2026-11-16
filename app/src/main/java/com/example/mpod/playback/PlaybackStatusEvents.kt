@@ -7,7 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed interface PlaybackStatusEvent {
-    data class Error(val message: String) : PlaybackStatusEvent()
+    data class Error(val message: String) : PlaybackStatusEvent
 }
 
 @Singleton

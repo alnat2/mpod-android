@@ -17,12 +17,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.argThat
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.never
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import com.example.mpod.testutil.any
+import com.example.mpod.testutil.argThat
+import com.example.mpod.testutil.mock
+import com.example.mpod.testutil.never
+import com.example.mpod.testutil.verify
+import com.example.mpod.testutil.whenever
 
 class PlaylistRepositoryPlayableItemsTest {
 
@@ -61,7 +61,7 @@ class PlaylistRepositoryPlayableItemsTest {
     )
 
     @Test
-    fun getPlayableItems_returnsEpisodesAndAudiobooksInPositionOrder() = runBlocking {
+    fun getPlayableItems_returnsEpisodesAndAudiobooksInPositionOrder(): Unit = runBlocking {
         val playlistItems = listOf(
             PlaylistItemEntity(id = 100L, episodeId = 1L, position = 0),
             PlaylistItemEntity(id = 101L, audiobookId = 20L, position = 1),
@@ -111,7 +111,7 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun getPlayableItemsFlow_emitsCombinedItemsInPositionOrder() = runBlocking {
+    fun getPlayableItemsFlow_emitsCombinedItemsInPositionOrder(): Unit = runBlocking {
         val playlistItems = listOf(
             PlaylistItemEntity(id = 100L, episodeId = 1L, position = 0),
             PlaylistItemEntity(id = 101L, audiobookId = 20L, position = 1)
@@ -139,7 +139,7 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun addAudiobookToPlaylist_withTrackIds_insertsMissingTracksAndAppends() = runBlocking {
+    fun addAudiobookToPlaylist_withTrackIds_insertsMissingTracksAndAppends(): Unit = runBlocking {
         whenever(audiobookDao.getSelectedTrackIdsForAudiobook(10L)).thenReturn(listOf(101L))
         whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
 
@@ -153,7 +153,7 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun addAudiobookToPlaylist_withNullTrackIdsAndNoExistingSelection_selectsAllTracks() = runBlocking {
+    fun addAudiobookToPlaylist_withNullTrackIdsAndNoExistingSelection_selectsAllTracks(): Unit = runBlocking {
         whenever(audiobookDao.getSelectedTrackIdsForAudiobook(10L)).thenReturn(emptyList())
         val allTracks = listOf(
             createTrack(101L, 10L, "Ch 1", 1),
@@ -172,7 +172,7 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun addAudiobookToPlaylist_withNullTrackIdsAndExistingSelection_doesNotOverwriteTracks() = runBlocking {
+    fun addAudiobookToPlaylist_withNullTrackIdsAndExistingSelection_doesNotOverwriteTracks(): Unit = runBlocking {
         whenever(audiobookDao.getSelectedTrackIdsForAudiobook(10L)).thenReturn(listOf(101L))
         whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
 
@@ -184,13 +184,13 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun removeAudiobookFromPlaylist_delegatesToPlaylistDao() = runBlocking {
+    fun removeAudiobookFromPlaylist_delegatesToPlaylistDao(): Unit = runBlocking {
         repository.removeAudiobookFromPlaylist(15L)
         verify(playlistDao).removeAudiobookFromPlaylist(15L)
     }
 
     @Test
-    fun reorderPlayableItems_delegatesToPlaylistDao() = runBlocking {
+    fun reorderPlayableItems_delegatesToPlaylistDao(): Unit = runBlocking {
         val items = listOf(
             PlaylistItemEntity(id = 1L, audiobookId = 10L, position = 0),
             PlaylistItemEntity(id = 2L, episodeId = 5L, position = 1)

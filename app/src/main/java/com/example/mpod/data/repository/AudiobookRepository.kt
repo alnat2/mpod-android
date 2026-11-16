@@ -56,9 +56,11 @@ class AudiobookRepository @Inject constructor(
         return scanner.scanFolder(treeUri)
     }
 
+    internal var uriParser: (String) -> Uri = { Uri.parse(it) }
+
     suspend fun rescanLibrary(): ScanSummary? {
         val folderUriString = appSettingsStore.settingsFlow.first().audiobooksFolderUri ?: return null
-        val treeUri = Uri.parse(folderUriString)
+        val treeUri = uriParser(folderUriString)
         return scanner.scanFolder(treeUri)
     }
 

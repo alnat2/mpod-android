@@ -381,7 +381,7 @@ class EpisodeManualActionCleanupTest {
             override fun getMaxPosition(): Int? = playlist.values.maxOfOrNull { it.position }
             override fun isEpisodeInPlaylist(episodeId: Long): Boolean = episodeId in playlist
             override fun insertPlaylistItem(item: PlaylistItemEntity): Long {
-                playlist[item.episodeId] = item
+                item.episodeId?.let { playlist[it] = item }
                 emit()
                 return item.id
             }

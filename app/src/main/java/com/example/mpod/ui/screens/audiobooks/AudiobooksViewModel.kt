@@ -108,7 +108,7 @@ class AudiobooksViewModel @Inject constructor(
                 val summary = audiobookRepository.scanDirectory(uri)
                 _state.value = _state.value.copy(
                     isScanning = false,
-                    statusMessage = "Found ${summary.booksAdded} audiobooks (${summary.tracksAdded} tracks)"
+                    statusMessage = "Found ${summary.booksScanned} audiobooks (${summary.tracksScanned} tracks)"
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
@@ -128,7 +128,7 @@ class AudiobooksViewModel @Inject constructor(
                 if (summary != null) {
                     _state.value = _state.value.copy(
                         isScanning = false,
-                        statusMessage = "Rescan complete: ${summary.booksAdded} added, ${summary.tracksAdded} tracks"
+                        statusMessage = "Rescan complete: ${summary.booksScanned} added, ${summary.tracksScanned} tracks"
                     )
                 } else {
                     _state.value = _state.value.copy(

@@ -14,11 +14,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.argThat
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import com.example.mpod.testutil.any
+import com.example.mpod.testutil.argThat
+import com.example.mpod.testutil.mock
+import com.example.mpod.testutil.verify
+import com.example.mpod.testutil.whenever
 
 class AudiobookRepositoryTest {
 
@@ -33,16 +33,21 @@ class AudiobookRepositoryTest {
         scanner = mock()
         appSettingsStore = FakeAppSettingsStore()
         repository = AudiobookRepository(audiobookDao, scanner, appSettingsStore)
+        repository.uriParser = { uriStr ->
+            val mockUri = mock<Uri>()
+            whenever(mockUri.toString()).thenReturn(uriStr)
+            mockUri
+        }
     }
 
     @Test
-    fun rescanLibrary_whenNoUriConfigured_returnsNull() = runBlocking {
+    fun rescanLibrary_whenNoUriConfigured_returnsNull(): Unit = runBlocking {
         val result = repository.rescanLibrary()
         assertNull(result)
     }
 
     @Test
-    fun rescanLibrary_whenUriConfigured_callsScanner() = runBlocking {
+    fun rescanLibrary_whenUriConfigured_callsScanner(): Unit = runBlocking {
         appSettingsStore.setAudiobooksFolderUri("content://audiobooks/my_books")
         val summary = ScanSummary(booksScanned = 2, tracksScanned = 10)
         whenever(scanner.scanFolder(any())).thenReturn(summary)
@@ -54,7 +59,7 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun scanDirectory_savesFolderUriAndDelegatesToScanner() = runBlocking {
+    fun scanDirectory_savesFolderUriAndDelegatesToScanner(): Unit = runBlocking {
         val uri = mock<Uri>()
         whenever(uri.toString()).thenReturn("content://audiobooks/tree")
         val summary = ScanSummary(booksScanned = 3, tracksScanned = 15)
@@ -68,7 +73,7 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun setSelectedTracks_clearsAndInsertsPlaylistTracks() = runBlocking {
+    fun setSelectedTracks_clearsAndInsertsPlaylistTracks(): Unit = runBlocking {
         repository.setSelectedTracks(42L, listOf(1L, 2L, 3L))
         verify(audiobookDao).clearPlaylistTracksForBook(42L)
         verify(audiobookDao).insertPlaylistTracks(argThat {
@@ -77,7 +82,7 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun getCurrentTrackForAudiobook_prefersUnlistenedTrack() = runBlocking {
+    fun getCurrentTrackForAudiobook_prefersUnlistenedTrack(): Unit = runBlocking {
         val unlistened = AudiobookTrackEntity(id = 1L, audiobookId = 10L, title = "Unlistened", fileUri = "u.mp3", trackNumber = 1)
         whenever(audiobookDao.getFirstUnlistenedSelectedTrack(10L)).thenReturn(unlistened)
 
@@ -86,7 +91,7 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun getCurrentTrackForAudiobook_fallbackToFirstSelectedTrackWhenAllListened() = runBlocking {
+    fun getCurrentTrackForAudiobook_fallbackToFirstSelectedTrackWhenAllListened(): Unit = runBlocking {
         val firstTrack = AudiobookTrackEntity(id = 1L, audiobookId = 10L, title = "First", fileUri = "1.mp3", trackNumber = 1)
         whenever(audiobookDao.getFirstUnlistenedSelectedTrack(10L)).thenReturn(null)
         whenever(audiobookDao.getFirstSelectedTrack(10L)).thenReturn(firstTrack)
@@ -96,7 +101,7 @@ class AudiobookRepositoryTest {
     }
 
     @Test
-    fun resetAudiobookProgress_delegatesToDao() = runBlocking {
+    fun resetAudiobookProgress_delegatesToDao(): Unit = runBlocking {
         repository.resetAudiobookProgress(101L)
         verify(audiobookDao).resetAudiobookProgress(101L)
     }

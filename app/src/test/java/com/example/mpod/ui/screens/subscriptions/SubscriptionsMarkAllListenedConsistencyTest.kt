@@ -768,7 +768,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
             override fun getAllPlaylistItems() = synchronized(lock) { playlistRows.values.toList() }
             override fun getMaxPosition() = synchronized(lock) { playlistRows.values.maxOfOrNull { it.position } }
             override fun isEpisodeInPlaylist(episodeId: Long) = synchronized(lock) { episodeId in playlistRows }
-            override fun insertPlaylistItem(item: PlaylistItemEntity): Long = synchronized(lock) { playlistRows[item.episodeId] = item; emit(); item.episodeId }
+            override fun insertPlaylistItem(item: PlaylistItemEntity): Long = synchronized(lock) { val id = item.episodeId ?: 0L; playlistRows[id] = item; emit(); id }
             override fun insertPlaylistItems(items: List<PlaylistItemEntity>) = synchronized(lock) { items.map { insertPlaylistItem(it) } }
             override fun removeFromPlaylist(episodeId: Long) = synchronized(lock) { removed.add(episodeId); playlistRows.remove(episodeId); emit() }
             override fun clearPlaylist() = synchronized(lock) { playlistRows.clear(); emit() }

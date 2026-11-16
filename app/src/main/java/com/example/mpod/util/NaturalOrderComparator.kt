@@ -53,12 +53,12 @@ class NaturalOrderComparator<T> private constructor(
                 } else {
                     val textCompare = c1.compareTo(c2, ignoreCase = true)
                     if (textCompare != 0) return textCompare
-                    val caseCompare = c1.compareTo(c2)
-                    if (caseCompare != 0) return caseCompare
                 }
             }
 
-            return chunks1.size.compareTo(chunks2.size)
+            val sizeCmp = chunks1.size.compareTo(chunks2.size)
+            if (sizeCmp != 0) return sizeCmp
+            return s1.compareTo(s2)
         }
 
         private fun splitIntoChunks(s: String): List<String> {

@@ -5,53 +5,48 @@ import android.content.Context
 import android.net.Uri
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.entity.AudiobookEntity
+import com.example.mpod.data.local.entity.AudiobookPlaylistTrackEntity
 import com.example.mpod.data.local.entity.AudiobookTrackEntity
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.argumentCaptor
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
+import org.mockito.Mockito
+import java.io.File
 
 class AudiobookStorageScannerTest {
 
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
-    private lateinit var audiobookDao: AudiobookDao
-    private lateinit var metadataExtractor: AudioMetadataExtractor
+    private lateinit var fakeAudiobookDao: FakeAudiobookDao
+    private lateinit var fakeMetadataExtractor: FakeAudioMetadataExtractor
     private lateinit var fakeTreeHelper: FakeDocumentTreeHelper
     private lateinit var scanner: AudiobookStorageScanner
     private lateinit var treeUri: Uri
 
     @Before
-    fun setUp() = runBlocking {
-        context = mock()
-        contentResolver = mock()
-        whenever(context.contentResolver).thenReturn(contentResolver)
+    fun setUp() {
+        context = Mockito.mock(Context::class.java)
+        contentResolver = Mockito.mock(ContentResolver::class.java)
+        Mockito.`when`(context.contentResolver).thenReturn(contentResolver)
+        Mockito.`when`(context.cacheDir).thenReturn(File(System.getProperty("java.io.tmpdir", "/tmp")))
 
-        audiobookDao = mock()
-        whenever(audiobookDao.upsertAudiobook(any())).thenReturn(100L)
-        whenever(audiobookDao.getTracksForAudiobook(any())).thenReturn(emptyList())
-
-        metadataExtractor = mock()
-        whenever(metadataExtractor.extract(any(), any())).thenReturn(null)
-
+        fakeAudiobookDao = FakeAudiobookDao()
+        fakeMetadataExtractor = FakeAudioMetadataExtractor()
         fakeTreeHelper = FakeDocumentTreeHelper()
-        scanner = AudiobookStorageScanner(context, audiobookDao, metadataExtractor)
+
+        scanner = AudiobookStorageScanner(context, fakeAudiobookDao, fakeMetadataExtractor)
         scanner.treeHelper = fakeTreeHelper
 
         treeUri = fakeTreeHelper.createMockUri("content://tree/root")
     }
 
     @Test
-    fun processBookFolder_withDiscSubfolders_aggregatesTracksAcrossDiscsInNaturalOrder() = runBlocking {
+    fun processBookFolder_withDiscSubfolders_aggregatesTracksAcrossDiscsInNaturalOrder(): Unit = runBlocking {
         val bookDir = DocumentItem(
             docId = "book_war_and_peace",
             name = "War and Peace",
@@ -86,16 +81,12 @@ class AudiobookStorageScannerTest {
         assertFalse(result.limitExceeded)
 
         // Verify book upserted
-        val bookCaptor = argumentCaptor<AudiobookEntity>()
-        verify(audiobookDao).upsertAudiobook(bookCaptor.capture())
-        assertEquals("War and Peace", bookCaptor.firstValue.title)
-        assertEquals("Leo Tolstoy", bookCaptor.firstValue.author)
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("War and Peace", book.title)
+        assertEquals("Leo Tolstoy", book.author)
 
         // Verify tracks upserted in natural order across both discs
-        val trackCaptor = argumentCaptor<AudiobookTrackEntity>()
-        verify(audiobookDao, times(4)).insertTrack(trackCaptor.capture())
-        val insertedTracks = trackCaptor.allValues
-
+        val insertedTracks = fakeAudiobookDao.insertedTracks
         assertEquals(4, insertedTracks.size)
         assertEquals("01-Chapter 1", insertedTracks[0].title)
         assertEquals(1, insertedTracks[0].trackNumber)
@@ -115,7 +106,7 @@ class AudiobookStorageScannerTest {
     }
 
     @Test
-    fun processBookFolder_withDiscSubfolders_discoversCoverInsideDiscFolderWhenMissingInRoot() = runBlocking {
+    fun processBookFolder_withDiscSubfolders_discoversCoverInsideDiscFolderWhenMissingInRoot(): Unit = runBlocking {
         val bookDir = DocumentItem(
             docId = "book_1",
             name = "Audiobook With Disc Cover",
@@ -146,13 +137,12 @@ class AudiobookStorageScannerTest {
             currentFileCount = 0
         )
 
-        val bookCaptor = argumentCaptor<AudiobookEntity>()
-        verify(audiobookDao).upsertAudiobook(bookCaptor.capture())
-        assertEquals("content://tree/cd1_cover", bookCaptor.firstValue.coverUri)
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("content://tree/cd1_cover", book.coverUri)
     }
 
     @Test
-    fun processBookFolder_withCoverInBookRoot_prefersRootCoverOverDiscCover() = runBlocking {
+    fun processBookFolder_withCoverInBookRoot_prefersRootCoverOverDiscCover(): Unit = runBlocking {
         val bookDir = DocumentItem(
             docId = "book_1",
             name = "Audiobook With Root Cover",
@@ -180,13 +170,12 @@ class AudiobookStorageScannerTest {
             currentFileCount = 0
         )
 
-        val bookCaptor = argumentCaptor<AudiobookEntity>()
-        verify(audiobookDao).upsertAudiobook(bookCaptor.capture())
-        assertEquals("content://tree/root_cover", bookCaptor.firstValue.coverUri)
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("content://tree/root_cover", book.coverUri)
     }
 
     @Test
-    fun scanFolder_withMultiDiscBook_identifiesBookFolderAndAggregatesDiscs() = runBlocking {
+    fun scanFolder_withMultiDiscBook_identifiesBookFolderAndAggregatesDiscs(): Unit = runBlocking {
         // Root has 1 book folder that contains only CD subfolders
         fakeTreeHelper.childrenMap["root"] = listOf(
             DocumentItem("book_hobbit", "The Hobbit", "vnd.android.document/directory", 0L, isDirectory = true)
@@ -210,7 +199,7 @@ class AudiobookStorageScannerTest {
     }
 
     @Test
-    fun scanFolder_withAuthorHierarchyAndDiscSubfolders_assignsAuthorAndProcessesBook() = runBlocking {
+    fun scanFolder_withAuthorHierarchyAndDiscSubfolders_assignsAuthorAndProcessesBook(): Unit = runBlocking {
         // Root / Author / Book / CD1
         fakeTreeHelper.childrenMap["root"] = listOf(
             DocumentItem("author_dir", "J. R. R. Tolkien", "vnd.android.document/directory", 0L, isDirectory = true)
@@ -231,14 +220,13 @@ class AudiobookStorageScannerTest {
         assertEquals(1, summary.booksScanned)
         assertEquals(2, summary.tracksScanned)
 
-        val bookCaptor = argumentCaptor<AudiobookEntity>()
-        verify(audiobookDao).upsertAudiobook(bookCaptor.capture())
-        assertEquals("The Two Towers", bookCaptor.firstValue.title)
-        assertEquals("J. R. R. Tolkien", bookCaptor.firstValue.author)
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("The Two Towers", book.title)
+        assertEquals("J. R. R. Tolkien", book.author)
     }
 
     @Test
-    fun processBookFolder_withDuplicateTrackNamesAcrossDiscs_preservesDiscSequenceWithoutInterleaving() = runBlocking {
+    fun processBookFolder_withDuplicateTrackNamesAcrossDiscs_preservesDiscSequenceWithoutInterleaving(): Unit = runBlocking {
         val bookDir = DocumentItem(
             docId = "book_lotr",
             name = "The Fellowship of the Ring",
@@ -275,9 +263,7 @@ class AudiobookStorageScannerTest {
         assertEquals(5, result.tracksProcessed)
         assertFalse(result.limitExceeded)
 
-        val trackCaptor = argumentCaptor<AudiobookTrackEntity>()
-        verify(audiobookDao, times(5)).insertTrack(trackCaptor.capture())
-        val tracks = trackCaptor.allValues
+        val tracks = fakeAudiobookDao.insertedTracks
 
         // Expected sequence: direct root -> CD1/01 -> CD1/02 -> CD2/01 -> CD2/02 (NO interleaving)
         assertEquals("00-intro", tracks[0].title)
@@ -297,7 +283,7 @@ class AudiobookStorageScannerTest {
     }
 
     @Test
-    fun processBookFolder_whenLimitReached_truncatesFromSequentialOrder() = runBlocking {
+    fun processBookFolder_whenLimitReached_truncatesFromSequentialOrder(): Unit = runBlocking {
         val bookDir = DocumentItem(
             docId = "book_1",
             name = "Book Over Capacity",
@@ -331,16 +317,94 @@ class AudiobookStorageScannerTest {
         assertEquals(2, result.tracksProcessed)
         assertTrue(result.limitExceeded)
 
-        val trackCaptor = argumentCaptor<AudiobookTrackEntity>()
-        verify(audiobookDao, times(2)).insertTrack(trackCaptor.capture())
-        val tracks = trackCaptor.allValues
+        val tracks = fakeAudiobookDao.insertedTracks
 
         // Only first 2 tracks in sequential order are processed
         assertEquals("content://tree/cd1_t1", tracks[0].fileUri)
         assertEquals("content://tree/cd1_t2", tracks[1].fileUri)
     }
 
-    class FakeDocumentTreeHelper : DocumentTreeHelper {
+    internal class FakeAudiobookDao : AudiobookDao {
+        val upsertedBooks = mutableListOf<AudiobookEntity>()
+        val insertedTracks = mutableListOf<AudiobookTrackEntity>()
+
+        override suspend fun upsertAudiobook(audiobook: AudiobookEntity): Long {
+            upsertedBooks.add(audiobook)
+            return 100L
+        }
+
+        override suspend fun insertAudiobook(audiobook: AudiobookEntity): Long = upsertAudiobook(audiobook)
+
+        override suspend fun insertAudiobooks(audiobooks: List<AudiobookEntity>): List<Long> {
+            upsertedBooks.addAll(audiobooks)
+            return audiobooks.map { 100L }
+        }
+
+        override suspend fun updateAudiobook(audiobook: AudiobookEntity) {}
+        override suspend fun deleteAudiobook(audiobook: AudiobookEntity) {}
+        override suspend fun deleteAudiobookById(audiobookId: Long) {}
+        override suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity? = null
+        override fun getAudiobookByIdFlow(audiobookId: Long): Flow<AudiobookEntity?> = emptyFlow()
+        override suspend fun getAudiobookByFolderUri(folderUri: String): AudiobookEntity? = null
+        override suspend fun getAllAudiobooks(): List<AudiobookEntity> = emptyList()
+        override fun getAllAudiobooksFlow(): Flow<List<AudiobookEntity>> = emptyFlow()
+        override suspend fun getAudiobookCount(): Int = upsertedBooks.size
+
+        override suspend fun upsertTrack(track: AudiobookTrackEntity): Long {
+            insertedTracks.add(track)
+            return track.id
+        }
+
+        override suspend fun upsertTracks(tracks: List<AudiobookTrackEntity>): List<Long> {
+            insertedTracks.addAll(tracks)
+            return tracks.map { it.id }
+        }
+
+        override suspend fun insertTrack(track: AudiobookTrackEntity): Long {
+            insertedTracks.add(track)
+            return track.id
+        }
+
+        override suspend fun insertTracks(tracks: List<AudiobookTrackEntity>): List<Long> {
+            insertedTracks.addAll(tracks)
+            return tracks.map { it.id }
+        }
+
+        override suspend fun updateTrack(track: AudiobookTrackEntity) {}
+        override suspend fun getTrackByFileUri(audiobookId: Long, fileUri: String): AudiobookTrackEntity? =
+            insertedTracks.find { it.audiobookId == audiobookId && it.fileUri == fileUri }
+        override suspend fun updateTrackProgress(trackId: Long, positionMs: Long, isListened: Boolean) {}
+        override suspend fun updateTrackAvailability(trackId: Long, isAvailable: Boolean) {}
+        override suspend fun getTrackById(trackId: Long): AudiobookTrackEntity? =
+            insertedTracks.find { it.id == trackId }
+        override suspend fun getTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> =
+            insertedTracks.filter { it.audiobookId == audiobookId }
+        override fun getTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>> = emptyFlow()
+        override suspend fun deleteTracksForAudiobook(audiobookId: Long) {}
+
+        override suspend fun insertPlaylistTrack(playlistTrack: AudiobookPlaylistTrackEntity) {}
+        override suspend fun insertPlaylistTracks(playlistTracks: List<AudiobookPlaylistTrackEntity>) {}
+        override suspend fun removePlaylistTrack(audiobookId: Long, trackId: Long) {}
+        override suspend fun clearPlaylistTracksForBook(audiobookId: Long) {}
+        override suspend fun getSelectedTrackIdsForAudiobook(audiobookId: Long): List<Long> = emptyList()
+        override suspend fun getSelectedTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> = emptyList()
+        override fun getSelectedTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>> = emptyFlow()
+        override fun getPlaylistAudiobookTracksFlow(): Flow<List<AudiobookTrackEntity>> = emptyFlow()
+        override suspend fun getFirstUnlistenedSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
+        override suspend fun getFirstSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
+        override suspend fun getCurrentTrackForAudiobook(audiobookId: Long): AudiobookTrackEntity? = null
+        override suspend fun resetAudiobookProgress(audiobookId: Long) {}
+    }
+
+    internal class FakeAudioMetadataExtractor : AudioMetadataExtractor {
+        var metadataResult: ExtractedAudioMetadata? = null
+        override fun extract(
+            uri: Uri,
+            includePicture: Boolean
+        ): ExtractedAudioMetadata? = metadataResult
+    }
+
+    internal class FakeDocumentTreeHelper : DocumentTreeHelper {
         val childrenMap = mutableMapOf<String, List<DocumentItem>>()
 
         override fun getTreeDocumentId(treeUri: Uri): String = "root"
@@ -358,8 +422,8 @@ class AudiobookStorageScannerTest {
         }
 
         fun createMockUri(uriString: String): Uri {
-            val mockUri = mock<Uri>()
-            whenever(mockUri.toString()).thenReturn(uriString)
+            val mockUri = Mockito.mock(Uri::class.java)
+            Mockito.`when`(mockUri.toString()).thenReturn(uriString)
             return mockUri
         }
     }

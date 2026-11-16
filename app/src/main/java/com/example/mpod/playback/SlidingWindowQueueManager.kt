@@ -57,10 +57,10 @@ sealed class PlaybackTrack {
         val podcastTitle: String,
         val podcastArtworkUrl: String
     ) : PlaybackTrack() {
-        override val mediaUri: Uri = resolveEpisodeUri(episode)
+        override val mediaUri: Uri get() = resolveEpisodeUri(episode)
         override val title: String = episode.title
         override val subtitle: String = podcastTitle
-        override val artworkUri: Uri? = podcastArtworkUrl.takeIf { it.isNotBlank() }?.let(Uri::parse)
+        override val artworkUri: Uri? get() = podcastArtworkUrl.takeIf { it.isNotBlank() }?.let(Uri::parse)
         override val durationSeconds: Long = episode.durationSeconds
         override val initialPositionMs: Long = episode.playbackPositionMs
         override val customCacheKey: String = "episode_${episode.id}"
@@ -84,10 +84,10 @@ sealed class PlaybackTrack {
         val chapterIndex: Int,
         val totalChapters: Int
     ) : PlaybackTrack() {
-        override val mediaUri: Uri = Uri.parse(track.fileUri)
+        override val mediaUri: Uri get() = Uri.parse(track.fileUri)
         override val title: String = track.title
         override val subtitle: String = audiobook.title
-        override val artworkUri: Uri? = audiobook.coverUri?.let(Uri::parse)
+        override val artworkUri: Uri? get() = audiobook.coverUri?.let(Uri::parse)
         override val durationSeconds: Long = track.durationSeconds
         override val initialPositionMs: Long = track.playbackPositionMs
         override val customCacheKey: String = "audiobook_${audiobook.id}_${track.id}"
