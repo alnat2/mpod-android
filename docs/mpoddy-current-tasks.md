@@ -55,10 +55,31 @@
   - Создан `AudiobookRepository` для координации сканирования, сохранения настроек и доступа к книгам/главам.
   - Добавлены тесты `NaturalOrderComparatorTest`, `AudiobookRepositoryTest`, расширен `AppSettingsDataStoreTest`.
 
+### MPOD-ABK-05 (Этап 4) — Логика очереди и бесшовный плеер
+- **Статус:** `CLOSED — PASS`, 14.11.2026.
+- **Что сделано:**
+  - Полиморфная модель очереди `PlayableItem` (`EpisodeItem` и `AudiobookItem`).
+  - Разрешение скользящего окна из 2 треков (`SlidingWindowResolver`) с предзагрузкой следующего трека/главы для бесшовного воспроизведения без пауз.
+  - Обработка `STATE_ENDED` и ротация скользящего окна в `PlaybackService`.
+  - Защита и перехват недоступных файлов (`ABK-05b`) с пропуском на следующий доступный трек.
+  - Атомарное удаление книги из очереди и сброс прогресса в Room (`ABK-10`) по завершении последней главы.
+  - Добавлены тесты `SlidingWindowResolverTest` и `PlaylistRepositoryPlayableItemsTest`.
+
+### MPOD-ABK-06 (Этап 5) — UI и Compose-компоненты по макетам Figma
+- **Статус:** `CLOSED — PASS`, 16.11.2026.
+- **Что сделано:**
+  - Нижняя навигация на 5 вкладок (`Player`, `Podcasts`, `Abooks`, `Settings`, `Add`) по макету `1269:7839`.
+  - Экран `AudiobooksScreen` и `AudiobooksViewModel` с навигацией по папкам авторов и книг, хлебными крошками (`1304:10573`).
+  - Компонент `FilemanagerItem` (`1288:9444`) с поддержкой типов `Directory`, `AudiobookDirectory`, `AudioFile`.
+  - Модальное окно `ChaptersModal` (`1309:12489`) с двумя режимами (`FileManager` для выбора глав в очередь без воспроизведения `ABK-07`, и `Player` с прогрессом и Pause/Play/Replay `ABK-08`).
+  - Цифровой ввод точного времени `PlayerMobileTimeInput` (`1346:15503`) с динамическим сдвигом цифр `HH:MM:SS` (`ABK-14`).
+  - Разделение статусов плеера в `PlayerView` (`1353:15629`): отображение скорости и вызова глав для аудиокниг, заметок для подкастов.
+  - Поддержка кастомной команды выбора главы через `EXTRA_PREFERRED_TRACK_ID`.
+  - Unit-тесты `PlayerMobileTimeInputTest`, `AudiobooksViewModelTest`, обновление `MpodAccessibilityTest`.
+  - Независимый diff review проведен в Swarm на `Claude Sonnet 4.6 (Thinking)`: все замечания (C1–C3, M2–M5, M7) исправлены и верифицированы.
+
 ### Очередь следующих этапов (MPOD-ABK)
-1. **`MPOD-ABK-05` (Этап 4):** Логика очереди и бесшовный плеер («1 книга = 1 элемент», 2-track sliding window, обработка `STATE_ENDED`, перехват `ABK-05b`).
-2. **`MPOD-ABK-06` (Этап 5):** UI и Compose-компоненты по макетам Figma (экран Abooks, 5 вкладок BottomNav, модалка глав `1309:12489`, ввод времени `PlayerMobileTimeInput` `1346:15503`, палитра mpoddy dark mode).
-3. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
+1. **`MPOD-ABK-07` (Этап 6):** Регрессионное тестирование, Room migration tests, diff review и сборка релизного APK.
 
 ## Последняя закрытая задача — MPOD-REL-02
 
