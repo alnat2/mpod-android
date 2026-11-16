@@ -74,14 +74,18 @@ class HomeViewModel @Inject constructor(
                             val curTrack = item.currentTrack
                             val chapterProgressSec = (curTrack?.playbackPositionMs ?: 0L) / 1000L
                             val chapterDurationSec = curTrack?.durationSeconds ?: 0L
-                            val posFormatted = formatProgressTime(curTrack?.playbackPositionMs ?: 0L)
-                            val durFormatted = formatEpisodeDuration(chapterDurationSec.toInt())
+                            val posFormatted = formatProgressTime(chapterProgressSec.toInt())
+                            val durFormatted = if (chapterDurationSec > 0) {
+                                formatEpisodeDuration(chapterDurationSec.toInt()).ifBlank { "00:00" }
+                            } else {
+                                "00:00"
+                            }
                             val formattedDuration = "Chapter ${item.currentChapterIndex} of ${item.totalChaptersCount} • $posFormatted / $durFormatted"
 
                             HomeEpisodeUi(
                                 id = -item.audiobook.id,
                                 title = item.audiobook.title,
-                                podcastTitle = item.audiobook.author,
+                                podcastTitle = curTrack?.title?.ifBlank { null } ?: item.audiobook.author,
                                 durationSeconds = chapterDurationSec.toInt(),
                                 playbackPositionSeconds = chapterProgressSec.toInt(),
                                 isListened = false,

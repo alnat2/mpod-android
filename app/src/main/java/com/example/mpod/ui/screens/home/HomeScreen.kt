@@ -151,7 +151,7 @@ fun HomeRoute(
 
     LaunchedEffect(playbackSummary.currentEpisodeId) {
         val episodeId = playbackSummary.currentEpisodeId ?: return@LaunchedEffect
-        if (episodeId != state.activeEpisodeId) {
+        if (episodeId > 0 && episodeId != state.activeEpisodeId) {
             delay(PLAYBACK_ROUTE_REFRESH_DELAY_MS)
             viewModel.refresh(invalidatePlaybackQueue = false)
         }
@@ -205,17 +205,28 @@ fun HomeRoute(
                             null -> mId == episodeId.toString()
                         }
                     }
+                val seekPosMs = resolveEpisodeSeekPositionMs(
+                    episodeId = episodeId,
+                    queue = state.queue,
+                    currentMediaItemIndex = player.currentMediaItemIndex,
+                    targetMediaItemIndex = index ?: 0,
+                    isPlayerIdle = player.playbackState == Player.STATE_IDLE
+                ) ?: 0L
+
                 if (index != null) {
-                    val seekPosMs = resolveEpisodeSeekPositionMs(
-                        episodeId = episodeId,
-                        queue = state.queue,
-                        currentMediaItemIndex = player.currentMediaItemIndex,
-                        targetMediaItemIndex = index,
-                        isPlayerIdle = player.playbackState == Player.STATE_IDLE
+                    player.seekTo(index, seekPosMs)
+                    player.play()
+                } else {
+                    val targetId = if (episodeId < 0) "audiobook:${-episodeId}" else "episode:$episodeId"
+                    val command = androidx.media3.session.SessionCommand(
+                        com.example.mpod.playback.PlaybackService.CUSTOM_COMMAND_PLAY_ITEM,
+                        android.os.Bundle.EMPTY
                     )
-                    if (seekPosMs != null) {
-                        player.seekTo(index, seekPosMs)
+                    val args = android.os.Bundle().apply {
+                        putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
+                        putLong(com.example.mpod.playback.PlaybackService.EXTRA_SEEK_POSITION_MS, seekPosMs)
                     }
+                    player.sendCustomCommand(command, args)
                     player.play()
                 }
             }

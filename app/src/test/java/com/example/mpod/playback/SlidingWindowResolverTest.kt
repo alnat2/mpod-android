@@ -186,6 +186,49 @@ class SlidingWindowResolverTest {
     }
 
     @Test
+    fun resolveWindow_audiobookWithUnavailableTrack_skipsToNextUnlistenedAvailableTrack() {
+        val t1 = createTrack(101L, 10L, "Ch 1", trackNumber = 1, isListened = true, isAvailable = true)
+        val t2 = createTrack(102L, 10L, "Ch 2", trackNumber = 2, isListened = false, isAvailable = false)
+        val t3 = createTrack(103L, 10L, "Ch 3", trackNumber = 3, isListened = false, isAvailable = true)
+
+        val abk = createAudiobookItem(
+            audiobookId = 10L,
+            title = "Book",
+            position = 0,
+            tracks = listOf(t1, t2, t3),
+            currentTrack = null
+        )
+
+        val window = SlidingWindowResolver.resolveWindow(listOf(abk))
+
+        // t1 is listened, t2 is unavailable, so current must be unlistened available track t3 (not jumping back to t1)
+        assertEquals(103L, (window.current as PlaybackTrack.AudiobookChapterTrack).track.id)
+        assertNull(window.next)
+    }
+
+    @Test
+    fun resolveWindow_audiobookAllTracksUnavailable_skipsToNextPlayableItem() {
+        val t1 = createTrack(101L, 10L, "Ch 1", trackNumber = 1, isAvailable = false)
+        val t2 = createTrack(102L, 10L, "Ch 2", trackNumber = 2, isAvailable = false)
+
+        val abk = createAudiobookItem(
+            audiobookId = 10L,
+            title = "Missing Book",
+            position = 0,
+            tracks = listOf(t1, t2)
+        )
+        val ep = createEpisodeItem(5L, "Playable Episode", position = 1)
+
+        val window = SlidingWindowResolver.resolveWindow(listOf(abk, ep))
+
+        // Audiobook has no available tracks, so resolver skips forward to the next item (ep)
+        assertNotNull(window.current)
+        assertTrue(window.current is PlaybackTrack.EpisodeTrack)
+        assertEquals(5L, (window.current as PlaybackTrack.EpisodeTrack).episode.id)
+        assertNull(window.next)
+    }
+
+    @Test
     fun mediaQueueId_parsingAndFormatting() {
         val epId = MediaQueueId.Episode(42L)
         assertEquals("episode:42", epId.toMediaId())

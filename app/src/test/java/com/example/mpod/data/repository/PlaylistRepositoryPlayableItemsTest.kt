@@ -34,6 +34,7 @@ class PlaylistRepositoryPlayableItemsTest {
     fun setUp() {
         playlistDao = mock()
         audiobookDao = mock()
+        whenever(audiobookDao.getPlaylistAudiobookTracksFlow()).thenReturn(flowOf(emptyList()))
         repository = PlaylistRepository(playlistDao, audiobookDao)
     }
 

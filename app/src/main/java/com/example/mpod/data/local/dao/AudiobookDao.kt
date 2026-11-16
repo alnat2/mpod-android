@@ -124,11 +124,18 @@ interface AudiobookDao {
     """)
     fun getSelectedTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>>
 
+    @Query("""
+        SELECT t.* FROM audiobook_tracks t
+        INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
+        INNER JOIN playlist_items p ON pt.audiobookId = p.audiobookId
+    """)
+    fun getPlaylistAudiobookTracksFlow(): Flow<List<AudiobookTrackEntity>>
+
     // Invariant: currentTrack = первая незаслушанная выбранная глава, или первая выбранная глава, если все прослушаны
     @Query("""
         SELECT t.* FROM audiobook_tracks t
         INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
-        WHERE pt.audiobookId = :audiobookId AND t.isListened = 0
+        WHERE pt.audiobookId = :audiobookId AND t.isListened = 0 AND t.isAvailable = 1
         ORDER BY t.trackNumber ASC
         LIMIT 1
     """)
@@ -137,7 +144,7 @@ interface AudiobookDao {
     @Query("""
         SELECT t.* FROM audiobook_tracks t
         INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
-        WHERE pt.audiobookId = :audiobookId
+        WHERE pt.audiobookId = :audiobookId AND t.isAvailable = 1
         ORDER BY t.trackNumber ASC
         LIMIT 1
     """)

@@ -29,8 +29,9 @@ class PlaylistRepository @Inject constructor(
         combine(
             playlistDao.getAllPlaylistItemsFlow(),
             playlistDao.getPlaylistItemsWithEpisodesFlow(),
-            playlistDao.getPlaylistItemsWithAudiobooksFlow()
-        ) { allItems, episodes, audiobooks ->
+            playlistDao.getPlaylistItemsWithAudiobooksFlow(),
+            audiobookDao.getPlaylistAudiobookTracksFlow()
+        ) { allItems, episodes, audiobooks, _ ->
             val episodeMap = episodes.associateBy { it.playlistItemId }
             val audiobookMap = audiobooks.associateBy { it.playlistItemId }
 

@@ -16,14 +16,19 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import com.example.mpod.BuildConfig
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.model.PlayableItem
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
+import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.repository.PlaylistRepository
 import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +71,7 @@ class PlaybackService : MediaSessionService() {
     private var lastSignificantPositionMs: Long = 0L
     internal val completedEpisodeTracker = CompletedEpisodeTracker()
     private var applyingSettingsSpeed = false
+    private var cachedSettings: AppSettings? = null
     private val queueReconciliationMutex = Mutex()
 
     @UnstableApi
@@ -92,7 +98,13 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         serviceScope.launch {
-            val settings = appSettingsDataStore.settingsFlow.first()
+            appSettingsDataStore.settingsFlow.collectLatest { settings ->
+                cachedSettings = settings
+            }
+        }
+
+        serviceScope.launch {
+            val settings = appSettingsDataStore.settingsFlow.first().also { cachedSettings = it }
             applyingSettingsSpeed = true
             player.playbackParameters = PlaybackParameters(settings.playbackSpeed)
             applyingSettingsSpeed = false
@@ -115,11 +127,37 @@ class PlaybackService : MediaSessionService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo
         ): MediaSession.ConnectionResult {
+            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                .add(SessionCommand(CUSTOM_COMMAND_PLAY_ITEM, android.os.Bundle.EMPTY))
+                .build()
             val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommands)
             if (session.isMediaNotificationController(controller)) {
                 result.setAvailablePlayerCommands(mediaNotificationPlayerCommands())
             }
             return result.build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: android.os.Bundle
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == CUSTOM_COMMAND_PLAY_ITEM) {
+                val targetId = args.getString(EXTRA_TARGET_ITEM_ID)
+                val seekPosMs = args.getLong(EXTRA_SEEK_POSITION_MS, 0L)
+                serviceScope.launch {
+                    reconcileQueueWithDatabase(
+                        targetQueueItemId = targetId,
+                        forcePlayPreferred = true,
+                        seekPositionMs = seekPosMs
+                    )
+                    player.play()
+                }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED))
         }
     }
 
@@ -157,7 +195,8 @@ class PlaybackService : MediaSessionService() {
         targetQueueItemId: String? = null,
         preferredTrackId: Long? = null,
         preferFirstItem: Boolean = false,
-        forcePlayPreferred: Boolean = false
+        forcePlayPreferred: Boolean = false,
+        seekPositionMs: Long? = null
     ) {
         queueReconciliationMutex.withLock {
             val playableItems = playlistRepository.getPlayableItems()
@@ -174,12 +213,14 @@ class PlaybackService : MediaSessionService() {
                 return@withLock
             }
 
-            val settings = appSettingsDataStore.settingsFlow.first()
+            val settings = cachedSettings ?: appSettingsDataStore.settingsFlow.first().also { cachedSettings = it }
             val currentMediaQueueId = currentMediaQueueId()
 
             val effectiveTargetItemId = targetQueueItemId
-                ?: if (preferFirstItem) playableItems.first().queueItemId
-                else settings.activeEpisodeId?.let { "episode:$it" }
+                ?: if (preferFirstItem) playableItems.firstOrNull()?.queueItemId
+                else currentMediaQueueId?.toMediaId()
+                ?: settings.activeEpisodeId?.let { "episode:$it" }
+                ?: playableItems.firstOrNull()?.queueItemId
 
             val window = SlidingWindowResolver.resolveWindow(
                 queue = playableItems,
@@ -213,6 +254,11 @@ class PlaybackService : MediaSessionService() {
                 forcePlayPreferred
 
             if (!needsRebuild) {
+                // If ExoPlayer transitioned to index 1, remove finished item(s) so active item is at index 0
+                while (player.currentMediaItemIndex > 0) {
+                    player.removeMediaItem(0)
+                }
+
                 // Synchronize index 1 (the 'Next' buffered track in the sliding window)
                 val expectedNext = window.next
                 val currentCount = player.mediaItemCount
@@ -228,6 +274,10 @@ class PlaybackService : MediaSessionService() {
                     }
                 } else if (currentCount > 1) {
                     player.removeMediaItem(1)
+                }
+
+                if (seekPositionMs != null) {
+                    player.seekTo(0, seekPositionMs)
                 }
 
                 // Apply correct speed if track type changed
@@ -246,11 +296,12 @@ class PlaybackService : MediaSessionService() {
             }
 
             player.removeListener(playerListener)
-            rememberSignificantPosition(currentTrack.toMediaId(), currentTrack.initialPositionMs)
+            val initialPos = seekPositionMs ?: currentTrack.initialPositionMs
+            rememberSignificantPosition(currentTrack.toMediaId(), initialPos)
 
             val mediaItems = listOfNotNull(currentTrack.toMediaItem(), window.next?.toMediaItem())
             previousMediaId = currentTrack.toMediaId()
-            player.setMediaItems(mediaItems, 0, currentTrack.initialPositionMs)
+            player.setMediaItems(mediaItems, 0, initialPos)
 
             val targetSpeed = if (currentTrack.isAudiobook) settings.audiobookPlaybackSpeed else settings.playbackSpeed
             applyingSettingsSpeed = true
@@ -348,16 +399,17 @@ class PlaybackService : MediaSessionService() {
                     smartListeningManager.forceDownloadImmediately(nextQueueId.episodeId)
                 }
 
-                // Update speed for current media type
-                serviceScope.launch {
-                    val settings = appSettingsDataStore.settingsFlow.first()
-                    val isAbk = nextQueueId is MediaQueueId.Audiobook
-                    val targetSpeed = if (isAbk) settings.audiobookPlaybackSpeed else settings.playbackSpeed
-                    if (player.playbackParameters.speed != targetSpeed) {
-                        applyingSettingsSpeed = true
-                        player.playbackParameters = PlaybackParameters(targetSpeed)
-                        applyingSettingsSpeed = false
-                    }
+                // Update speed for current media type synchronously
+                val isAbk = nextQueueId is MediaQueueId.Audiobook
+                val targetSpeed = if (isAbk) {
+                    cachedSettings?.audiobookPlaybackSpeed ?: 1.0f
+                } else {
+                    cachedSettings?.playbackSpeed ?: 1.3f
+                }
+                if (player.playbackParameters.speed != targetSpeed) {
+                    applyingSettingsSpeed = true
+                    player.playbackParameters = PlaybackParameters(targetSpeed)
+                    applyingSettingsSpeed = false
                 }
             }
 
@@ -365,10 +417,11 @@ class PlaybackService : MediaSessionService() {
                 handleTrackCompleted(finishedMediaId, nextMediaId)
             } else if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK && nextMediaId != null) {
                 val nextQueueId = MediaQueueId.fromMediaId(nextMediaId)
-                if (nextQueueId is MediaQueueId.Episode) {
-                    serviceScope.launch {
+                serviceScope.launch {
+                    if (nextQueueId is MediaQueueId.Episode) {
                         appSettingsDataStore.setActiveEpisodeId(nextQueueId.episodeId)
                     }
+                    reconcileQueueWithDatabase()
                 }
             }
         }
@@ -513,6 +566,13 @@ class PlaybackService : MediaSessionService() {
     private fun currentMediaId(): String? = player.currentMediaItem?.mediaId
     private fun currentMediaQueueId(): MediaQueueId? = MediaQueueId.fromMediaId(currentMediaId())
     private fun currentEpisodeId(): Long? = (currentMediaQueueId() as? MediaQueueId.Episode)?.episodeId
+
+    companion object {
+        const val EXTRA_DURATION_SECONDS = "com.prod.mpod.duration_seconds"
+        const val CUSTOM_COMMAND_PLAY_ITEM = "com.prod.mpod.PLAY_ITEM"
+        const val EXTRA_TARGET_ITEM_ID = "com.prod.mpod.target_item_id"
+        const val EXTRA_SEEK_POSITION_MS = "com.prod.mpod.seek_position_ms"
+    }
 }
 
 internal fun buildEpisodeCustomCacheKey(episodeId: Long): String = "episode_$episodeId"

@@ -153,7 +153,7 @@ object SlidingWindowResolver {
     ): SlidingWindow {
         if (queue.isEmpty()) return SlidingWindow(null, null)
 
-        // 1. Identify active PlayableItem
+        // 1. Identify starting PlayableItem index
         val targetItemIndex = when {
             targetQueueItemId != null -> queue.indexOfFirst { it.queueItemId == targetQueueItemId }
             currentMediaQueueId != null -> queue.indexOfFirst { item ->
@@ -165,39 +165,20 @@ object SlidingWindowResolver {
             else -> 0
         }.let { if (it >= 0) it else 0 }
 
-        val currentItem = queue[targetItemIndex]
+        // 2. Resolve current PlaybackTrack, advancing to next item if target item has no playable tracks
+        var activeItemIndex = targetItemIndex
+        var currentTrack: PlaybackTrack? = null
 
-        // 2. Resolve current PlaybackTrack
-        val currentTrack: PlaybackTrack? = when (currentItem) {
-            is PlayableItem.EpisodeItem -> {
-                PlaybackTrack.EpisodeTrack(
-                    episode = currentItem.episode,
-                    podcastTitle = currentItem.podcastTitle,
-                    podcastArtworkUrl = currentItem.podcastArtworkUrl
-                )
-            }
-            is PlayableItem.AudiobookItem -> {
-                val availableTracks = currentItem.selectedTracks.filter { it.isAvailable }
-                if (availableTracks.isEmpty()) null
-                else {
-                    val track = when {
-                        preferredTrackId != null -> availableTracks.firstOrNull { it.id == preferredTrackId }
-                        currentMediaQueueId is MediaQueueId.Audiobook && currentMediaQueueId.audiobookId == currentItem.audiobook.id ->
-                            availableTracks.firstOrNull { it.id == currentMediaQueueId.trackId }
-                        else -> null
-                    } ?: currentItem.currentTrack?.takeIf { it.isAvailable }
-                      ?: availableTracks.first()
-
-                    val chapterIdx = currentItem.selectedTracks.indexOfFirst { it.id == track.id }
-                        .let { if (it >= 0) it + 1 else 1 }
-
-                    PlaybackTrack.AudiobookChapterTrack(
-                        audiobook = currentItem.audiobook,
-                        track = track,
-                        chapterIndex = chapterIdx,
-                        totalChapters = currentItem.selectedTracks.size
-                    )
-                }
+        for (i in targetItemIndex until queue.size) {
+            val candidate = resolveTrackForItem(
+                item = queue[i],
+                preferredTrackId = if (i == targetItemIndex) preferredTrackId else null,
+                currentMediaQueueId = if (i == targetItemIndex) currentMediaQueueId else null
+            )
+            if (candidate != null) {
+                activeItemIndex = i
+                currentTrack = candidate
+                break
             }
         }
 
@@ -205,10 +186,10 @@ object SlidingWindowResolver {
         val nextTrack: PlaybackTrack? = when (currentTrack) {
             null -> null
             is PlaybackTrack.EpisodeTrack -> {
-                resolveFirstTrackOfItem(queue, targetItemIndex + 1)
+                resolveFirstTrackOfItem(queue, activeItemIndex + 1)
             }
             is PlaybackTrack.AudiobookChapterTrack -> {
-                val currentAbkItem = currentItem as PlayableItem.AudiobookItem
+                val currentAbkItem = queue[activeItemIndex] as PlayableItem.AudiobookItem
                 val selectedTracks = currentAbkItem.selectedTracks
                 val currentTrackIdx = selectedTracks.indexOfFirst { it.id == currentTrack.track.id }
 
@@ -226,7 +207,7 @@ object SlidingWindowResolver {
                         totalChapters = selectedTracks.size
                     )
                 } else {
-                    resolveFirstTrackOfItem(queue, targetItemIndex + 1)
+                    resolveFirstTrackOfItem(queue, activeItemIndex + 1)
                 }
             }
         }
@@ -234,31 +215,50 @@ object SlidingWindowResolver {
         return SlidingWindow(current = currentTrack, next = nextTrack)
     }
 
-    private fun resolveFirstTrackOfItem(queue: List<PlayableItem>, startIndex: Int): PlaybackTrack? {
-        for (i in startIndex until queue.size) {
-            when (val item = queue[i]) {
-                is PlayableItem.EpisodeItem -> {
-                    return PlaybackTrack.EpisodeTrack(
-                        episode = item.episode,
-                        podcastTitle = item.podcastTitle,
-                        podcastArtworkUrl = item.podcastArtworkUrl
+    private fun resolveTrackForItem(
+        item: PlayableItem,
+        preferredTrackId: Long?,
+        currentMediaQueueId: MediaQueueId?
+    ): PlaybackTrack? {
+        return when (item) {
+            is PlayableItem.EpisodeItem -> {
+                PlaybackTrack.EpisodeTrack(
+                    episode = item.episode,
+                    podcastTitle = item.podcastTitle,
+                    podcastArtworkUrl = item.podcastArtworkUrl
+                )
+            }
+            is PlayableItem.AudiobookItem -> {
+                val availableTracks = item.selectedTracks.filter { it.isAvailable }
+                if (availableTracks.isEmpty()) null
+                else {
+                    val track = when {
+                        preferredTrackId != null -> availableTracks.firstOrNull { it.id == preferredTrackId }
+                        currentMediaQueueId is MediaQueueId.Audiobook && currentMediaQueueId.audiobookId == item.audiobook.id ->
+                            availableTracks.firstOrNull { it.id == currentMediaQueueId.trackId }
+                        else -> null
+                    } ?: item.currentTrack?.takeIf { it.isAvailable }
+                      ?: availableTracks.firstOrNull { !it.isListened }
+                      ?: availableTracks.first()
+
+                    val chapterIdx = item.selectedTracks.indexOfFirst { it.id == track.id }
+                        .let { if (it >= 0) it + 1 else 1 }
+
+                    PlaybackTrack.AudiobookChapterTrack(
+                        audiobook = item.audiobook,
+                        track = track,
+                        chapterIndex = chapterIdx,
+                        totalChapters = item.selectedTracks.size
                     )
                 }
-                is PlayableItem.AudiobookItem -> {
-                    val available = item.selectedTracks.filter { it.isAvailable }
-                    if (available.isNotEmpty()) {
-                        val firstTrack = item.currentTrack?.takeIf { it.isAvailable } ?: available.first()
-                        val chapterIdx = item.selectedTracks.indexOfFirst { it.id == firstTrack.id }
-                            .let { if (it >= 0) it + 1 else 1 }
-                        return PlaybackTrack.AudiobookChapterTrack(
-                            audiobook = item.audiobook,
-                            track = firstTrack,
-                            chapterIndex = chapterIdx,
-                            totalChapters = item.selectedTracks.size
-                        )
-                    }
-                }
             }
+        }
+    }
+
+    private fun resolveFirstTrackOfItem(queue: List<PlayableItem>, startIndex: Int): PlaybackTrack? {
+        for (i in startIndex until queue.size) {
+            val candidate = resolveTrackForItem(queue[i], preferredTrackId = null, currentMediaQueueId = null)
+            if (candidate != null) return candidate
         }
         return null
     }
