@@ -7,6 +7,7 @@ import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PlaylistItemEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
+import com.example.mpod.data.local.model.PlaylistItemWithAudiobook
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.network.ProxyHttpClientFactory
@@ -930,7 +931,16 @@ class SmartListeningManagerTest {
         override fun removeFromPlaylist(episodeId: Long) {}
         override fun clearPlaylist() {}
         override fun updatePosition(episodeId: Long, position: Int): Int = 0
-        override fun deleteNotIn(episodeIds: List<Long>) {}
+        override fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>> = emptyFlow()
+        override fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook> = emptyList()
+        override fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>> = emptyFlow()
+        override fun isAudiobookInPlaylist(audiobookId: Long): Boolean = false
+        override fun removeAudiobookFromPlaylist(audiobookId: Long) {}
+        override fun updateAudiobookPosition(audiobookId: Long, position: Int): Int = 0
+        override fun deleteEpisodesNotIn(episodeIds: List<Long>) {}
+        override fun deleteEpisodeItems() {}
+        override fun deleteAudiobooksNotIn(audiobookIds: List<Long>) {}
+        override fun deleteAudiobookItems() {}
     }
 
     data class DownloadedState(val episodeId: Long, val isDownloaded: Boolean, val path: String?)

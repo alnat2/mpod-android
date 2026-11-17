@@ -75,12 +75,13 @@ interface PlaylistDao {
             a.coverUri AS coverUri,
             a.durationSeconds AS durationSeconds,
             a.isSingleFile AS isSingleFile,
-            a.addedAt AS addedAt
+            a.addedAt AS addedAt,
+            a.relativePath AS relativePath
         FROM playlist_items p
         INNER JOIN audiobooks a ON p.audiobookId = a.id
         ORDER BY p.position ASC
     """)
-    fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>> = kotlinx.coroutines.flow.flowOf(emptyList())
+    fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>>
 
     @Query("""
         SELECT 
@@ -93,18 +94,19 @@ interface PlaylistDao {
             a.coverUri AS coverUri,
             a.durationSeconds AS durationSeconds,
             a.isSingleFile AS isSingleFile,
-            a.addedAt AS addedAt
+            a.addedAt AS addedAt,
+            a.relativePath AS relativePath
         FROM playlist_items p
         INNER JOIN audiobooks a ON p.audiobookId = a.id
         ORDER BY p.position ASC
     """)
-    fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook> = emptyList()
+    fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook>
 
     @Query("SELECT * FROM playlist_items ORDER BY position ASC")
-    fun getAllPlaylistItems(): List<PlaylistItemEntity> = emptyList()
+    fun getAllPlaylistItems(): List<PlaylistItemEntity>
 
     @Query("SELECT * FROM playlist_items ORDER BY position ASC")
-    fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>> = kotlinx.coroutines.flow.flowOf(emptyList())
+    fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>>
 
     @Query("SELECT MAX(position) FROM playlist_items")
     fun getMaxPosition(): Int?
@@ -113,7 +115,7 @@ interface PlaylistDao {
     fun isEpisodeInPlaylist(episodeId: Long): Boolean
 
     @Query("SELECT EXISTS(SELECT 1 FROM playlist_items WHERE audiobookId = :audiobookId)")
-    fun isAudiobookInPlaylist(audiobookId: Long): Boolean = false
+    fun isAudiobookInPlaylist(audiobookId: Long): Boolean
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertPlaylistItem(item: PlaylistItemEntity): Long
@@ -125,7 +127,7 @@ interface PlaylistDao {
     fun removeFromPlaylist(episodeId: Long)
 
     @Query("DELETE FROM playlist_items WHERE audiobookId = :audiobookId")
-    fun removeAudiobookFromPlaylist(audiobookId: Long) {}
+    fun removeAudiobookFromPlaylist(audiobookId: Long)
 
     @Query("DELETE FROM playlist_items")
     fun clearPlaylist()
@@ -134,25 +136,22 @@ interface PlaylistDao {
     fun updatePosition(episodeId: Long, position: Int): Int
 
     @Query("UPDATE playlist_items SET position = :position WHERE audiobookId = :audiobookId")
-    fun updateAudiobookPosition(audiobookId: Long, position: Int): Int = 0
+    fun updateAudiobookPosition(audiobookId: Long, position: Int): Int
+
+    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
+    fun deleteEpisodesNotIn(episodeIds: List<Long>)
 
     @Deprecated("Use deleteEpisodesNotIn instead. deleteNotIn is kept for backward compatibility.")
-    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
-    fun deleteNotIn(episodeIds: List<Long>)
-
-    @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL AND episodeId NOT IN (:episodeIds)")
-    fun deleteEpisodesNotIn(episodeIds: List<Long>) {
-        deleteNotIn(episodeIds)
-    }
+    fun deleteNotIn(episodeIds: List<Long>) = deleteEpisodesNotIn(episodeIds)
 
     @Query("DELETE FROM playlist_items WHERE episodeId IS NOT NULL")
-    fun deleteEpisodeItems() {}
+    fun deleteEpisodeItems()
 
     @Query("DELETE FROM playlist_items WHERE audiobookId IS NOT NULL AND audiobookId NOT IN (:audiobookIds)")
-    fun deleteAudiobooksNotIn(audiobookIds: List<Long>) {}
+    fun deleteAudiobooksNotIn(audiobookIds: List<Long>)
 
     @Query("DELETE FROM playlist_items WHERE audiobookId IS NOT NULL")
-    fun deleteAudiobookItems() {}
+    fun deleteAudiobookItems()
 
     @Transaction
     fun appendEpisodeIfMissing(episodeId: Long): Boolean {

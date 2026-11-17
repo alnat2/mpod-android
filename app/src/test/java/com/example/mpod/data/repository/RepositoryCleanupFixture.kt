@@ -4,6 +4,7 @@ import android.content.ContextWrapper
 import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.PlaylistItemEntity
+import com.example.mpod.data.local.model.PlaylistItemWithAudiobook
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.SmartListeningManager
@@ -23,5 +24,14 @@ internal fun repositoryCleanupManager(episodes: EpisodeDao, client: ProxyHttpCli
         override fun removeFromPlaylist(episodeId: Long) = error("Refresh/OPML does not mutate playlist")
         override fun clearPlaylist() = error("Refresh/OPML does not mutate playlist")
         override fun updatePosition(episodeId: Long, position: Int): Int = error("Refresh/OPML does not mutate playlist")
-        override fun deleteNotIn(episodeIds: List<Long>) = error("Refresh/OPML does not mutate playlist")
+        override fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>> = emptyFlow()
+        override fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook> = emptyList()
+        override fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>> = emptyFlow()
+        override fun isAudiobookInPlaylist(audiobookId: Long): Boolean = false
+        override fun removeAudiobookFromPlaylist(audiobookId: Long) = error("Refresh/OPML does not mutate playlist")
+        override fun updateAudiobookPosition(audiobookId: Long, position: Int): Int = error("Refresh/OPML does not mutate playlist")
+        override fun deleteEpisodesNotIn(episodeIds: List<Long>) = error("Refresh/OPML does not mutate playlist")
+        override fun deleteEpisodeItems() = error("Refresh/OPML does not mutate playlist")
+        override fun deleteAudiobooksNotIn(audiobookIds: List<Long>) = error("Refresh/OPML does not mutate playlist")
+        override fun deleteAudiobookItems() = error("Refresh/OPML does not mutate playlist")
     }, episodes, client)

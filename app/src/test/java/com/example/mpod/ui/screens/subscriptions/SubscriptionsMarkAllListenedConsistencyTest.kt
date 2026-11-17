@@ -10,6 +10,7 @@ import com.example.mpod.data.local.entity.EpisodeEntity
 import com.example.mpod.data.local.entity.PlaylistItemEntity
 import com.example.mpod.data.local.entity.PodcastEntity
 import com.example.mpod.data.local.model.EpisodeWithPodcast
+import com.example.mpod.data.local.model.PlaylistItemWithAudiobook
 import com.example.mpod.data.local.model.PlaylistItemWithEpisode
 import com.example.mpod.data.local.model.SubscriptionRow
 import com.example.mpod.data.local.model.subscriptionRows
@@ -780,13 +781,22 @@ class SubscriptionsMarkAllListenedConsistencyTest {
                     1
                 } else 0
             }
-            override fun deleteNotIn(episodeIds: List<Long>) = synchronized(lock) {
+            override fun deleteEpisodesNotIn(episodeIds: List<Long>) = synchronized(lock) {
                 val toRemove = playlistRows.keys.filter { it !in episodeIds }
                 if (toRemove.isNotEmpty()) {
                     toRemove.forEach { playlistRows.remove(it) }
                     emit()
                 }
             }
+            override fun getPlaylistItemsWithAudiobooksFlow(): Flow<List<PlaylistItemWithAudiobook>> = kotlinx.coroutines.flow.emptyFlow()
+            override fun getPlaylistItemsWithAudiobooks(): List<PlaylistItemWithAudiobook> = emptyList()
+            override fun getAllPlaylistItemsFlow(): Flow<List<PlaylistItemEntity>> = kotlinx.coroutines.flow.flowOf(playlistRows.values.toList())
+            override fun isAudiobookInPlaylist(audiobookId: Long): Boolean = false
+            override fun removeAudiobookFromPlaylist(audiobookId: Long) {}
+            override fun updateAudiobookPosition(audiobookId: Long, position: Int): Int = 0
+            override fun deleteEpisodeItems() {}
+            override fun deleteAudiobooksNotIn(audiobookIds: List<Long>) {}
+            override fun deleteAudiobookItems() {}
         }
     }
 
