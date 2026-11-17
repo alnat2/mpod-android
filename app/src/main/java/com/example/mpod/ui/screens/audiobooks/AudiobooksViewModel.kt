@@ -39,6 +39,7 @@ data class AudiobooksUiState(
     val audiobooksFolderUri: String? = null,
     val currentPath: List<String> = emptyList(),
     val items: List<FilemanagerItemUi> = emptyList(),
+    val totalBooksCount: Int = 0,
     val selectedBookForModal: AudiobookEntity? = null,
     val selectedBookTracks: List<AudiobookTrackEntity> = emptyList(),
     val selectedBookPlaylistTrackIds: Set<Long> = emptySet()
@@ -81,7 +82,8 @@ class AudiobooksViewModel @Inject constructor(
                     isLoading = false,
                     audiobooksFolderUri = settings.audiobooksFolderUri,
                     currentPath = currentPath,
-                    items = items
+                    items = items,
+                    totalBooksCount = audiobooks.size
                 )
             }.collect { nextState ->
                 _state.value = nextState
@@ -227,71 +229,85 @@ class AudiobooksViewModel @Inject constructor(
         ): List<FilemanagerItemUi> {
             if (audiobooks.isEmpty()) return emptyList()
 
-            return if (currentPath.isEmpty()) {
-                // Root level: Group by Author (if author != "Unknown Author" and book author is present)
-                val authors = audiobooks.map { it.author.trim() }
-                    .filter { it.isNotBlank() && !it.equals("Unknown Author", ignoreCase = true) }
-                    .distinct()
-                    .sorted()
+            val directoriesMap = mutableMapOf<String, String>()
+            val directBooks = mutableListOf<AudiobookEntity>()
 
-                val authorItems = authors.map { authorName ->
-                    FilemanagerItemUi(
-                        id = "dir:$authorName",
-                        title = authorName,
-                        type = FilemanagerItemType.Directory,
-                        author = authorName
-                    )
+            for (book in audiobooks) {
+                val segments = if (book.relativePath.isNotBlank()) {
+                    book.relativePath.split('/').filter { it.isNotBlank() }
+                } else {
+                    if (book.author.isNotBlank() && !book.author.equals("Unknown Author", ignoreCase = true)) {
+                        listOf(book.author, book.title)
+                    } else {
+                        listOf(book.title)
+                    }
                 }
 
-                // Books without recognized author (or "Unknown Author") placed at root
-                val rootBooks = audiobooks.filter {
-                    it.author.isBlank() || it.author.equals("Unknown Author", ignoreCase = true)
-                }.sortedBy { it.title }
-
-                val bookItems = rootBooks.map { book ->
-                    val type = if (book.isSingleFile) {
-                        FilemanagerItemType.AudioFile
-                    } else {
-                        FilemanagerItemType.AudiobookDirectory
+                if (segments.size <= currentPath.size) continue
+                var matchesCurrentPath = true
+                for (i in currentPath.indices) {
+                    if (!segments[i].equals(currentPath[i], ignoreCase = true)) {
+                        matchesCurrentPath = false
+                        break
                     }
-                    FilemanagerItemUi(
-                        id = "book:${book.id}",
-                        title = book.title,
-                        type = type,
-                        durationText = formatFmDuration(book.durationSeconds),
-                        audiobookId = book.id,
-                        isInPlaylist = book.id in playlistIds,
-                        author = book.author,
-                        book = book
-                    )
                 }
+                if (!matchesCurrentPath) continue
 
-                authorItems + bookItems
-            } else {
-                // Subdirectory level: books for selected author (or folder)
-                val targetAuthor = currentPath.first()
-                val authorBooks = audiobooks.filter {
-                    it.author.equals(targetAuthor, ignoreCase = true)
-                }.sortedBy { it.title }
-
-                authorBooks.map { book ->
-                    val type = if (book.isSingleFile) {
-                        FilemanagerItemType.AudioFile
-                    } else {
-                        FilemanagerItemType.AudiobookDirectory
-                    }
-                    FilemanagerItemUi(
-                        id = "book:${book.id}",
-                        title = book.title,
-                        type = type,
-                        durationText = formatFmDuration(book.durationSeconds),
-                        audiobookId = book.id,
-                        isInPlaylist = book.id in playlistIds,
-                        author = book.author,
-                        book = book
-                    )
+                val remaining = segments.drop(currentPath.size)
+                if (remaining.size == 1) {
+                    directBooks.add(book)
+                } else {
+                    val subDirName = remaining.first()
+                    directoriesMap.putIfAbsent(subDirName, (currentPath + subDirName).joinToString("/"))
                 }
             }
+
+            val dirItems = directoriesMap.keys
+                .sortedWith(com.example.mpod.util.NaturalOrderComparator.INSTANCE)
+                .map { dirName ->
+                    val dirFullPath = directoriesMap[dirName] ?: dirName
+                    FilemanagerItemUi(
+                        id = "dir:$dirFullPath",
+                        title = dirName,
+                        type = FilemanagerItemType.Directory,
+                        author = (currentPath + dirName).firstOrNull()
+                    )
+                }
+
+            val folderBooks = directBooks
+                .filter { !it.isSingleFile }
+                .sortedWith(com.example.mpod.util.NaturalOrderComparator.comparing { it.title })
+                .map { book ->
+                    FilemanagerItemUi(
+                        id = "book:${book.id}",
+                        title = book.title,
+                        type = FilemanagerItemType.AudiobookDirectory,
+                        durationText = formatFmDuration(book.durationSeconds),
+                        audiobookId = book.id,
+                        isInPlaylist = book.id in playlistIds,
+                        author = book.author,
+                        book = book
+                    )
+                }
+
+            val standaloneFiles = directBooks
+                .filter { it.isSingleFile }
+                .sortedWith(com.example.mpod.util.NaturalOrderComparator.comparing { it.title })
+                .map { book ->
+                    FilemanagerItemUi(
+                        id = "book:${book.id}",
+                        title = book.title,
+                        type = FilemanagerItemType.AudioFile,
+                        durationText = formatFmDuration(book.durationSeconds),
+                        audiobookId = book.id,
+                        isInPlaylist = book.id in playlistIds,
+                        author = book.author,
+                        book = book
+                    )
+                }
+
+            val allFolders = (dirItems + folderBooks).sortedWith(com.example.mpod.util.NaturalOrderComparator.comparing { it.title })
+            return allFolders + standaloneFiles
         }
     }
 }

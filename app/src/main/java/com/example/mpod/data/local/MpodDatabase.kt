@@ -26,7 +26,7 @@ import com.example.mpod.data.local.entity.PodcastEntity
         AudiobookTrackEntity::class,
         AudiobookPlaylistTrackEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(ShareImportStatusConverter::class)

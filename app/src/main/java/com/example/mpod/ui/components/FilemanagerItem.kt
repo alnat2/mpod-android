@@ -86,7 +86,7 @@ fun FilemanagerItem(
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
-                tint = if (isHighlighted) MaterialTheme.colorScheme.primary else titleColor,
+                tint = if (type == FilemanagerItemType.Directory || isHighlighted) MaterialTheme.colorScheme.primary else titleColor,
                 modifier = Modifier.size(24.dp)
             )
             Text(

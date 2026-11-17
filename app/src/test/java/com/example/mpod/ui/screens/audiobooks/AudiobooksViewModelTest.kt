@@ -130,4 +130,101 @@ class AudiobooksViewModelTest {
         )
         assertEquals(1, item.currentChapterIndex)
     }
+
+    @Test
+    fun buildFilemanagerItems_withNestedSeries_showsSeriesFolderUnderAuthor() {
+        val books = listOf(
+            AudiobookEntity(
+                id = 1L,
+                folderUri = "uri://inhabited_island",
+                title = "Обитаемый остров",
+                author = "Стругацкие",
+                isSingleFile = false,
+                durationSeconds = 12000L,
+                relativePath = "Стругацкие/Мир Полудня/Обитаемый остров"
+            ),
+            AudiobookEntity(
+                id = 2L,
+                folderUri = "uri://hard_to_be_a_god",
+                title = "Трудно быть богом",
+                author = "Стругацкие",
+                isSingleFile = false,
+                durationSeconds = 10000L,
+                relativePath = "Стругацкие/Трудно быть богом"
+            )
+        )
+
+        // 1. Root level should only contain 1 folder for "Стругацкие"
+        val rootItems = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), emptyList())
+        assertEquals(1, rootItems.size)
+        assertEquals("Стругацкие", rootItems[0].title)
+        assertEquals(FilemanagerItemType.Directory, rootItems[0].type)
+
+        // 2. Inside "Стругацкие" should show series folder "Мир Полудня" and book folder "Трудно быть богом"
+        val authorItems = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), listOf("Стругацкие"))
+        assertEquals(2, authorItems.size)
+        // Folders sorted naturally: "Мир Полудня", then "Трудно быть богом"
+        assertEquals("Мир Полудня", authorItems[0].title)
+        assertEquals(FilemanagerItemType.Directory, authorItems[0].type)
+        assertEquals("Трудно быть богом", authorItems[1].title)
+        assertEquals(FilemanagerItemType.AudiobookDirectory, authorItems[1].type)
+
+        // 3. Inside "Стругацкие/Мир Полудня" should show book folder "Обитаемый остров"
+        val seriesItems = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), listOf("Стругацкие", "Мир Полудня"))
+        assertEquals(1, seriesItems.size)
+        assertEquals("Обитаемый остров", seriesItems[0].title)
+        assertEquals(FilemanagerItemType.AudiobookDirectory, seriesItems[0].type)
+    }
+
+    @Test
+    fun buildFilemanagerItems_sorting_foldersFirstThenFilesNaturally() {
+        val books = listOf(
+            AudiobookEntity(
+                id = 1L,
+                folderUri = "uri://file2",
+                title = "02 Track",
+                isSingleFile = true,
+                durationSeconds = 100L,
+                relativePath = "02 Track.mp3"
+            ),
+            AudiobookEntity(
+                id = 2L,
+                folderUri = "uri://file1",
+                title = "01 Track",
+                isSingleFile = true,
+                durationSeconds = 100L,
+                relativePath = "01 Track.mp3"
+            ),
+            AudiobookEntity(
+                id = 3L,
+                folderUri = "uri://book2",
+                title = "Book 10",
+                isSingleFile = false,
+                durationSeconds = 100L,
+                relativePath = "Book 10"
+            ),
+            AudiobookEntity(
+                id = 4L,
+                folderUri = "uri://book1",
+                title = "Book 2",
+                isSingleFile = false,
+                durationSeconds = 100L,
+                relativePath = "Book 2"
+            )
+        )
+
+        val items = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), emptyList())
+        assertEquals(4, items.size)
+        // Folders first in natural order: "Book 2", then "Book 10"
+        assertEquals("Book 2", items[0].title)
+        assertEquals(FilemanagerItemType.AudiobookDirectory, items[0].type)
+        assertEquals("Book 10", items[1].title)
+        assertEquals(FilemanagerItemType.AudiobookDirectory, items[1].type)
+
+        // Followed by files in natural order: "01 Track", then "02 Track"
+        assertEquals("01 Track", items[2].title)
+        assertEquals(FilemanagerItemType.AudioFile, items[2].type)
+        assertEquals("02 Track", items[3].title)
+        assertEquals(FilemanagerItemType.AudioFile, items[3].type)
+    }
 }

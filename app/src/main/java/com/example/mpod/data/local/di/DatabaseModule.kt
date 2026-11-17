@@ -29,7 +29,8 @@ object DatabaseModule {
         )
         .addMigrations(
             MpodDatabaseMigrations.MIGRATION_1_2,
-            MpodDatabaseMigrations.MIGRATION_2_3
+            MpodDatabaseMigrations.MIGRATION_2_3,
+            MpodDatabaseMigrations.MIGRATION_3_4
         )
         .build()
     }

@@ -324,6 +324,93 @@ class AudiobookStorageScannerTest {
         assertEquals("content://tree/cd1_t2", tracks[1].fileUri)
     }
 
+    @Test
+    fun scanFolder_withDeepHierarchy_preservesRelativePathAndAuthor(): Unit = runBlocking {
+        // Root / Author / Series / Book / 01.mp3
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("author_dir", "Стругацкие", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["author_dir"] = listOf(
+            DocumentItem("series_dir", "Мир Полудня", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["series_dir"] = listOf(
+            DocumentItem("book_dir", "Обитаемый остров", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("t2", "02-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertEquals(2, summary.tracksScanned)
+
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("Обитаемый остров", book.title)
+        assertEquals("Стругацкие", book.author)
+        assertEquals("Стругацкие/Мир Полудня/Обитаемый остров", book.relativePath)
+        assertFalse(book.isSingleFile)
+
+        val tracks = fakeAudiobookDao.insertedTracks
+        assertEquals(2, tracks.size)
+        assertEquals("01-Chapter", tracks[0].title)
+        assertEquals("02-Chapter", tracks[1].title)
+    }
+
+    @Test
+    fun scanFolder_withID3TagsDifferingFromFileSystem_strictlyPrioritizesFileSystemNames(): Unit = runBlocking {
+        fakeMetadataExtractor.metadataResult = ExtractedAudioMetadata(
+            title = "ID3 Chapter Title",
+            artist = "ID3 Artist Name",
+            album = "ID3 Album Name",
+            durationSeconds = 500L
+        )
+
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("author_dir", "Толстой", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["author_dir"] = listOf(
+            DocumentItem("book_dir", "Война и мир", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Начало.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        scanner.scanFolder(treeUri)
+
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        // File system names MUST prevail over ID3 tags
+        assertEquals("Война и мир", book.title)
+        assertEquals("Толстой", book.author)
+        assertEquals("Толстой/Война и мир", book.relativePath)
+
+        val track = fakeAudiobookDao.insertedTracks.first()
+        assertEquals("01-Начало", track.title)
+        assertEquals(500L, track.durationSeconds) // Duration is retained from metadata
+    }
+
+    @Test
+    fun scanFolder_withStandaloneAudioFileInAuthorFolder_extractsStandaloneBook(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("author_dir", "Стругацкие", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["author_dir"] = listOf(
+            DocumentItem("standalone", "Хромая судьба.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertEquals(1, summary.tracksScanned)
+
+        val book = fakeAudiobookDao.upsertedBooks.first()
+        assertEquals("Хромая судьба", book.title)
+        assertEquals("Стругацкие", book.author)
+        assertEquals("Стругацкие/Хромая судьба.mp3", book.relativePath)
+        assertTrue(book.isSingleFile)
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()

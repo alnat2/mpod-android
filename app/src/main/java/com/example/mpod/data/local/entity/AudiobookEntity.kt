@@ -19,5 +19,6 @@ data class AudiobookEntity(
     val coverUri: String? = null,
     val durationSeconds: Long = 0,
     val isSingleFile: Boolean = false,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val relativePath: String = ""
 )

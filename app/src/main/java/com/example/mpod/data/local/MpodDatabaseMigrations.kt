@@ -123,4 +123,10 @@ object MpodDatabaseMigrations {
             )
         }
     }
+
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE `audiobooks` ADD COLUMN `relativePath` TEXT NOT NULL DEFAULT ''")
+        }
+    }
 }
