@@ -108,23 +108,27 @@ fun PageHeader(
 
         if (showActions) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SquareIconButton(
-                    iconRes = R.drawable.ic_huge_refresh_dot,
-                    contentDescription = "Refresh",
-                    iconRotating = isRefreshing,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    elevation = 0.dp,
-                    onClick = onRefreshClick
-                )
-                SquareIconButton(
-                    iconRes = viewIconRes,
-                    contentDescription = viewActionDescription,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    elevation = 1.dp,
-                    onClick = onViewClick
-                )
+                if (onRefreshClick != null || isRefreshing) {
+                    SquareIconButton(
+                        iconRes = R.drawable.ic_huge_refresh_dot,
+                        contentDescription = "Refresh",
+                        iconRotating = isRefreshing,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        elevation = 0.dp,
+                        onClick = onRefreshClick
+                    )
+                }
+                if (onViewClick != null) {
+                    SquareIconButton(
+                        iconRes = viewIconRes,
+                        contentDescription = viewActionDescription,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        elevation = 1.dp,
+                        onClick = onViewClick
+                    )
+                }
             }
         }
     }

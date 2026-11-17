@@ -1,11 +1,33 @@
 package com.example.mpod.ui.screens.audiobooks
 
+import android.net.Uri
+import com.example.mpod.data.audiobook.ScanSummary
+import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.AudiobookEntity
+import com.example.mpod.data.local.preferences.AppSettings
+import com.example.mpod.data.local.preferences.AppSettingsStore
+import com.example.mpod.data.repository.AudiobookRepository
+import com.example.mpod.data.repository.PlaylistRepository
+import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.components.FilemanagerItemType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import org.mockito.Mockito.`when`
+import org.mockito.Mockito.mock
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AudiobooksViewModelTest {
 
     @Test
@@ -226,5 +248,86 @@ class AudiobooksViewModelTest {
         assertEquals(FilemanagerItemType.AudioFile, items[2].type)
         assertEquals("02 Track", items[3].title)
         assertEquals(FilemanagerItemType.AudioFile, items[3].type)
+    }
+
+    @Test
+    fun onRescanLibrary_whenScannerReturnsError_setsErrorMessageInState() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings(audiobooksFolderUri = "content://tree/root")))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(audiobookRepository.rescanLibrary()).thenReturn(
+                ScanSummary(booksScanned = 0, tracksScanned = 0, errorMessage = "Access denied")
+            )
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository = audiobookRepository,
+                playlistRepository = playlistRepository,
+                playlistDao = playlistDao,
+                appSettingsStore = appSettingsStore,
+                queueInvalidator = queueInvalidator
+            ).apply {
+                ioDispatcher = testDispatcher
+            }
+            advanceUntilIdle()
+
+            viewModel.onRescanLibrary()
+            advanceUntilIdle()
+
+            assertEquals("Rescan failed: Access denied", viewModel.state.value.errorMessage)
+            assertNull(viewModel.state.value.statusMessage)
+            assertEquals(false, viewModel.state.value.isScanning)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun onScanFolder_whenScannerReturnsError_setsErrorMessageInState() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+            val uri = mock(Uri::class.java)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(audiobookRepository.scanDirectory(uri)).thenReturn(
+                ScanSummary(booksScanned = 0, tracksScanned = 0, errorMessage = "SAF permission revoked")
+            )
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository = audiobookRepository,
+                playlistRepository = playlistRepository,
+                playlistDao = playlistDao,
+                appSettingsStore = appSettingsStore,
+                queueInvalidator = queueInvalidator
+            ).apply {
+                ioDispatcher = testDispatcher
+            }
+            advanceUntilIdle()
+
+            viewModel.onScanFolder(uri)
+            advanceUntilIdle()
+
+            assertEquals("Scan failed: SAF permission revoked", viewModel.state.value.errorMessage)
+            assertNull(viewModel.state.value.statusMessage)
+            assertEquals(false, viewModel.state.value.isScanning)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 }

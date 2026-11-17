@@ -411,6 +411,52 @@ class AudiobookStorageScannerTest {
         assertTrue(book.isSingleFile)
     }
 
+    @Test
+    fun scanFolder_whenStorageAccessThrows_returnsErrorMessageAndPreservesDb(): Unit = runBlocking {
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Existing Book",
+                folderUri = "content://tree/existing",
+                relativePath = "Existing Book"
+            )
+        )
+        fakeTreeHelper.throwOnQuery = SecurityException("Permission revoked for tree")
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(0, summary.booksScanned)
+        assertTrue(summary.errorMessage != null)
+        assertTrue(summary.errorMessage!!.contains("Permission revoked"))
+        // Database must not be cleared when scan encounters an error
+        assertEquals(1, fakeAudiobookDao.upsertedBooks.size)
+    }
+
+    @Test
+    fun scanFolder_reconcilesAndDeletesMissingBooks(): Unit = runBlocking {
+        // Pre-populate DB with an old deleted book
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Old Deleted Book",
+                folderUri = "content://tree/old_deleted",
+                relativePath = "Old Deleted Book"
+            )
+        )
+
+        // Storage currently only contains a single new audio file
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("new_track", "New Book.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        // Old book should be deleted by reconciliation; only new book remains
+        assertEquals(1, fakeAudiobookDao.upsertedBooks.size)
+        assertEquals("New Book", fakeAudiobookDao.upsertedBooks.first().title)
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()
@@ -430,6 +476,12 @@ class AudiobookStorageScannerTest {
         override suspend fun updateAudiobook(audiobook: AudiobookEntity) {}
         override suspend fun deleteAudiobook(audiobook: AudiobookEntity) {}
         override suspend fun deleteAudiobookById(audiobookId: Long) {}
+        override suspend fun deleteAllAudiobooks() {
+            upsertedBooks.clear()
+        }
+        override suspend fun deleteAudiobooksNotIn(retainedFolderUris: List<String>) {
+            upsertedBooks.removeAll { it.folderUri !in retainedFolderUris }
+        }
         override suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity? = null
         override fun getAudiobookByIdFlow(audiobookId: Long): Flow<AudiobookEntity?> = emptyFlow()
         override suspend fun getAudiobookByFolderUri(folderUri: String): AudiobookEntity? = null
@@ -493,6 +545,7 @@ class AudiobookStorageScannerTest {
 
     internal class FakeDocumentTreeHelper : DocumentTreeHelper {
         val childrenMap = mutableMapOf<String, List<DocumentItem>>()
+        var throwOnQuery: Throwable? = null
 
         override fun getTreeDocumentId(treeUri: Uri): String = "root"
 
@@ -501,6 +554,7 @@ class AudiobookStorageScannerTest {
             treeUri: Uri,
             parentDocId: String
         ): List<DocumentItem> {
+            throwOnQuery?.let { throw it }
             return childrenMap[parentDocId] ?: emptyList()
         }
 

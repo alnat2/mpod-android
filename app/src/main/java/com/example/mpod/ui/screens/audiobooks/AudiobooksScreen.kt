@@ -179,12 +179,17 @@ fun AudiobooksScreen(
                 }
 
                 state.items.isEmpty() && !state.isScanning -> {
+                    val hasError = state.errorMessage != null
                     item {
                         AudiobooksEmptyState(
-                            title = "No audiobooks found",
-                            description = "Place audiobooks in the selected folder, or choose another folder.",
-                            buttonText = "Rescan library",
-                            onButtonClick = onRescanClick
+                            title = if (hasError) "Storage access error" else "No audiobooks found",
+                            description = if (hasError) {
+                                "Could not access the selected folder. Permission may have expired. Please select the folder again."
+                            } else {
+                                "Place audiobooks in the selected folder, or choose another folder."
+                            },
+                            buttonText = if (hasError) "Choose folder" else "Rescan library",
+                            onButtonClick = if (hasError) onChooseFolderClick else onRescanClick
                         )
                     }
                 }

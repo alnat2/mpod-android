@@ -12,6 +12,7 @@ import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.components.FilemanagerItemType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,12 +58,15 @@ class AudiobooksViewModel @Inject constructor(
     private val _state = MutableStateFlow(AudiobooksUiState(isLoading = true))
     val state: StateFlow<AudiobooksUiState> = _state.asStateFlow()
 
+    internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
     private val currentPathFlow = MutableStateFlow<List<String>>(emptyList())
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
     private var playlistAudiobookIds: Set<Long> = emptySet()
+    private var hasTriggeredLegacyRescan = false
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             combine(
                 appSettingsStore.settingsFlow,
                 audiobookRepository.audiobooksFlow,
@@ -71,6 +75,13 @@ class AudiobooksViewModel @Inject constructor(
             ) { settings, audiobooks, playlistItems, currentPath ->
                 allAudiobooks = audiobooks
                 playlistAudiobookIds = playlistItems.map { it.audiobook.id }.toSet()
+
+                if (!hasTriggeredLegacyRescan && settings.audiobooksFolderUri != null && audiobooks.any { it.relativePath.isBlank() }) {
+                    hasTriggeredLegacyRescan = true
+                    viewModelScope.launch(ioDispatcher) {
+                        audiobookRepository.rescanLibrary()
+                    }
+                }
 
                 val items = buildFilemanagerItems(
                     audiobooks = audiobooks,
@@ -104,14 +115,22 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun onScanFolder(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             _state.value = _state.value.copy(isScanning = true, errorMessage = null, statusMessage = "Scanning audiobooks...")
             try {
                 val summary = audiobookRepository.scanDirectory(uri)
-                _state.value = _state.value.copy(
-                    isScanning = false,
-                    statusMessage = "Found ${summary.booksScanned} audiobooks (${summary.tracksScanned} tracks)"
-                )
+                if (summary.errorMessage != null) {
+                    _state.value = _state.value.copy(
+                        isScanning = false,
+                        errorMessage = "Scan failed: ${summary.errorMessage}",
+                        statusMessage = null
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        isScanning = false,
+                        statusMessage = "Found ${summary.booksScanned} audiobooks (${summary.tracksScanned} tracks)"
+                    )
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isScanning = false,
@@ -123,15 +142,23 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun onRescanLibrary() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             _state.value = _state.value.copy(isScanning = true, errorMessage = null, statusMessage = "Rescanning library...")
             try {
                 val summary = audiobookRepository.rescanLibrary()
                 if (summary != null) {
-                    _state.value = _state.value.copy(
-                        isScanning = false,
-                        statusMessage = "Rescan complete: ${summary.booksScanned} added, ${summary.tracksScanned} tracks"
-                    )
+                    if (summary.errorMessage != null) {
+                        _state.value = _state.value.copy(
+                            isScanning = false,
+                            errorMessage = "Rescan failed: ${summary.errorMessage}",
+                            statusMessage = null
+                        )
+                    } else {
+                        _state.value = _state.value.copy(
+                            isScanning = false,
+                            statusMessage = "Rescan complete: ${summary.booksScanned} added, ${summary.tracksScanned} tracks"
+                        )
+                    }
                 } else {
                     _state.value = _state.value.copy(
                         isScanning = false,
@@ -149,7 +176,7 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun toggleBookPlaylist(bookId: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             if (bookId in playlistAudiobookIds) {
                 playlistRepository.removeAudiobookFromPlaylist(bookId)
             } else {
@@ -160,7 +187,7 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun openBookModal(book: AudiobookEntity) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
             val selectedTracks = audiobookRepository.getSelectedTracksForAudiobook(book.id)
             val selectedIds = if (selectedTracks.isNotEmpty()) {
@@ -197,7 +224,7 @@ class AudiobooksViewModel @Inject constructor(
 
         _state.value = _state.value.copy(selectedBookPlaylistTrackIds = currentSelected)
 
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             audiobookRepository.setSelectedTracks(book.id, currentSelected.toList())
             queueInvalidator.invalidate()
         }

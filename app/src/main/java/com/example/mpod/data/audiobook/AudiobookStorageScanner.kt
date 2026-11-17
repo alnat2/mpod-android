@@ -61,6 +61,7 @@ class AudiobookStorageScanner @Inject constructor(
     suspend fun scanFolder(treeUri: Uri): ScanSummary = withContext(Dispatchers.IO) {
         val contentResolver = context.contentResolver
         val counter = ScanCounter()
+        val scannedFolderUris = mutableSetOf<String>()
 
         try {
             val rootDocId = treeHelper.getTreeDocumentId(treeUri)
@@ -69,8 +70,17 @@ class AudiobookStorageScanner @Inject constructor(
                 treeUri = treeUri,
                 dirDocId = rootDocId,
                 currentPath = emptyList(),
-                counter = counter
+                counter = counter,
+                scannedFolderUris = scannedFolderUris
             )
+
+            if (!counter.limitExceeded) {
+                if (scannedFolderUris.isEmpty()) {
+                    audiobookDao.deleteAllAudiobooks()
+                } else {
+                    audiobookDao.deleteAudiobooksNotIn(scannedFolderUris.toList())
+                }
+            }
 
             ScanSummary(
                 booksScanned = counter.booksCount,
@@ -82,7 +92,9 @@ class AudiobookStorageScanner @Inject constructor(
                 booksScanned = counter.booksCount,
                 tracksScanned = counter.tracksCount,
                 isLimitExceeded = counter.limitExceeded,
-                errorMessage = e.message
+                errorMessage = e.message?.takeIf { it.isNotBlank() }
+                    ?: e.localizedMessage?.takeIf { it.isNotBlank() }
+                    ?: "Storage access error (${e.javaClass.simpleName})"
             )
         }
     }
@@ -92,7 +104,8 @@ class AudiobookStorageScanner @Inject constructor(
         treeUri: Uri,
         dirDocId: String,
         currentPath: List<String>,
-        counter: ScanCounter
+        counter: ScanCounter,
+        scannedFolderUris: MutableSet<String>
     ) {
         if (counter.limitExceeded || counter.filesEvaluated >= MAX_FILES_LIMIT) {
             counter.limitExceeded = true
@@ -126,6 +139,7 @@ class AudiobookStorageScanner @Inject constructor(
                     relativePath = audioFile.name
                 )
                 if (book != null) {
+                    scannedFolderUris.add(book.folderUri)
                     counter.booksCount++
                     counter.tracksCount++
                 }
@@ -142,7 +156,8 @@ class AudiobookStorageScanner @Inject constructor(
                     treeUri = treeUri,
                     dirDocId = subDir.docId,
                     currentPath = listOf(subDir.name),
-                    counter = counter
+                    counter = counter,
+                    scannedFolderUris = scannedFolderUris
                 )
             }
         } else {
@@ -176,7 +191,11 @@ class AudiobookStorageScanner @Inject constructor(
 
                 counter.filesEvaluated += bookResult.tracksProcessed
                 counter.tracksCount += bookResult.tracksProcessed
-                if (bookResult.tracksProcessed > 0) counter.booksCount++
+                if (bookResult.tracksProcessed > 0) {
+                    val bookFolderUri = treeHelper.buildDocumentUri(treeUri, bookDir.docId).toString()
+                    scannedFolderUris.add(bookFolderUri)
+                    counter.booksCount++
+                }
                 if (bookResult.limitExceeded) {
                     counter.limitExceeded = true
                 }
@@ -198,6 +217,7 @@ class AudiobookStorageScanner @Inject constructor(
                         relativePath = relativePath
                     )
                     if (book != null) {
+                        scannedFolderUris.add(book.folderUri)
                         counter.booksCount++
                         counter.tracksCount++
                     }
@@ -213,7 +233,8 @@ class AudiobookStorageScanner @Inject constructor(
                         treeUri = treeUri,
                         dirDocId = subDir.docId,
                         currentPath = currentPath + subDir.name,
-                        counter = counter
+                        counter = counter,
+                        scannedFolderUris = scannedFolderUris
                     )
                 }
             }
@@ -531,26 +552,24 @@ internal class DefaultDocumentTreeHelper : DocumentTreeHelper {
             DocumentsContract.Document.COLUMN_SIZE
         )
         val items = mutableListOf<DocumentItem>()
-        try {
-            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+        val cursor = contentResolver.query(childrenUri, projection, null, null, null)
+            ?: throw SecurityException("Cannot query SAF directory (permission revoked or directory inaccessible): $parentDocId")
+        cursor.use { c ->
+            val idIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            val sizeIdx = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
 
-                while (cursor.moveToNext()) {
-                    val docId = if (idIdx >= 0) cursor.getString(idIdx) else ""
-                    val name = if (nameIdx >= 0) cursor.getString(nameIdx) ?: "" else ""
-                    val mime = if (mimeIdx >= 0) cursor.getString(mimeIdx) ?: "" else ""
-                    val size = if (sizeIdx >= 0) cursor.getLong(sizeIdx) else 0L
-                    val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
-                    if (docId.isNotBlank()) {
-                        items.add(DocumentItem(docId, name, mime, size, isDir))
-                    }
+            while (c.moveToNext()) {
+                val docId = if (idIdx >= 0) c.getString(idIdx) else ""
+                val name = if (nameIdx >= 0) c.getString(nameIdx) ?: "" else ""
+                val mime = if (mimeIdx >= 0) c.getString(mimeIdx) ?: "" else ""
+                val size = if (sizeIdx >= 0) c.getLong(sizeIdx) else 0L
+                val isDir = mime == DocumentsContract.Document.MIME_TYPE_DIR
+                if (docId.isNotBlank()) {
+                    items.add(DocumentItem(docId, name, mime, size, isDir))
                 }
             }
-        } catch (_: Exception) {
-            // Permission lost or directory inaccessible
         }
         return items
     }
