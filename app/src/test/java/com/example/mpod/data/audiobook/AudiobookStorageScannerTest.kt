@@ -457,23 +457,79 @@ class AudiobookStorageScannerTest {
         assertEquals("New Book", fakeAudiobookDao.upsertedBooks.first().title)
     }
 
+    @Test
+    fun scanFolder_withExistingAudiobookInDb_preservesExistingIdAndInsertsTracksWithCorrectAudiobookId(): Unit = runBlocking {
+        val existingBookId = 42L
+        val bookFolderUri = "content://tree/book_dir"
+
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = existingBookId,
+                title = "Old Title",
+                folderUri = bookFolderUri,
+                relativePath = "Old Title"
+            )
+        )
+
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Updated Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("t2", "02-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertTrue(summary.errorMessage == null)
+
+        val book = fakeAudiobookDao.upsertedBooks.find { it.folderUri == bookFolderUri }
+        assertTrue(book != null)
+        assertEquals(existingBookId, book!!.id)
+        assertEquals("Updated Book", book.title)
+
+        val insertedTrack = fakeAudiobookDao.insertedTracks.first()
+        assertEquals(existingBookId, insertedTrack.audiobookId)
+        assertTrue(insertedTrack.audiobookId > 0)
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()
 
         override suspend fun upsertAudiobook(audiobook: AudiobookEntity): Long {
-            upsertedBooks.add(audiobook)
-            return 100L
+            val existing = getAudiobookByFolderUri(audiobook.folderUri)
+            return if (existing != null) {
+                updateAudiobook(audiobook.copy(id = existing.id))
+                -1L // Emulates Room's EntityUpsertionAdapter returning -1L on update
+            } else {
+                insertAudiobook(audiobook)
+            }
         }
 
-        override suspend fun insertAudiobook(audiobook: AudiobookEntity): Long = upsertAudiobook(audiobook)
+        override suspend fun insertAudiobook(audiobook: AudiobookEntity): Long {
+            if (upsertedBooks.any { it.folderUri == audiobook.folderUri }) {
+                return -1L
+            }
+            val generatedId = if (audiobook.id > 0) audiobook.id else (upsertedBooks.size + 1).toLong()
+            upsertedBooks.add(audiobook.copy(id = generatedId))
+            return generatedId
+        }
 
         override suspend fun insertAudiobooks(audiobooks: List<AudiobookEntity>): List<Long> {
-            upsertedBooks.addAll(audiobooks)
-            return audiobooks.map { 100L }
+            return audiobooks.map { insertAudiobook(it) }
         }
 
-        override suspend fun updateAudiobook(audiobook: AudiobookEntity) {}
+        override suspend fun updateAudiobook(audiobook: AudiobookEntity) {
+            val idx = upsertedBooks.indexOfFirst { it.id == audiobook.id }
+            if (idx >= 0) {
+                upsertedBooks[idx] = audiobook
+            } else {
+                upsertedBooks.add(audiobook)
+            }
+        }
+
         override suspend fun deleteAudiobook(audiobook: AudiobookEntity) {}
         override suspend fun deleteAudiobookById(audiobookId: Long) {}
         override suspend fun deleteAllAudiobooks() {
@@ -484,7 +540,8 @@ class AudiobookStorageScannerTest {
         }
         override suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity? = null
         override fun getAudiobookByIdFlow(audiobookId: Long): Flow<AudiobookEntity?> = emptyFlow()
-        override suspend fun getAudiobookByFolderUri(folderUri: String): AudiobookEntity? = null
+        override suspend fun getAudiobookByFolderUri(folderUri: String): AudiobookEntity? =
+            upsertedBooks.find { it.folderUri == folderUri }
         override suspend fun getAllAudiobooks(): List<AudiobookEntity> = emptyList()
         override fun getAllAudiobooksFlow(): Flow<List<AudiobookEntity>> = emptyFlow()
         override suspend fun getAudiobookCount(): Int = upsertedBooks.size

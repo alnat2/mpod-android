@@ -338,12 +338,18 @@ class AudiobookStorageScanner @Inject constructor(
             author = bookAuthor,
             folderUri = bookFolderUri,
             coverUri = coverUriString ?: existingBook?.coverUri,
-            durationSeconds = 0L,
+            durationSeconds = existingBook?.durationSeconds ?: 0L,
             isSingleFile = sortedAudioFiles.size == 1,
             addedAt = existingBook?.addedAt ?: System.currentTimeMillis(),
             relativePath = relativePath
         )
-        val bookId = audiobookDao.upsertAudiobook(bookEntity)
+        val bookId = if (existingBook != null) {
+            audiobookDao.updateAudiobook(bookEntity)
+            existingBook.id
+        } else {
+            val insertedId = audiobookDao.insertAudiobook(bookEntity)
+            if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(bookFolderUri)?.id ?: -1L)
+        }
 
         // Sync tracks
         val existingTracks = audiobookDao.getTracksForAudiobook(bookId)
@@ -436,7 +442,13 @@ class AudiobookStorageScanner @Inject constructor(
             addedAt = existingBook?.addedAt ?: System.currentTimeMillis(),
             relativePath = relativePath
         )
-        val bookId = audiobookDao.upsertAudiobook(bookEntity)
+        val bookId = if (existingBook != null) {
+            audiobookDao.updateAudiobook(bookEntity)
+            existingBook.id
+        } else {
+            val insertedId = audiobookDao.insertAudiobook(bookEntity)
+            if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(fileUri.toString())?.id ?: -1L)
+        }
 
         val existingTracks = audiobookDao.getTracksForAudiobook(bookId)
         val existing = existingTracks.firstOrNull { it.fileUri == fileUri.toString() }
