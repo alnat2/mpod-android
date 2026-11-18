@@ -49,4 +49,16 @@ object DatabaseModule {
 
     @Provides
     fun provideAudiobookDao(database: MpodDatabase): AudiobookDao = database.audiobookDao()
+
+    @Provides
+    @Singleton
+    fun providePlaylistRepository(
+        playlistDao: PlaylistDao,
+        audiobookDao: AudiobookDao,
+        database: MpodDatabase
+    ): com.example.mpod.data.repository.PlaylistRepository = com.example.mpod.data.repository.PlaylistRepository(
+        playlistDao = playlistDao,
+        audiobookDao = audiobookDao,
+        database = database
+    )
 }

@@ -184,6 +184,77 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
+    fun isAudiobookInPlaylist_delegatesToPlaylistDao(): Unit = runBlocking {
+        whenever(playlistDao.isAudiobookInPlaylist(42L)).thenReturn(true)
+        val result = repository.isAudiobookInPlaylist(42L)
+        assertTrue(result)
+        verify(playlistDao).isAudiobookInPlaylist(42L)
+    }
+
+    @Test
+    fun isAudiobookInPlaylist_returnsFalseWhenNotInPlaylist(): Unit = runBlocking {
+        whenever(playlistDao.isAudiobookInPlaylist(42L)).thenReturn(false)
+        val result = repository.isAudiobookInPlaylist(42L)
+        org.junit.Assert.assertFalse(result)
+        verify(playlistDao).isAudiobookInPlaylist(42L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_withTrackIds_clearsOldTracksInsertsNewAndAppendsAudiobook(): Unit = runBlocking {
+        whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
+
+        val result = repository.syncAudiobookSelection(10L, listOf(101L, 102L))
+
+        assertTrue(result)
+        verify(audiobookDao).clearPlaylistTracksForBook(10L)
+        verify(audiobookDao).insertPlaylistTracks(argThat {
+            size == 2 && map { it.trackId } == listOf(101L, 102L) && all { it.audiobookId == 10L }
+        })
+        verify(playlistDao).appendAudiobookIfMissing(10L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_orderOfOperationsIsClearThenInsertThenAppend(): Unit = runBlocking {
+        whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
+
+        val result = repository.syncAudiobookSelection(10L, listOf(101L, 102L))
+
+        assertTrue(result)
+        val order = org.mockito.Mockito.inOrder(audiobookDao, playlistDao)
+        order.verify(audiobookDao).clearPlaylistTracksForBook(10L)
+        order.verify(audiobookDao).insertPlaylistTracks(any())
+        order.verify(playlistDao).appendAudiobookIfMissing(10L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_withEmptyTrackIds_clearsTracksAndRemovesFromPlaylist(): Unit = runBlocking {
+        val result = repository.syncAudiobookSelection(10L, emptyList())
+
+        assertTrue(result)
+        verify(audiobookDao).clearPlaylistTracksForBook(10L)
+        verify(playlistDao).removeAudiobookFromPlaylist(10L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_withNullAudiobookDao_removesFromPlaylistWhenEmpty(): Unit = runBlocking {
+        val repoWithoutAudiobookDao = PlaylistRepository(playlistDao, null)
+        val result = repoWithoutAudiobookDao.syncAudiobookSelection(10L, emptyList())
+
+        assertTrue(result)
+        verify(playlistDao).removeAudiobookFromPlaylist(10L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_withNullAudiobookDao_appendsToPlaylistWhenNotEmpty(): Unit = runBlocking {
+        whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
+        val repoWithoutAudiobookDao = PlaylistRepository(playlistDao, null)
+        val result = repoWithoutAudiobookDao.syncAudiobookSelection(10L, listOf(101L))
+
+        assertTrue(result)
+        verify(playlistDao).appendAudiobookIfMissing(10L)
+    }
+
+    @Test
     fun removeAudiobookFromPlaylist_delegatesToPlaylistDao(): Unit = runBlocking {
         repository.removeAudiobookFromPlaylist(15L)
         verify(playlistDao).removeAudiobookFromPlaylist(15L)

@@ -1,5 +1,7 @@
 package com.example.mpod.data.repository
 
+import androidx.room.withTransaction
+import com.example.mpod.data.local.MpodDatabase
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.AudiobookPlaylistTrackEntity
@@ -14,11 +16,19 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-@Singleton
-class PlaylistRepository @Inject constructor(
+class PlaylistRepository(
     private val playlistDao: PlaylistDao,
-    private val audiobookDao: AudiobookDao? = null
+    private val audiobookDao: AudiobookDao? = null,
+    private val database: MpodDatabase? = null
 ) {
+    private suspend fun <T> runInTransaction(block: suspend () -> T): T {
+        val db = database
+        return if (db != null) {
+            db.withTransaction { block() }
+        } else {
+            block()
+        }
+    }
     fun getPlaylistFlow(): Flow<List<PlaylistItemWithEpisode>> =
         playlistDao.getPlaylistItemsWithEpisodesFlow()
 
@@ -109,28 +119,57 @@ class PlaylistRepository @Inject constructor(
         playlistDao.appendEpisodeIfMissing(episodeId)
     }
 
-    suspend fun addAudiobookToPlaylist(audiobookId: Long, trackIds: List<Long>? = null): Boolean = withContext(Dispatchers.IO) {
-        if (trackIds != null && trackIds.isNotEmpty()) {
-            val existing = audiobookDao?.getSelectedTrackIdsForAudiobook(audiobookId) ?: emptySet()
-            val toInsert = trackIds.filter { it !in existing }.map {
-                AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it)
-            }
-            if (toInsert.isNotEmpty()) {
-                audiobookDao?.insertPlaylistTracks(toInsert)
-            }
-        } else {
-            val existing = audiobookDao?.getSelectedTrackIdsForAudiobook(audiobookId) ?: emptySet()
-            if (existing.isEmpty()) {
-                val allTracks = audiobookDao?.getTracksForAudiobook(audiobookId) ?: emptyList()
-                val entries = allTracks.map {
-                    AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it.id)
+    suspend fun isAudiobookInPlaylist(audiobookId: Long): Boolean = withContext(Dispatchers.IO) {
+        playlistDao.isAudiobookInPlaylist(audiobookId)
+    }
+
+    suspend fun syncAudiobookSelection(audiobookId: Long, trackIds: List<Long>): Boolean = withContext(Dispatchers.IO) {
+        runInTransaction {
+            val dao = audiobookDao
+            if (trackIds.isNotEmpty()) {
+                dao?.clearPlaylistTracksForBook(audiobookId)
+                val now = System.currentTimeMillis()
+                val entries = trackIds.map {
+                    AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
                 }
-                if (entries.isNotEmpty()) {
-                    audiobookDao?.insertPlaylistTracks(entries)
-                }
+                dao?.insertPlaylistTracks(entries)
+                playlistDao.appendAudiobookIfMissing(audiobookId)
+                true
+            } else {
+                dao?.clearPlaylistTracksForBook(audiobookId)
+                playlistDao.removeAudiobookFromPlaylist(audiobookId)
+                true
             }
         }
-        playlistDao.appendAudiobookIfMissing(audiobookId)
+    }
+
+    suspend fun addAudiobookToPlaylist(audiobookId: Long, trackIds: List<Long>? = null): Boolean = withContext(Dispatchers.IO) {
+        runInTransaction {
+            val now = System.currentTimeMillis()
+            if (!trackIds.isNullOrEmpty()) {
+                val existing = audiobookDao?.getSelectedTrackIdsForAudiobook(audiobookId) ?: emptyList()
+                val existingSet = existing.toSet()
+                val toInsert = trackIds.filter { it !in existingSet }.map {
+                    AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
+                }
+                if (toInsert.isNotEmpty()) {
+                    audiobookDao?.insertPlaylistTracks(toInsert)
+                }
+            } else {
+                val existing = audiobookDao?.getSelectedTrackIdsForAudiobook(audiobookId) ?: emptyList()
+                if (existing.isEmpty()) {
+                    val allTracks = audiobookDao?.getTracksForAudiobook(audiobookId) ?: emptyList()
+                    val entries = allTracks.map {
+                        AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it.id, addedAt = now)
+                    }
+                    if (entries.isNotEmpty()) {
+                        audiobookDao?.insertPlaylistTracks(entries)
+                    }
+                }
+            }
+            val appended = playlistDao.appendAudiobookIfMissing(audiobookId)
+            appended
+        }
     }
 
     suspend fun removeFromPlaylist(episodeId: Long) = withContext(Dispatchers.IO) {
