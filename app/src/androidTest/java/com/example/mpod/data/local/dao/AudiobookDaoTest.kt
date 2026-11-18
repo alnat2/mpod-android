@@ -203,7 +203,7 @@ class AudiobookDaoTest {
 
     @Test
     fun polymorphicPlaylistSupportsBothEpisodesAndAudiobooks() = runBlocking {
-        val podcastId = podcastDao.insertPodcast(
+        val podcastId = podcastDao.insert(
             PodcastEntity(feedUrl = "https://example.com/feed.xml", title = "Tech Podcast")
         )
         val episodeId = episodeDao.insertEpisode(
@@ -268,7 +268,7 @@ class AudiobookDaoTest {
 
     @Test
     fun reorderPlaylist_episodesOnly_doesNotPruneAudiobooks() = runBlocking {
-        val podcastId = podcastDao.insertPodcast(
+        val podcastId = podcastDao.insert(
             PodcastEntity(feedUrl = "https://example.com/feed.xml", title = "Podcast")
         )
         val ep1 = episodeDao.insertEpisode(
@@ -320,5 +320,135 @@ class AudiobookDaoTest {
         assertThrows(IllegalArgumentException::class.java) {
             PlaylistItemEntity(episodeId = 1L, audiobookId = 2L, position = 0)
         }
+    }
+
+    @Test
+    fun getPlaylistItemsWithAudiobooks_returnsAudiobookWithRelativePath() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(
+                title = "Test Book",
+                author = "Author",
+                folderUri = "content://audiobooks/test",
+                relativePath = "Subfolder/Test Book"
+            )
+        )
+        playlistDao.appendAudiobookIfMissing(bookId)
+
+        val flowItems = playlistDao.getPlaylistItemsWithAudiobooksFlow().first()
+        assertEquals(1, flowItems.size)
+        assertEquals(bookId, flowItems[0].audiobook.id)
+        assertEquals("Subfolder/Test Book", flowItems[0].audiobook.relativePath)
+        assertEquals("Test Book", flowItems[0].audiobook.title)
+        assertEquals(0, flowItems[0].position)
+
+        val listItems = playlistDao.getPlaylistItemsWithAudiobooks()
+        assertEquals(1, listItems.size)
+        assertEquals(bookId, listItems[0].audiobook.id)
+        assertEquals("Subfolder/Test Book", listItems[0].audiobook.relativePath)
+        assertEquals(0, listItems[0].position)
+    }
+
+    @Test
+    fun appendAudiobookIfMissing_isIdempotent() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Book Once", folderUri = "content://audiobooks/once")
+        )
+        val firstAppend = playlistDao.appendAudiobookIfMissing(bookId)
+        assertTrue(firstAppend)
+        assertEquals(1, playlistDao.getAllPlaylistItems().size)
+
+        val secondAppend = playlistDao.appendAudiobookIfMissing(bookId)
+        assertFalse(secondAppend)
+        assertEquals(1, playlistDao.getAllPlaylistItems().size)
+    }
+
+    @Test
+    fun isAudiobookInPlaylist_reflectsAdditionAndRemoval() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Book A", folderUri = "content://audiobooks/a")
+        )
+        assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+
+        playlistDao.appendAudiobookIfMissing(bookId)
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+
+        playlistDao.removeAudiobookFromPlaylist(bookId)
+        assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+    }
+
+    @Test
+    fun deleteAudiobooksNotIn_prunesExcludedAudiobooksAndKeepsEpisodes() = runBlocking {
+        val podcastId = podcastDao.insert(
+            PodcastEntity(feedUrl = "https://example.com/feed.xml", title = "Podcast")
+        )
+        val ep1 = episodeDao.insertEpisode(
+            EpisodeEntity(podcastId = podcastId, guid = "ep-1", title = "Ep 1", audioUrl = "ep1.mp3")
+        )
+        val book1 = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Book 1", folderUri = "content://audiobooks/1")
+        )
+        val book2 = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Book 2", folderUri = "content://audiobooks/2")
+        )
+
+        playlistDao.appendEpisodeIfMissing(ep1)
+        playlistDao.appendAudiobookIfMissing(book1)
+        playlistDao.appendAudiobookIfMissing(book2)
+
+        assertEquals(3, playlistDao.getAllPlaylistItems().size)
+
+        // Delete audiobooks not in [book1]
+        playlistDao.deleteAudiobooksNotIn(listOf(book1))
+
+        val remaining = playlistDao.getAllPlaylistItems()
+        assertEquals(2, remaining.size)
+        assertTrue(remaining.any { it.episodeId == ep1 })
+        assertTrue(remaining.any { it.audiobookId == book1 })
+        assertFalse(remaining.any { it.audiobookId == book2 })
+    }
+
+    @Test
+    fun syncAudiobookSelection_withRealDatabase_atomicallyUpdatesTracksAndQueue() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Sapiens", folderUri = "content://audiobooks/sapiens")
+        )
+        val track1 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Part 1", fileUri = "1.mp3", trackNumber = 1)
+        )
+        val track2 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Part 2", fileUri = "2.mp3", trackNumber = 2)
+        )
+        val track3 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Part 3", fileUri = "3.mp3", trackNumber = 3)
+        )
+
+        val repository = com.example.mpod.data.repository.PlaylistRepository(
+            playlistDao = playlistDao,
+            audiobookDao = audiobookDao,
+            database = database
+        )
+
+        // 1. Initially: book not in queue
+        assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+
+        // 2. Select track 1 and 2: book should be added to playlist_items atomically
+        repository.syncAudiobookSelection(bookId, listOf(track1, track2))
+
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+        val selectedTracks = audiobookDao.getSelectedTracksForAudiobook(bookId)
+        assertEquals(listOf(track1, track2), selectedTracks.map { it.id })
+
+        // 3. Update selection to only track 3: old tracks cleared, track 3 inserted, book stays in queue
+        repository.syncAudiobookSelection(bookId, listOf(track3))
+
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+        val updatedTracks = audiobookDao.getSelectedTracksForAudiobook(bookId)
+        assertEquals(listOf(track3), updatedTracks.map { it.id })
+
+        // 4. Deselect all tracks (emptyList()): tracks cleared AND book removed from playlist_items
+        repository.syncAudiobookSelection(bookId, emptyList())
+
+        assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+        assertTrue(audiobookDao.getSelectedTracksForAudiobook(bookId).isEmpty())
     }
 }
