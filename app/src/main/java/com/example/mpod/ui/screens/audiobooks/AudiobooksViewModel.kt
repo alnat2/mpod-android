@@ -14,6 +14,8 @@ import com.example.mpod.ui.components.FilemanagerItemType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +32,12 @@ data class FilemanagerItemUi(
     val isInPlaylist: Boolean = false,
     val author: String? = null,
     val book: AudiobookEntity? = null
+)
+
+private data class ChapterSyncRequest(
+    val bookId: Long,
+    val trackIds: List<Long>,
+    val fallbackTrackIds: Set<Long>
 )
 
 data class AudiobooksUiState(
@@ -64,6 +72,39 @@ class AudiobooksViewModel @Inject constructor(
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
     private var playlistAudiobookIds: Set<Long> = emptySet()
     private var hasTriggeredLegacyRescan = false
+    private val chapterSyncChannel = Channel<ChapterSyncRequest>(Channel.CONFLATED)
+    @Volatile
+    private var syncWorkerJob: Job? = null
+    private val syncWorkerLock = Any()
+
+    private fun ensureSyncWorker() {
+        if (syncWorkerJob?.isActive == true) return
+        synchronized(syncWorkerLock) {
+            if (syncWorkerJob?.isActive != true) {
+                syncWorkerJob = viewModelScope.launch(ioDispatcher) {
+                    for (request in chapterSyncChannel) {
+                        try {
+                            playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
+                            queueInvalidator.invalidate()
+                        } catch (e: Exception) {
+                            _state.value = _state.value.let { s ->
+                                if (s.selectedBookForModal?.id == request.bookId) {
+                                    s.copy(
+                                        selectedBookPlaylistTrackIds = request.fallbackTrackIds,
+                                        errorMessage = "Failed to update chapters: ${e.localizedMessage ?: "Unknown error"}"
+                                    )
+                                } else {
+                                    s.copy(
+                                        errorMessage = "Failed to update chapters: ${e.localizedMessage ?: "Unknown error"}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     init {
         viewModelScope.launch(ioDispatcher) {
@@ -179,8 +220,19 @@ class AudiobooksViewModel @Inject constructor(
         viewModelScope.launch(ioDispatcher) {
             if (bookId in playlistAudiobookIds) {
                 playlistRepository.removeAudiobookFromPlaylist(bookId)
+                if (_state.value.selectedBookForModal?.id == bookId) {
+                    _state.value = _state.value.copy(selectedBookPlaylistTrackIds = emptySet())
+                }
             } else {
                 playlistRepository.addAudiobookToPlaylist(bookId)
+                if (_state.value.selectedBookForModal?.id == bookId) {
+                    val tracks = audiobookRepository.getTracksForAudiobook(bookId)
+                    _state.value = _state.value.let { s ->
+                        if (s.selectedBookForModal?.id == bookId) {
+                            s.copy(selectedBookPlaylistTrackIds = tracks.map { it.id }.toSet())
+                        } else s
+                    }
+                }
             }
             queueInvalidator.invalidate()
         }
@@ -188,12 +240,17 @@ class AudiobooksViewModel @Inject constructor(
 
     fun openBookModal(book: AudiobookEntity) {
         viewModelScope.launch(ioDispatcher) {
+            val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
-            val selectedTracks = audiobookRepository.getSelectedTracksForAudiobook(book.id)
-            val selectedIds = if (selectedTracks.isNotEmpty()) {
-                selectedTracks.map { it.id }.toSet()
+            val selectedIds = if (inQueue) {
+                val selectedTracks = audiobookRepository.getSelectedTracksForAudiobook(book.id)
+                if (selectedTracks.isNotEmpty()) {
+                    selectedTracks.map { it.id }.toSet()
+                } else {
+                    tracks.map { it.id }.toSet()
+                }
             } else {
-                tracks.map { it.id }.toSet()
+                emptySet()
             }
 
             _state.value = _state.value.copy(
@@ -214,7 +271,8 @@ class AudiobooksViewModel @Inject constructor(
 
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
         val book = _state.value.selectedBookForModal ?: return
-        val currentSelected = _state.value.selectedBookPlaylistTrackIds.toMutableSet()
+        val previousSelected = _state.value.selectedBookPlaylistTrackIds
+        val currentSelected = previousSelected.toMutableSet()
 
         if (track.id in currentSelected) {
             currentSelected.remove(track.id)
@@ -224,10 +282,14 @@ class AudiobooksViewModel @Inject constructor(
 
         _state.value = _state.value.copy(selectedBookPlaylistTrackIds = currentSelected)
 
-        viewModelScope.launch(ioDispatcher) {
-            audiobookRepository.setSelectedTracks(book.id, currentSelected.toList())
-            queueInvalidator.invalidate()
-        }
+        ensureSyncWorker()
+        chapterSyncChannel.trySend(
+            ChapterSyncRequest(
+                bookId = book.id,
+                trackIds = currentSelected.toList(),
+                fallbackTrackIds = previousSelected
+            )
+        )
     }
 
     fun dismissError() {
@@ -236,6 +298,12 @@ class AudiobooksViewModel @Inject constructor(
 
     fun dismissStatus() {
         _state.value = _state.value.copy(statusMessage = null)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        chapterSyncChannel.close()
+        syncWorkerJob?.cancel()
     }
 
     companion object {
