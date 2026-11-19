@@ -1,11 +1,27 @@
 package com.example.mpod.testutil
 
+import com.example.mpod.data.local.MpodDatabase
+import com.example.mpod.data.local.dao.AudiobookDao
+import kotlinx.coroutines.flow.emptyFlow
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatcher
 import org.mockito.Mockito
 import org.mockito.stubbing.OngoingStubbing
 
 inline fun <reified T> mock(): T = Mockito.mock(T::class.java)
+
+fun mockAudiobookDao(): AudiobookDao {
+    val dao: AudiobookDao = mock()
+    whenever(dao.getPlaylistAudiobookTracksFlow()).thenReturn(emptyFlow())
+    return dao
+}
+
+fun mockMpodDatabase(): MpodDatabase {
+    val db: MpodDatabase = mock()
+    whenever(db.transactionExecutor).thenReturn(java.util.concurrent.Executor { it.run() })
+    whenever(db.suspendingTransactionId).thenReturn(ThreadLocal())
+    return db
+}
 
 fun <T> whenever(methodCall: T): OngoingStubbing<T> = Mockito.`when`(methodCall)
 

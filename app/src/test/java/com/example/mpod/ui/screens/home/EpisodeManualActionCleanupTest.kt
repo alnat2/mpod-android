@@ -19,6 +19,8 @@ import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.testutil.mock
+import com.example.mpod.testutil.mockAudiobookDao
+import com.example.mpod.testutil.mockMpodDatabase
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.playback.SmartListeningManager
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsViewModel
@@ -78,7 +80,7 @@ class EpisodeManualActionCleanupTest {
 
         val queueInvalidator = PlaybackQueueInvalidator()
         val appSettingsStore = FakeAppSettingsStore()
-        val playlistRepository = PlaylistRepository(fakeStorage.playlistDao, mock(), mock())
+        val playlistRepository = PlaylistRepository(fakeStorage.playlistDao, mockAudiobookDao(), mockMpodDatabase())
         val podcastRepository = PodcastRepository(
             podcastDao = fakeStorage.podcastDao,
             episodeDao = fakeStorage.episodeDao,
