@@ -58,7 +58,7 @@ class UnsubscribeDownloadTest {
         val invalidator = PlaybackQueueInvalidator()
         val repo = PodcastRepository(db.podcastDao(), db.episodeDao(), settings, client, manager, invalidator)
         compose.runOnUiThread {
-            vm = SubscriptionsViewModel(db.podcastDao(), db.episodeDao(), db.playlistDao(), repo, PlaylistRepository(db.playlistDao()), invalidator, manager)
+            vm = SubscriptionsViewModel(db.podcastDao(), db.episodeDao(), db.playlistDao(), repo, PlaylistRepository(db.playlistDao(), db.audiobookDao(), db), invalidator, manager)
         }
     }
 

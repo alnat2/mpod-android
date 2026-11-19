@@ -12,6 +12,7 @@ import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.testutil.mock
 import com.example.mpod.data.repository.repositoryCleanupManager
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +82,7 @@ class SubscriptionsStateConcurrencyTest {
         val invalidator = PlaybackQueueInvalidator()
         val repository = PodcastRepository(podcastDao, episodes, FakeAppSettingsStore(), client, manager, invalidator)
         viewModel = SubscriptionsViewModel(podcastDao, episodes, playlist, repository,
-            PlaylistRepository(playlist), invalidator, manager)
+            PlaylistRepository(playlist, mock(), mock()), invalidator, manager)
         withTimeout(TIMEOUT) { viewModel.state.first { !it.isLoading } }
 
         // Intercept the actual VM's read/CAS boundary without adding production test hooks.

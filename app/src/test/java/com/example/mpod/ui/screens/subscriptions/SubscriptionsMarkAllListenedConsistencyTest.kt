@@ -19,6 +19,7 @@ import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
+import com.example.mpod.testutil.mock
 import com.example.mpod.playback.CleanupResult
 import com.example.mpod.playback.FileOperations
 import com.example.mpod.playback.PlaybackQueueInvalidator
@@ -91,7 +92,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
         invalidator = PlaybackQueueInvalidator()
         repository = PodcastRepository(store.podcasts, store.episodes, FakeAppSettingsStore(), client, manager, invalidator)
         viewModel = SubscriptionsViewModel(store.podcasts, store.episodes, store.playlist,
-            repository, PlaylistRepository(store.playlist), invalidator, manager)
+            repository, PlaylistRepository(store.playlist, mock(), mock()), invalidator, manager)
     }
 
     @After
@@ -589,7 +590,7 @@ class SubscriptionsMarkAllListenedConsistencyTest {
         val recorder = QueueEvents()
         val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch(start = CoroutineStart.UNDISPATCHED) {
             invalidator.events.collect {
-                val items = PlaylistRepository(store.playlist).getPlaylistItems()
+                val items = PlaylistRepository(store.playlist, mock(), mock()).getPlaylistItems()
                 val queue = items.map { QueueEpisodeState(it.episode.id, it.episode.playbackPositionMs) }
                 val target = resolveQueuePlaybackTarget(queue, null, 101, 0, false)
                 if (queue.isEmpty()) assertNull(target) else assertTrue(target!!.episodeId in queue.map { it.episodeId })

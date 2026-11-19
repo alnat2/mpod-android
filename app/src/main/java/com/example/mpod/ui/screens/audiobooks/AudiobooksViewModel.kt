@@ -1,6 +1,7 @@
 package com.example.mpod.ui.screens.audiobooks
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mpod.data.local.dao.PlaylistDao
@@ -20,7 +21,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class FilemanagerItemUi(
@@ -76,6 +79,29 @@ class AudiobooksViewModel @Inject constructor(
     @Volatile
     private var syncWorkerJob: Job? = null
     private val syncWorkerLock = Any()
+
+    private suspend fun handleSyncError(request: ChapterSyncRequest, error: Exception) {
+        Log.e("AudiobooksVM", "Failed to sync book ${request.bookId}", error)
+        _state.update { s ->
+            if (s.selectedBookForModal?.id == request.bookId) {
+                val actualDbState = try {
+                    withContext(ioDispatcher) {
+                        audiobookRepository.getSelectedTracksForAudiobook(request.bookId).map { it.id }.toSet()
+                    }
+                } catch (dbReadError: Exception) {
+                    Log.e("AudiobooksVM", "Failed to read DB state after sync error", dbReadError)
+                    emptySet()
+                }
+
+                s.copy(
+                    selectedBookPlaylistTrackIds = actualDbState,
+                    errorMessage = "Failed to update chapters: ${error.localizedMessage ?: "Unknown error"}"
+                )
+            } else {
+                s
+            }
+        }
+    }
 
     private fun ensureSyncWorker() {
         if (syncWorkerJob?.isActive == true) return

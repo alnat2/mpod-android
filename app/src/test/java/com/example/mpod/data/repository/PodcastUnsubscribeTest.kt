@@ -10,6 +10,7 @@ import com.example.mpod.data.local.preferences.AppSettings
 import com.example.mpod.data.local.preferences.FakeAppSettingsStore
 import com.example.mpod.data.network.ProxyHttpClientFactory
 import com.example.mpod.playback.*
+import com.example.mpod.testutil.mock
 import com.example.mpod.ui.screens.subscriptions.SubscriptionsViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -93,7 +94,7 @@ class PodcastUnsubscribeTest {
         }
         invalidator = PlaybackQueueInvalidator()
         repository = PodcastRepository(podcasts, episodes, settings, client, manager, invalidator)
-        viewModel = SubscriptionsViewModel(podcasts, episodes, playlist, repository, PlaylistRepository(playlist), invalidator, manager)
+        viewModel = SubscriptionsViewModel(podcasts, episodes, playlist, repository, PlaylistRepository(playlist, mock(), mock()), invalidator, manager)
     }
 
     @After fun teardown() {

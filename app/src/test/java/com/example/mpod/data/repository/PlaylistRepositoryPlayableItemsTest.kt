@@ -1,5 +1,6 @@
 package com.example.mpod.data.repository
 
+import com.example.mpod.data.local.MpodDatabase
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.AudiobookEntity
@@ -28,14 +29,18 @@ class PlaylistRepositoryPlayableItemsTest {
 
     private lateinit var playlistDao: PlaylistDao
     private lateinit var audiobookDao: AudiobookDao
+    private lateinit var database: MpodDatabase
     private lateinit var repository: PlaylistRepository
 
     @Before
     fun setUp() {
         playlistDao = mock()
         audiobookDao = mock()
+        database = mock()
+        whenever(database.transactionExecutor).thenReturn(java.util.concurrent.Executor { it.run() })
+        whenever(database.suspendingTransactionId).thenReturn(ThreadLocal())
         whenever(audiobookDao.getPlaylistAudiobookTracksFlow()).thenReturn(flowOf(emptyList()))
-        repository = PlaylistRepository(playlistDao, audiobookDao)
+        repository = PlaylistRepository(playlistDao, audiobookDao, database)
     }
 
     private fun createEpisode(id: Long, title: String) = EpisodeEntity(
@@ -233,25 +238,6 @@ class PlaylistRepositoryPlayableItemsTest {
         assertTrue(result)
         verify(audiobookDao).clearPlaylistTracksForBook(10L)
         verify(playlistDao).removeAudiobookFromPlaylist(10L)
-    }
-
-    @Test
-    fun syncAudiobookSelection_withNullAudiobookDao_removesFromPlaylistWhenEmpty(): Unit = runBlocking {
-        val repoWithoutAudiobookDao = PlaylistRepository(playlistDao, null)
-        val result = repoWithoutAudiobookDao.syncAudiobookSelection(10L, emptyList())
-
-        assertTrue(result)
-        verify(playlistDao).removeAudiobookFromPlaylist(10L)
-    }
-
-    @Test
-    fun syncAudiobookSelection_withNullAudiobookDao_appendsToPlaylistWhenNotEmpty(): Unit = runBlocking {
-        whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
-        val repoWithoutAudiobookDao = PlaylistRepository(playlistDao, null)
-        val result = repoWithoutAudiobookDao.syncAudiobookSelection(10L, listOf(101L))
-
-        assertTrue(result)
-        verify(playlistDao).appendAudiobookIfMissing(10L)
     }
 
     @Test
