@@ -14,6 +14,7 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.components.FilemanagerItemType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -75,10 +76,40 @@ class AudiobooksViewModel @Inject constructor(
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
     private var playlistAudiobookIds: Set<Long> = emptySet()
     private var hasTriggeredLegacyRescan = false
-    private val chapterSyncChannel = Channel<ChapterSyncRequest>(Channel.CONFLATED)
-    @Volatile
-    private var syncWorkerJob: Job? = null
-    private val syncWorkerLock = Any()
+
+    private val activeBookSyncChannels = java.util.concurrent.ConcurrentHashMap<Long, Pair<Channel<ChapterSyncRequest>, Job>>()
+    private val syncChannelsLock = Any()
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun getSyncChannelForBook(bookId: Long): Channel<ChapterSyncRequest> {
+        synchronized(syncChannelsLock) {
+            val existing = activeBookSyncChannels[bookId]
+            if (existing != null && !existing.first.isClosedForSend) {
+                return existing.first
+            }
+            val channel = Channel<ChapterSyncRequest>(Channel.CONFLATED)
+            val job = viewModelScope.launch(ioDispatcher) {
+                try {
+                    for (request in channel) {
+                        try {
+                            playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
+                            queueInvalidator.invalidate()
+                        } catch (e: Exception) {
+                            handleSyncError(request, e)
+                        }
+                    }
+                } finally {
+                    synchronized(syncChannelsLock) {
+                        if (activeBookSyncChannels[bookId]?.first == channel) {
+                            activeBookSyncChannels.remove(bookId)
+                        }
+                    }
+                }
+            }
+            activeBookSyncChannels[bookId] = channel to job
+            return channel
+        }
+    }
 
     private suspend fun handleSyncError(request: ChapterSyncRequest, error: Exception) {
         Log.e("AudiobooksVM", "Failed to sync book ${request.bookId}", error)
@@ -99,35 +130,6 @@ class AudiobooksViewModel @Inject constructor(
                 )
             } else {
                 s
-            }
-        }
-    }
-
-    private fun ensureSyncWorker() {
-        if (syncWorkerJob?.isActive == true) return
-        synchronized(syncWorkerLock) {
-            if (syncWorkerJob?.isActive != true) {
-                syncWorkerJob = viewModelScope.launch(ioDispatcher) {
-                    for (request in chapterSyncChannel) {
-                        try {
-                            playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
-                            queueInvalidator.invalidate()
-                        } catch (e: Exception) {
-                            _state.value = _state.value.let { s ->
-                                if (s.selectedBookForModal?.id == request.bookId) {
-                                    s.copy(
-                                        selectedBookPlaylistTrackIds = request.fallbackTrackIds,
-                                        errorMessage = "Failed to update chapters: ${e.localizedMessage ?: "Unknown error"}"
-                                    )
-                                } else {
-                                    s.copy(
-                                        errorMessage = "Failed to update chapters: ${e.localizedMessage ?: "Unknown error"}"
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -288,11 +290,19 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun closeBookModal() {
-        _state.value = _state.value.copy(
-            selectedBookForModal = null,
-            selectedBookTracks = emptyList(),
-            selectedBookPlaylistTrackIds = emptySet()
-        )
+        val currentBook = _state.value.selectedBookForModal
+        currentBook?.let { book ->
+            synchronized(syncChannelsLock) {
+                activeBookSyncChannels[book.id]?.first?.close()
+            }
+        }
+        _state.update { s ->
+            s.copy(
+                selectedBookForModal = null,
+                selectedBookTracks = emptyList(),
+                selectedBookPlaylistTrackIds = emptySet()
+            )
+        }
     }
 
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
@@ -306,10 +316,10 @@ class AudiobooksViewModel @Inject constructor(
             currentSelected.add(track.id)
         }
 
-        _state.value = _state.value.copy(selectedBookPlaylistTrackIds = currentSelected)
+        _state.update { it.copy(selectedBookPlaylistTrackIds = currentSelected) }
 
-        ensureSyncWorker()
-        chapterSyncChannel.trySend(
+        val channel = getSyncChannelForBook(book.id)
+        channel.trySend(
             ChapterSyncRequest(
                 bookId = book.id,
                 trackIds = currentSelected.toList(),
@@ -328,8 +338,13 @@ class AudiobooksViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        chapterSyncChannel.close()
-        syncWorkerJob?.cancel()
+        synchronized(syncChannelsLock) {
+            activeBookSyncChannels.values.forEach { (channel, job) ->
+                channel.close()
+                job.cancel()
+            }
+            activeBookSyncChannels.clear()
+        }
     }
 
     companion object {
