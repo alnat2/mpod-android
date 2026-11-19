@@ -508,4 +508,122 @@ class AudiobooksViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun toggleTrackSelection_fastBookSwitch_doesNotLoseFirstBookChanges() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+
+            val bookA = AudiobookEntity(id = 10L, folderUri = "uri://bookA", title = "Book A")
+            val trackA1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "A1", fileUri = "uri://a1", trackNumber = 1)
+            val trackA2 = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "A2", fileUri = "uri://a2", trackNumber = 2)
+
+            val bookB = AudiobookEntity(id = 20L, folderUri = "uri://bookB", title = "Book B")
+            val trackB1 = AudiobookTrackEntity(id = 201L, audiobookId = 20L, title = "B1", fileUri = "uri://b1", trackNumber = 1)
+
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(playlistDao.isAudiobookInPlaylist(20L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(trackA1, trackA2))
+            `when`(audiobookRepository.getTracksForAudiobook(20L)).thenReturn(listOf(trackB1))
+
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L, 102L))).thenReturn(true)
+            `when`(playlistRepository.syncAudiobookSelection(20L, listOf(201L))).thenReturn(true)
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            // 1. Open book A, select A1 then A2
+            viewModel.openBookModal(bookA)
+            advanceUntilIdle()
+            viewModel.toggleTrackSelection(trackA1)
+            viewModel.toggleTrackSelection(trackA2)
+
+            // 2. Quickly close modal for A and open book B without idling
+            viewModel.closeBookModal()
+            viewModel.openBookModal(bookB)
+            advanceUntilIdle()
+            viewModel.toggleTrackSelection(trackB1)
+
+            // Process all background sync jobs
+            advanceUntilIdle()
+
+            // Verify both book A and book B had syncAudiobookSelection invoked!
+            val invocations = org.mockito.Mockito.mockingDetails(playlistRepository).invocations
+            val syncedBooksAndTracks = invocations
+                .filter { it.method.name == "syncAudiobookSelection" }
+                .map { invocation ->
+                    val bookId = invocation.arguments[0] as Long
+                    @Suppress("UNCHECKED_CAST")
+                    val tracks = invocation.arguments[1] as List<Long>
+                    bookId to tracks
+                }
+            assertTrue(syncedBooksAndTracks.contains(10L to listOf(101L, 102L)))
+            assertTrue(syncedBooksAndTracks.contains(20L to listOf(201L)))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun toggleTrackSelection_errorRollsBackToActualDatabaseState() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val track2 = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "Ch 2", fileUri = "uri://2", trackNumber = 2)
+
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1, track2))
+            // Actual DB state: only track 1 is saved in DB
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(track1))
+            // Sync fails with exception
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L, 102L)))
+                .thenThrow(RuntimeException("Disk I/O error"))
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            viewModel.openBookModal(book)
+            advanceUntilIdle()
+
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            // User selects track 2: optimistic update shows [101, 102]
+            viewModel.toggleTrackSelection(track2)
+            assertEquals(setOf(101L, 102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            advanceUntilIdle()
+
+            // After error: must roll back to actual DB state [101L]
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+            assertTrue(viewModel.state.value.errorMessage?.contains("Disk I/O error") == true)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }

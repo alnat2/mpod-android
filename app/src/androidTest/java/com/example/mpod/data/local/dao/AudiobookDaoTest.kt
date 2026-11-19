@@ -451,4 +451,37 @@ class AudiobookDaoTest {
         assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
         assertTrue(audiobookDao.getSelectedTracksForAudiobook(bookId).isEmpty())
     }
+
+    @Test
+    fun endToEnd_selectChapters_visibleInPlayableItemsFlow_persistsAcrossReopen(): Unit = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(folderUri = "uri://book_e2e", title = "E2E Book", author = "Author")
+        )
+        val track1 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Chapter 1", fileUri = "1.mp3", trackNumber = 1)
+        )
+        val track2 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Chapter 2", fileUri = "2.mp3", trackNumber = 2)
+        )
+
+        val repo = com.example.mpod.data.repository.PlaylistRepository(
+            playlistDao = playlistDao,
+            audiobookDao = audiobookDao,
+            database = database
+        )
+
+        // 1. User selects chapters 1 and 2
+        repo.syncAudiobookSelection(bookId, listOf(track1, track2))
+
+        // Verify visible in playable items flow
+        val items1 = repo.getPlayableItemsFlow().first()
+        assertTrue(items1.any { it is com.example.mpod.data.local.model.PlayableItem.AudiobookItem && it.audiobook.id == bookId })
+
+        // 2. User deselects all chapters
+        repo.syncAudiobookSelection(bookId, emptyList())
+
+        // Verify removed from playable items flow
+        val items2 = repo.getPlayableItemsFlow().first()
+        assertFalse(items2.any { it is com.example.mpod.data.local.model.PlayableItem.AudiobookItem && it.audiobook.id == bookId })
+    }
 }
