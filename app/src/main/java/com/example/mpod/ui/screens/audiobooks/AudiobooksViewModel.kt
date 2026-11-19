@@ -95,6 +95,7 @@ class AudiobooksViewModel @Inject constructor(
                             playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
                             queueInvalidator.invalidate()
                         } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
                             handleSyncError(request, e)
                         }
                     }
@@ -113,17 +114,20 @@ class AudiobooksViewModel @Inject constructor(
 
     private suspend fun handleSyncError(request: ChapterSyncRequest, error: Exception) {
         Log.e("AudiobooksVM", "Failed to sync book ${request.bookId}", error)
+        if (_state.value.selectedBookForModal?.id != request.bookId) {
+            return
+        }
+        val actualDbState = try {
+            withContext(ioDispatcher) {
+                audiobookRepository.getSelectedTracksForAudiobook(request.bookId).map { it.id }.toSet()
+            }
+        } catch (dbReadError: Exception) {
+            Log.e("AudiobooksVM", "Failed to read DB state after sync error", dbReadError)
+            emptySet()
+        }
+
         _state.update { s ->
             if (s.selectedBookForModal?.id == request.bookId) {
-                val actualDbState = try {
-                    withContext(ioDispatcher) {
-                        audiobookRepository.getSelectedTracksForAudiobook(request.bookId).map { it.id }.toSet()
-                    }
-                } catch (dbReadError: Exception) {
-                    Log.e("AudiobooksVM", "Failed to read DB state after sync error", dbReadError)
-                    emptySet()
-                }
-
                 s.copy(
                     selectedBookPlaylistTrackIds = actualDbState,
                     errorMessage = "Failed to update chapters: ${error.localizedMessage ?: "Unknown error"}"
