@@ -246,16 +246,19 @@ class AudiobooksViewModel @Inject constructor(
 
     fun toggleBookPlaylist(bookId: Long) {
         viewModelScope.launch(ioDispatcher) {
-            if (bookId in playlistAudiobookIds) {
+            val inQueue = playlistDao.isAudiobookInPlaylist(bookId)
+            if (inQueue) {
                 playlistRepository.removeAudiobookFromPlaylist(bookId)
-                if (_state.value.selectedBookForModal?.id == bookId) {
-                    _state.value = _state.value.copy(selectedBookPlaylistTrackIds = emptySet())
+                _state.update { s ->
+                    if (s.selectedBookForModal?.id == bookId) {
+                        s.copy(selectedBookPlaylistTrackIds = emptySet())
+                    } else s
                 }
             } else {
                 playlistRepository.addAudiobookToPlaylist(bookId)
                 if (_state.value.selectedBookForModal?.id == bookId) {
                     val tracks = audiobookRepository.getTracksForAudiobook(bookId)
-                    _state.value = _state.value.let { s ->
+                    _state.update { s ->
                         if (s.selectedBookForModal?.id == bookId) {
                             s.copy(selectedBookPlaylistTrackIds = tracks.map { it.id }.toSet())
                         } else s
