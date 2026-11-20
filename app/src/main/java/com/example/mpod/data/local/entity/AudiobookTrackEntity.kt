@@ -30,5 +30,7 @@ data class AudiobookTrackEntity(
     val durationSeconds: Long = 0,
     val playbackPositionMs: Long = 0,
     val isListened: Boolean = false,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val fileSizeBytes: Long = 0,
+    val lastModifiedMs: Long = 0
 )

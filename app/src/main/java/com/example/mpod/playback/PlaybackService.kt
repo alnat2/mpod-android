@@ -222,11 +222,13 @@ class PlaybackService : MediaSessionService() {
             val settings = cachedSettings ?: appSettingsDataStore.settingsFlow.first().also { cachedSettings = it }
             val currentMediaQueueId = currentMediaQueueId()
 
-            val effectiveTargetItemId = targetQueueItemId
-                ?: if (preferFirstItem) playableItems.firstOrNull()?.queueItemId
-                else currentMediaQueueId?.toMediaId()
-                ?: settings.activeEpisodeId?.let { "episode:$it" }
-                ?: playableItems.firstOrNull()?.queueItemId
+            val effectiveTargetItemId = when {
+                targetQueueItemId != null -> targetQueueItemId
+                preferFirstItem -> playableItems.firstOrNull()?.queueItemId
+                currentMediaQueueId != null -> null
+                settings.activeEpisodeId != null -> "episode:${settings.activeEpisodeId}"
+                else -> playableItems.firstOrNull()?.queueItemId
+            }
 
             val window = SlidingWindowResolver.resolveWindow(
                 queue = playableItems,

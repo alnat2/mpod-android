@@ -494,6 +494,147 @@ class AudiobookStorageScannerTest {
         assertTrue(insertedTrack.audiobookId > 0)
     }
 
+    @Test
+    fun scanFolder_rescanUnchangedBook_skipsMetadataExtraction(): Unit = runBlocking {
+        val bookFolderUri = "content://tree/book_dir"
+        val track1Uri = "content://tree/t1"
+        val track2Uri = "content://tree/t2"
+
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Cached Book",
+                folderUri = bookFolderUri,
+                coverUri = "content://covers/1",
+                durationSeconds = 600L
+            )
+        )
+        fakeAudiobookDao.insertedTracks.addAll(
+            listOf(
+                AudiobookTrackEntity(
+                    id = 101L,
+                    audiobookId = 1L,
+                    title = "01-Chapter",
+                    fileUri = track1Uri,
+                    trackNumber = 1,
+                    durationSeconds = 300L,
+                    fileSizeBytes = 1000L,
+                    lastModifiedMs = 5000L
+                ),
+                AudiobookTrackEntity(
+                    id = 102L,
+                    audiobookId = 1L,
+                    title = "02-Chapter",
+                    fileUri = track2Uri,
+                    trackNumber = 2,
+                    durationSeconds = 300L,
+                    fileSizeBytes = 1200L,
+                    lastModifiedMs = 5000L
+                )
+            )
+        )
+
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Cached Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false, lastModified = 5000L),
+            DocumentItem("t2", "02-Chapter.mp3", "audio/mpeg", 1200L, isDirectory = false, lastModified = 5000L)
+        )
+
+        fakeMetadataExtractor.extractCallCount = 0
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertEquals(0, fakeMetadataExtractor.extractCallCount)
+    }
+
+    @Test
+    fun scanFolder_whenLastModifiedZero_fallsBackToExtractingMetadata(): Unit = runBlocking {
+        val bookFolderUri = "content://tree/book_dir"
+        val track1Uri = "content://tree/t1"
+
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Book",
+                folderUri = bookFolderUri,
+                coverUri = "content://covers/1",
+                durationSeconds = 300L
+            )
+        )
+        fakeAudiobookDao.insertedTracks.add(
+            AudiobookTrackEntity(
+                id = 101L,
+                audiobookId = 1L,
+                title = "01-Chapter",
+                fileUri = track1Uri,
+                trackNumber = 1,
+                durationSeconds = 300L,
+                fileSizeBytes = 1000L,
+                lastModifiedMs = 5000L
+            )
+        )
+
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        // lastModified is 0L -> untrusted/changed -> must extract
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false, lastModified = 0L)
+        )
+
+        fakeMetadataExtractor.extractCallCount = 0
+        fakeMetadataExtractor.metadataResult = ExtractedAudioMetadata(durationSeconds = 350L)
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertTrue(fakeMetadataExtractor.extractCallCount > 0)
+    }
+
+    @Test
+    fun scanFolder_whenFileSizeDiffers_extractsMetadata(): Unit = runBlocking {
+        val bookFolderUri = "content://tree/book_dir"
+        val track1Uri = "content://tree/t1"
+
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Book",
+                folderUri = bookFolderUri,
+                coverUri = "content://covers/1",
+                durationSeconds = 300L
+            )
+        )
+        fakeAudiobookDao.insertedTracks.add(
+            AudiobookTrackEntity(
+                id = 101L,
+                audiobookId = 1L,
+                title = "01-Chapter",
+                fileUri = track1Uri,
+                trackNumber = 1,
+                durationSeconds = 300L,
+                fileSizeBytes = 1000L,
+                lastModifiedMs = 5000L
+            )
+        )
+
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        // File size changed from 1000L to 2000L
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 2000L, isDirectory = false, lastModified = 5000L)
+        )
+
+        fakeMetadataExtractor.extractCallCount = 0
+        fakeMetadataExtractor.metadataResult = ExtractedAudioMetadata(durationSeconds = 600L)
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertTrue(fakeMetadataExtractor.extractCallCount > 0)
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()
@@ -566,7 +707,14 @@ class AudiobookStorageScannerTest {
             return tracks.map { it.id }
         }
 
-        override suspend fun updateTrack(track: AudiobookTrackEntity) {}
+        override suspend fun updateTrack(track: AudiobookTrackEntity) {
+            val idx = insertedTracks.indexOfFirst { it.id == track.id }
+            if (idx >= 0) insertedTracks[idx] = track else insertedTracks.add(track)
+        }
+
+        override suspend fun updateTracks(tracks: List<AudiobookTrackEntity>) {
+            tracks.forEach { updateTrack(it) }
+        }
         override suspend fun getTrackByFileUri(audiobookId: Long, fileUri: String): AudiobookTrackEntity? =
             insertedTracks.find { it.audiobookId == audiobookId && it.fileUri == fileUri }
         override suspend fun updateTrackProgress(trackId: Long, positionMs: Long, isListened: Boolean) {}
@@ -594,10 +742,14 @@ class AudiobookStorageScannerTest {
 
     internal class FakeAudioMetadataExtractor : AudioMetadataExtractor {
         var metadataResult: ExtractedAudioMetadata? = null
+        var extractCallCount: Int = 0
         override fun extract(
             uri: Uri,
             includePicture: Boolean
-        ): ExtractedAudioMetadata? = metadataResult
+        ): ExtractedAudioMetadata? {
+            extractCallCount++
+            return metadataResult
+        }
     }
 
     internal class FakeDocumentTreeHelper : DocumentTreeHelper {

@@ -153,17 +153,43 @@ object SlidingWindowResolver {
     ): SlidingWindow {
         if (queue.isEmpty()) return SlidingWindow(null, null)
 
+        val explicitTargetTrackId = if (targetQueueItemId?.startsWith("audiobook:") == true) {
+            val parts = targetQueueItemId.removePrefix("audiobook:").split(":")
+            if (parts.size >= 2) parts[1].toLongOrNull() else null
+        } else null
+
+        val effectivePreferredTrackId = preferredTrackId ?: explicitTargetTrackId
+
         // 1. Identify starting PlayableItem index
         val targetItemIndex = when {
-            targetQueueItemId != null -> queue.indexOfFirst { it.queueItemId == targetQueueItemId }
-            currentMediaQueueId != null -> queue.indexOfFirst { item ->
-                when (currentMediaQueueId) {
-                    is MediaQueueId.Episode -> item is PlayableItem.EpisodeItem && item.episode.id == currentMediaQueueId.episodeId
-                    is MediaQueueId.Audiobook -> item is PlayableItem.AudiobookItem && item.audiobook.id == currentMediaQueueId.audiobookId
+            targetQueueItemId != null -> {
+                val idx = queue.indexOfFirst { item ->
+                    when (item) {
+                        is PlayableItem.EpisodeItem -> item.queueItemId == targetQueueItemId
+                        is PlayableItem.AudiobookItem -> {
+                            if (targetQueueItemId.startsWith("audiobook:")) {
+                                val targetAbkId = targetQueueItemId.removePrefix("audiobook:").substringBefore(':').toLongOrNull()
+                                targetAbkId == item.audiobook.id
+                            } else {
+                                item.queueItemId == targetQueueItemId
+                            }
+                        }
+                    }
                 }
+                if (idx < 0) return SlidingWindow(null, null)
+                idx
+            }
+            currentMediaQueueId != null -> {
+                val idx = queue.indexOfFirst { item ->
+                    when (currentMediaQueueId) {
+                        is MediaQueueId.Episode -> item is PlayableItem.EpisodeItem && item.episode.id == currentMediaQueueId.episodeId
+                        is MediaQueueId.Audiobook -> item is PlayableItem.AudiobookItem && item.audiobook.id == currentMediaQueueId.audiobookId
+                    }
+                }
+                if (idx >= 0) idx else 0
             }
             else -> 0
-        }.let { if (it >= 0) it else 0 }
+        }
 
         // 2. Resolve current PlaybackTrack, advancing to next item if target item has no playable tracks
         var activeItemIndex = targetItemIndex
@@ -172,7 +198,7 @@ object SlidingWindowResolver {
         for (i in targetItemIndex until queue.size) {
             val candidate = resolveTrackForItem(
                 item = queue[i],
-                preferredTrackId = if (i == targetItemIndex) preferredTrackId else null,
+                preferredTrackId = if (i == targetItemIndex) effectivePreferredTrackId else null,
                 currentMediaQueueId = if (i == targetItemIndex) currentMediaQueueId else null
             )
             if (candidate != null) {

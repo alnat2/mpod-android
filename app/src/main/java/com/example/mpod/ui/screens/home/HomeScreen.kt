@@ -242,7 +242,6 @@ fun HomeRoute(
                         putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
                     }
                     player.sendCustomCommand(command, args)
-                    player.play()
                 }
             }
         },
@@ -288,7 +287,6 @@ fun HomeRoute(
                         putLong(com.example.mpod.playback.PlaybackService.EXTRA_PREFERRED_TRACK_ID, track.id)
                     }
                     player.sendCustomCommand(command, args)
-                    player.play()
                 }
             }
         )

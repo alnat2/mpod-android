@@ -243,6 +243,77 @@ class SlidingWindowResolverTest {
         assertNull(MediaQueueId.fromMediaId("invalid:format:extra"))
     }
 
+    @Test
+    fun resolveWindow_twoAudiobooksInQueue_targetSecondBookByQueueItemId_playsSecondBook() {
+        val book1 = createAudiobookItem(1L, "Book One", 0, listOf(createTrack(101L, 1L, "Ch 1", 1)))
+        val book2 = createAudiobookItem(2L, "Book Two", 1, listOf(createTrack(201L, 2L, "Ch 1", 1)))
+
+        val window = SlidingWindowResolver.resolveWindow(
+            queue = listOf(book1, book2),
+            targetQueueItemId = "audiobook:2"
+        )
+
+        assertNotNull(window.current)
+        assertTrue(window.current is PlaybackTrack.AudiobookChapterTrack)
+        val current = window.current as PlaybackTrack.AudiobookChapterTrack
+        assertEquals(2L, current.audiobook.id)
+        assertEquals(201L, current.track.id)
+    }
+
+    @Test
+    fun resolveWindow_twoAudiobooksInQueue_targetSecondBookByFullMediaId_playsSecondBookAndPreferredTrack() {
+        val book1 = createAudiobookItem(1L, "Book One", 0, listOf(createTrack(101L, 1L, "Ch 1", 1)))
+        val book2 = createAudiobookItem(
+            2L, "Book Two", 1,
+            listOf(
+                createTrack(201L, 2L, "Ch 1", 1),
+                createTrack(202L, 2L, "Ch 2", 2)
+            )
+        )
+
+        val window = SlidingWindowResolver.resolveWindow(
+            queue = listOf(book1, book2),
+            targetQueueItemId = "audiobook:2:202"
+        )
+
+        assertNotNull(window.current)
+        assertTrue(window.current is PlaybackTrack.AudiobookChapterTrack)
+        val current = window.current as PlaybackTrack.AudiobookChapterTrack
+        assertEquals(2L, current.audiobook.id)
+        assertEquals(202L, current.track.id)
+    }
+
+    @Test
+    fun resolveWindow_explicitTargetQueueItemIdNotFound_doesNotFallbackToZero() {
+        val book1 = createAudiobookItem(1L, "Book One", 0, listOf(createTrack(101L, 1L, "Ch 1", 1)))
+        val book2 = createAudiobookItem(2L, "Book Two", 1, listOf(createTrack(201L, 2L, "Ch 1", 1)))
+
+        val window = SlidingWindowResolver.resolveWindow(
+            queue = listOf(book1, book2),
+            targetQueueItemId = "audiobook:999"
+        )
+
+        assertNull(window.current)
+        assertNull(window.next)
+    }
+
+    @Test
+    fun resolveWindow_currentMediaQueueIdMatchesSecondAudiobook_keepsSecondBook() {
+        val book1 = createAudiobookItem(1L, "Book One", 0, listOf(createTrack(101L, 1L, "Ch 1", 1)))
+        val book2 = createAudiobookItem(2L, "Book Two", 1, listOf(createTrack(201L, 2L, "Ch 1", 1)))
+
+        val window = SlidingWindowResolver.resolveWindow(
+            queue = listOf(book1, book2),
+            targetQueueItemId = null,
+            currentMediaQueueId = MediaQueueId.Audiobook(2L, 201L)
+        )
+
+        assertNotNull(window.current)
+        val current = window.current as PlaybackTrack.AudiobookChapterTrack
+        assertEquals(2L, current.audiobook.id)
+        assertEquals(201L, current.track.id)
+    }
+
     private fun createEpisodeItem(id: Long, title: String, position: Int): PlayableItem.EpisodeItem {
         return PlayableItem.EpisodeItem(
             playlistItemId = id * 10,

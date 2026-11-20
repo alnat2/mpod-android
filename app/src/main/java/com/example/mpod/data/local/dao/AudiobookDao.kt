@@ -76,6 +76,9 @@ interface AudiobookDao {
     @Update
     suspend fun updateTrack(track: AudiobookTrackEntity)
 
+    @Update
+    suspend fun updateTracks(tracks: List<AudiobookTrackEntity>)
+
     @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId AND fileUri = :fileUri")
     suspend fun getTrackByFileUri(audiobookId: Long, fileUri: String): AudiobookTrackEntity?
 
