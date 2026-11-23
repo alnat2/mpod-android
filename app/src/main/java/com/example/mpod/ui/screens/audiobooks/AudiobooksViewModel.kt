@@ -229,7 +229,7 @@ class AudiobooksViewModel @Inject constructor(
                     } else {
                         _state.value = _state.value.copy(
                             isScanning = false,
-                            statusMessage = "Rescan complete: ${summary.booksScanned} added, ${summary.tracksScanned} tracks"
+                            statusMessage = "Rescan complete: ${summary.booksScanned} scanned, ${summary.tracksScanned} tracks"
                         )
                     }
                 } else {

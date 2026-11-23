@@ -56,4 +56,53 @@ class HomePlaybackIntentTest {
         org.junit.Assert.assertEquals(1800, state.durationSeconds)
         org.junit.Assert.assertNotNull(state.errorMessage)
     }
+
+    @Test
+    fun `audiobook chapter mediaItem populates chapter details in playback state`() {
+        val mockPlayer = org.mockito.Mockito.mock(androidx.media3.common.Player::class.java)
+        val extras = org.mockito.Mockito.mock(android.os.Bundle::class.java)
+        org.mockito.Mockito.`when`(extras.getInt(com.example.mpod.playback.PlaybackTrack.EXTRA_CHAPTER_INDEX)).thenReturn(2)
+        org.mockito.Mockito.`when`(extras.getInt(com.example.mpod.playback.PlaybackTrack.EXTRA_TOTAL_CHAPTERS)).thenReturn(5)
+
+        val mediaMetadata = androidx.media3.common.MediaMetadata.Builder()
+            .setTitle("02 - Chapter Two")
+            .setArtist("Author Name")
+            .setExtras(extras)
+            .build()
+        val mediaItem = androidx.media3.common.MediaItem.Builder()
+            .setMediaId("audiobook:5:202")
+            .setMediaMetadata(mediaMetadata)
+            .build()
+
+        org.mockito.Mockito.`when`(mockPlayer.currentMediaItem).thenReturn(mediaItem)
+        org.mockito.Mockito.`when`(mockPlayer.currentPosition).thenReturn(15000L)
+        org.mockito.Mockito.`when`(mockPlayer.duration).thenReturn(60000L)
+        org.mockito.Mockito.`when`(mockPlayer.playWhenReady).thenReturn(true)
+
+        val queue = listOf(
+            HomeEpisodeUi(
+                id = -5L,
+                title = "Book Title",
+                podcastTitle = "01 - Chapter One",
+                durationSeconds = 60,
+                playbackPositionSeconds = 0,
+                isListened = false,
+                downloaded = true,
+                summary = null,
+                isAudiobook = true,
+                audiobookId = 5L,
+                currentTrackId = 201L
+            )
+        )
+
+        val state = mockPlayer.toHomePlaybackUiState(activeEpisodeId = null, queue = queue)
+        org.junit.Assert.assertEquals(-5L, state.currentEpisodeId)
+        org.junit.Assert.assertEquals(202L, state.currentTrackId)
+        org.junit.Assert.assertEquals("02 - Chapter Two", state.currentChapterTitle)
+        org.junit.Assert.assertEquals(2, state.currentChapterIndex)
+        org.junit.Assert.assertEquals(5, state.totalChapters)
+        org.junit.Assert.assertEquals(15, state.positionSeconds)
+        org.junit.Assert.assertEquals(60, state.durationSeconds)
+        org.junit.Assert.assertTrue(state.isPlaying)
+    }
 }

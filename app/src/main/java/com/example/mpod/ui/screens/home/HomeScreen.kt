@@ -265,28 +265,42 @@ fun HomeRoute(
     }
 
     if (showChaptersModal && currentPlayingEpisode != null) {
+        val activeTrackId = if (playbackState.currentEpisodeId == currentPlayingEpisode.id && playbackState.currentTrackId != null) {
+            playbackState.currentTrackId
+        } else {
+            currentPlayingEpisode.currentTrackId
+        }
         com.example.mpod.ui.components.ChaptersModal(
             title = currentPlayingEpisode.title,
             author = currentPlayingEpisode.podcastTitle,
             coverUri = currentPlayingEpisode.coverUri,
             tracks = bookTracks,
-            currentTrackId = currentPlayingEpisode.currentTrackId,
+            currentTrackId = activeTrackId,
             isPlaying = playbackState.isPlaying,
             mode = com.example.mpod.ui.components.ChaptersModalMode.Player,
             onDismiss = { showChaptersModal = false },
             onSelectChapter = { track ->
                 showChaptersModal = false
                 controller?.let { player ->
-                    val targetId = "audiobook:${currentPlayingEpisode.audiobookId}"
-                    val command = androidx.media3.session.SessionCommand(
-                        com.example.mpod.playback.PlaybackService.CUSTOM_COMMAND_PLAY_ITEM,
-                        android.os.Bundle.EMPTY
-                    )
-                    val args = android.os.Bundle().apply {
-                        putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
-                        putLong(com.example.mpod.playback.PlaybackService.EXTRA_PREFERRED_TRACK_ID, track.id)
+                    val targetMediaId = "audiobook:${currentPlayingEpisode.audiobookId}:${track.id}"
+                    val existingIndex = (0 until player.mediaItemCount).firstOrNull {
+                        player.getMediaItemAt(it).mediaId == targetMediaId
                     }
-                    player.sendCustomCommand(command, args)
+                    if (existingIndex != null) {
+                        player.seekTo(existingIndex, track.playbackPositionMs)
+                        player.play()
+                    } else {
+                        val targetId = "audiobook:${currentPlayingEpisode.audiobookId}:${track.id}"
+                        val command = androidx.media3.session.SessionCommand(
+                            com.example.mpod.playback.PlaybackService.CUSTOM_COMMAND_PLAY_ITEM,
+                            android.os.Bundle.EMPTY
+                        )
+                        val args = android.os.Bundle().apply {
+                            putString(com.example.mpod.playback.PlaybackService.EXTRA_TARGET_ITEM_ID, targetId)
+                            putLong(com.example.mpod.playback.PlaybackService.EXTRA_PREFERRED_TRACK_ID, track.id)
+                        }
+                        player.sendCustomCommand(command, args)
+                    }
                 }
             }
         )
@@ -500,12 +514,26 @@ fun HomeScreen(
                         } else {
                             episode.durationSeconds
                         }
+                        val isCurrentItem = episode.id == currentEpisode.id
+                        val currentPlaybackState = playbackStateProvider()
+                        val effectivePodcastName = if (isCurrentItem && episode.isAudiobook && currentPlaybackState.currentChapterTitle != null) {
+                            currentPlaybackState.currentChapterTitle
+                        } else {
+                            episode.podcastTitle
+                        }
+                        val effectiveFormattedDuration = if (isCurrentItem && episode.isAudiobook && currentPlaybackState.currentChapterIndex != null && currentPlaybackState.totalChapters != null) {
+                            val posFormatted = formatProgressTime(currentPlaybackState.positionSeconds)
+                            val durFormatted = formatEpisodeDuration(currentPlaybackState.durationSeconds).ifBlank { "00:00" }
+                            "Chapter ${currentPlaybackState.currentChapterIndex} of ${currentPlaybackState.totalChapters} • $posFormatted / $durFormatted"
+                        } else {
+                            episode.formattedDuration ?: formatEpisodeDuration(effectiveDuration)
+                        }
                         PlayerPlaylistItem(
                             title = episode.title,
-                            podcastName = episode.podcastTitle,
-                            duration = episode.formattedDuration ?: formatEpisodeDuration(effectiveDuration),
-                            isCurrent = episode.id == currentEpisode.id,
-                            isPlaying = episode.id == currentEpisode.id && playbackSummary.isPlaying,
+                            podcastName = effectivePodcastName ?: "",
+                            duration = effectiveFormattedDuration,
+                            isCurrent = isCurrentItem,
+                            isPlaying = isCurrentItem && playbackSummary.isPlaying,
                             downloaded = episode.downloaded,
                             actionsEnabled = episode.id !in state.busyEpisodeIds,
                             modifier = Modifier
@@ -600,11 +628,16 @@ private fun HomePlayerCard(
     modifier: Modifier = Modifier
 ) {
     val playbackState = playbackStateProvider()
+    val effectivePodcastTitle = if (episode.isAudiobook && playbackState.currentChapterTitle != null) {
+        playbackState.currentChapterTitle
+    } else {
+        episode.podcastTitle
+    }
 
     PlayerView(
         modifier = modifier,
         title = episode.title,
-        podcastTitle = episode.podcastTitle,
+        podcastTitle = effectivePodcastTitle,
         elapsedLabel = formatProgressTime(playbackState.positionSeconds),
         durationLabel = formatRemainingTime(
             durationSeconds = playbackState.durationSeconds,
@@ -691,7 +724,11 @@ data class HomePlaybackUiState(
     val durationSeconds: Int = 0,
     val isPlaying: Boolean = false,
     val speedLabel: String = "1.0",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val currentTrackId: Long? = null,
+    val currentChapterTitle: String? = null,
+    val currentChapterIndex: Int? = null,
+    val totalChapters: Int? = null
 ) {
     val remainingSeconds: Int
         get() = (durationSeconds - positionSeconds).coerceAtLeast(0)
@@ -732,6 +769,18 @@ internal fun Player?.toHomePlaybackUiState(
         this?.currentPosition ?: savedPositionMs
     }
 
+    val currentTrackId = when (currentQueueId) {
+        is com.example.mpod.playback.MediaQueueId.Audiobook -> currentQueueId.trackId
+        else -> null
+    }
+    val extras = this?.currentMediaItem?.mediaMetadata?.extras
+    val chapterTitle = when (currentQueueId) {
+        is com.example.mpod.playback.MediaQueueId.Audiobook -> this?.currentMediaItem?.mediaMetadata?.title?.toString()
+        else -> null
+    }
+    val chapterIdx = extras?.getInt(com.example.mpod.playback.PlaybackTrack.EXTRA_CHAPTER_INDEX)?.takeIf { it > 0 }
+    val totalChapters = extras?.getInt(com.example.mpod.playback.PlaybackTrack.EXTRA_TOTAL_CHAPTERS)?.takeIf { it > 0 }
+
     return HomePlaybackUiState(
         currentEpisodeId = episodeId,
         positionSeconds = (positionMs / 1_000L).toInt().coerceAtLeast(0),
@@ -740,7 +789,11 @@ internal fun Player?.toHomePlaybackUiState(
         speedLabel = this?.playbackParameters?.speed.toSpeedLabel(),
         errorMessage = this?.playerError?.let {
             "Could not play this episode. Check its audio source and try again."
-        }
+        },
+        currentTrackId = currentTrackId,
+        currentChapterTitle = chapterTitle,
+        currentChapterIndex = chapterIdx,
+        totalChapters = totalChapters
     )
 }
 
