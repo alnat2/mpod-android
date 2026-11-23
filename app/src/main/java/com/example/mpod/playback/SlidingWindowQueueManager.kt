@@ -2,8 +2,10 @@ package com.example.mpod.playback
 
 import android.net.Uri
 import android.os.Bundle
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.util.UnstableApi
 import com.example.mpod.data.local.entity.AudiobookEntity
 import com.example.mpod.data.local.entity.AudiobookTrackEntity
 import com.example.mpod.data.local.entity.EpisodeEntity
@@ -95,6 +97,7 @@ sealed class PlaybackTrack {
         override fun toMediaId(): String = "audiobook:${audiobook.id}:${track.id}"
     }
 
+    @OptIn(UnstableApi::class)
     fun toMediaItem(): MediaItem {
         val extras = Bundle().apply {
             putLong(EXTRA_DURATION_SECONDS, durationSeconds)
