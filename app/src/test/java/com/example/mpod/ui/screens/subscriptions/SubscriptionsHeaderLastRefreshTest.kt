@@ -95,8 +95,8 @@ class SubscriptionsHeaderLastRefreshTest {
         // Initially blank
         assertNull(vm.state.value.lastRefreshHeaderText)
 
-        // Set refresh time to a timestamp
-        val zoneId = ZoneId.of("Europe/Amsterdam")
+        // Set refresh time to a timestamp in the JVM's system timezone
+        val zoneId = ZoneId.systemDefault()
         val nowMillis = java.time.LocalDate.now(zoneId).atTime(10, 0).atZone(zoneId).toInstant().toEpochMilli()
         store.setLastRefreshTime(nowMillis.toString())
 
