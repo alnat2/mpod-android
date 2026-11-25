@@ -8,11 +8,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -25,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -38,6 +36,9 @@ import androidx.compose.ui.unit.sp
 import com.example.mpod.R
 import com.example.mpod.ui.theme.InterFontFamily
 
+/**
+ * Compact floating playback controls aligned to Figma `Player Mobile` (`1804:12156` in `1264:6524`).
+ */
 @Composable
 fun MiniPlayer(
     isPlaying: Boolean,
@@ -46,59 +47,31 @@ fun MiniPlayer(
     onSeekForward: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pillShape = RoundedCornerShape(26.dp)
+    val containerShape = RoundedCornerShape(16.dp)
 
     Row(
         modifier = modifier
             .testTag("mini_player")
-            .figmaDropShadow(style = FigmaShadowStyle.Md, shape = pillShape)
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, shape = containerShape)
+            .clip(containerShape)
+            .background(MaterialTheme.colorScheme.surface, containerShape)
             .border(
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                shape = pillShape
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                shape = containerShape
             )
-            .clip(pillShape)
-            .background(MaterialTheme.colorScheme.surface, pillShape)
             .height(52.dp)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Rewind 15: text "-15" + rewind icon
-        Row(
-            modifier = Modifier
-                .testTag("mini_player_seek_backward")
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(bounded = true),
-                    role = Role.Button,
-                    onClick = onSeekBackward
-                )
-                .semantics {
-                    contentDescription = "Rewind 15 seconds"
-                    role = Role.Button
-                }
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "-15",
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                painter = painterResource(id = R.drawable.ic_huge_forward_02_wide),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.height(18.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.width(4.dp))
+        MiniPlayerSeekButton(
+            label = "-15",
+            contentDescription = "Rewind 15 seconds",
+            testTag = "mini_player_seek_backward",
+            iconFirst = false,
+            iconRotationDegrees = 0f,
+            onClick = onSeekBackward
+        )
 
         // Center Play / Pause button
         Box(
@@ -106,7 +79,7 @@ fun MiniPlayer(
             modifier = Modifier
                 .testTag("mini_player_play_pause")
                 .size(40.dp)
-                .figmaDropShadow(style = FigmaShadowStyle.Sm, shape = CircleShape)
+                .figmaDropShadow(style = FigmaShadowStyle.Md, shape = CircleShape)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
                 .clickable(
@@ -129,48 +102,86 @@ fun MiniPlayer(
                     }
                 ),
                 contentDescription = null,
-                tint = Color(0xFFF7FEE7),
-                modifier = Modifier.size(20.dp)
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(16.dp)
             )
         }
 
-        Spacer(modifier = Modifier.width(4.dp))
+        MiniPlayerSeekButton(
+            label = "+30",
+            contentDescription = "Forward 30 seconds",
+            testTag = "mini_player_seek_forward",
+            iconFirst = true,
+            iconRotationDegrees = 180f,
+            onClick = onSeekForward
+        )
+    }
+}
 
-        // Forward 30: forward icon (rotated 180) + text "+30"
+@Composable
+private fun MiniPlayerSeekButton(
+    label: String,
+    contentDescription: String,
+    testTag: String,
+    iconFirst: Boolean,
+    iconRotationDegrees: Float,
+    onClick: () -> Unit
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .testTag(testTag)
+            .widthIn(min = 56.dp)
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(bounded = true),
+                role = Role.Button,
+                onClick = onClick
+            )
+            .semantics {
+                this.contentDescription = contentDescription
+                role = Role.Button
+            }
+    ) {
         Row(
-            modifier = Modifier
-                .testTag("mini_player_seek_forward")
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(bounded = true),
-                    role = Role.Button,
-                    onClick = onSeekForward
-                )
-                .semantics {
-                    contentDescription = "Forward 30 seconds"
-                    role = Role.Button
-                }
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_huge_forward_02_wide),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .rotate(180f)
-                    .height(18.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "+30",
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (iconFirst) {
+                MiniPlayerSeekIcon(rotationDegrees = iconRotationDegrees)
+                MiniPlayerSeekLabel(text = label)
+            } else {
+                MiniPlayerSeekLabel(text = label)
+                MiniPlayerSeekIcon(rotationDegrees = iconRotationDegrees)
+            }
         }
     }
+}
+
+@Composable
+private fun MiniPlayerSeekIcon(rotationDegrees: Float) {
+    Icon(
+        painter = painterResource(id = R.drawable.ic_huge_forward_02_wide),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .rotate(rotationDegrees)
+            .size(width = 26.4.dp, height = 16.dp)
+    )
+}
+
+@Composable
+private fun MiniPlayerSeekLabel(text: String) {
+    Text(
+        text = text,
+        fontFamily = InterFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        maxLines = 1,
+        softWrap = false,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }

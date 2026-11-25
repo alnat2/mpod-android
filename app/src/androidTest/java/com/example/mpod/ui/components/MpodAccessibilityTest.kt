@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertTouchWidthIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -128,5 +130,38 @@ class MpodAccessibilityTest {
         composeRule.onNodeWithContentDescription("Playback speed 1.5x").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Show notes").assertIsDisplayed()
         composeRule.onNodeWithText("A long episode title that also occupies two lines").assertIsDisplayed()
+    }
+
+    @Test
+    fun pageHeaderActionsMatchFigmaVisualAndTouchSizes() {
+        composeRule.setContent {
+            MpodTheme {
+                Column(modifier = androidx.compose.ui.Modifier.width(360.dp)) {
+                    PageHeader(
+                        title = "Subscriptions",
+                        subtitle = "12 podcasts · 2 unlistened\nLast refresh today at 03:04",
+                        showActions = true,
+                        onRefreshClick = {},
+                        viewActionDescription = "Show all",
+                        onViewClick = {}
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Refresh")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .assertWidthIsEqualTo(44.dp)
+            .assertHeightIsEqualTo(44.dp)
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
+        composeRule.onNodeWithContentDescription("Show all")
+            .assertIsDisplayed()
+            .assertHasClickAction()
+            .assertWidthIsEqualTo(44.dp)
+            .assertHeightIsEqualTo(44.dp)
+            .assertTouchWidthIsEqualTo(48.dp)
+            .assertTouchHeightIsEqualTo(48.dp)
     }
 }

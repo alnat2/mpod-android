@@ -80,7 +80,7 @@ fun PageHeader(
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
             modifier = Modifier.weight(1f),
@@ -116,11 +116,12 @@ fun PageHeader(
                         iconRes = R.drawable.ic_huge_refresh_dot,
                         contentDescription = "Refresh",
                         iconRotating = isRefreshing,
-                        containerColor = Color.Transparent,
+                        containerColor = MaterialTheme.colorScheme.background,
                         contentColor = MaterialTheme.colorScheme.primary,
-                        size = 40.dp,
-                        iconSize = 20.dp,
-                        elevation = 0.dp,
+                        size = 44.dp,
+                        iconSize = 24.dp,
+                        radius = 10.dp,
+                        shadowStyle = FigmaShadowStyle.Sm,
                         onClick = onRefreshClick
                     )
                 }
@@ -130,10 +131,10 @@ fun PageHeader(
                         contentDescription = viewActionDescription,
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.background,
-                        size = 40.dp,
-                        iconSize = 20.dp,
-                        radius = 8.dp,
-                        elevation = 0.dp,
+                        size = 44.dp,
+                        iconSize = 24.dp,
+                        radius = 10.dp,
+                        shadowStyle = FigmaShadowStyle.Sm,
                         onClick = onViewClick
                     )
                 }
