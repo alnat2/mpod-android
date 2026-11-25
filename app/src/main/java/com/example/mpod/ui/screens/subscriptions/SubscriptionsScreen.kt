@@ -154,7 +154,7 @@ fun SubscriptionsScreen(
         ) {
             when {
                 state.isLoading || (!state.hasLoadedOnce && state.errorMessage == null) -> {
-                    PageHeader(title = "Podcasts")
+                    PageHeader(title = "Subscriptions")
                     MpodStatusBanner(
                         message = "Loading subscriptions",
                         type = StatusBannerType.Loading
@@ -162,7 +162,7 @@ fun SubscriptionsScreen(
                 }
 
                 state.errorMessage != null -> {
-                    PageHeader(title = "Podcasts")
+                    PageHeader(title = "Subscriptions")
                     MpodStatusBanner(
                         message = state.errorMessage,
                         type = StatusBannerType.Error,
@@ -186,8 +186,8 @@ fun SubscriptionsScreen(
 
                 podcasts.isEmpty() -> {
                     PageHeader(
-                        title = "Podcasts",
-                        subtitle = subscriptionsHeaderSubtitle(state.podcasts),
+                        title = "Subscriptions",
+                        subtitle = subscriptionsHeaderSubtitle(state.podcasts, state.lastRefreshHeaderText),
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
                         isRefreshing = state.isRefreshingAll,
@@ -203,12 +203,8 @@ fun SubscriptionsScreen(
 
                 else -> {
                     PageHeader(
-                        title = "Podcasts",
-                        subtitle = if (hasRefreshError) {
-                            "Last refresh · today 3:04"
-                        } else {
-                            subscriptionsHeaderSubtitle(state.podcasts)
-                        },
+                        title = "Subscriptions",
+                        subtitle = subscriptionsHeaderSubtitle(state.podcasts, state.lastRefreshHeaderText),
                         showActions = true,
                         onRefreshClick = if (state.isRefreshingAll) null else onRefreshAll,
                         isRefreshing = state.isRefreshingAll,
@@ -321,6 +317,7 @@ fun SubscriptionsScreen(
                                 .fillMaxWidth()
                                 .weight(1f)
                                 .testTag("subscriptions_episode_list"),
+                            contentPadding = PaddingValues(bottom = 72.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             item {
@@ -552,9 +549,17 @@ private fun podcastCountLabel(count: Int): String {
     return "$count ${if (count == 1) "podcast" else "podcasts"}"
 }
 
-internal fun subscriptionsHeaderSubtitle(podcasts: List<SubscriptionPodcastUi>): String {
+internal fun subscriptionsHeaderSubtitle(
+    podcasts: List<SubscriptionPodcastUi>,
+    lastRefreshText: String? = null
+): String {
     val podcastsWithUnlistened = podcasts.count { it.unlistenedEpisodeCount > 0 }
-    return "${podcastCountLabel(podcasts.size)} · $podcastsWithUnlistened unlistened"
+    val counts = "${podcastCountLabel(podcasts.size)} · $podcastsWithUnlistened unlistened"
+    return if (!lastRefreshText.isNullOrBlank()) {
+        "$counts\n$lastRefreshText"
+    } else {
+        counts
+    }
 }
 
 private fun podcastEpisodeSummary(podcast: SubscriptionPodcastUi): String {
@@ -610,6 +615,7 @@ private fun previewSubscriptionsState(): SubscriptionsUiState {
     )
 
     return SubscriptionsUiState(
+        lastRefreshHeaderText = "Last refresh today at 03:04",
         podcasts = listOf(
             SubscriptionPodcastUi(
                 id = 1,

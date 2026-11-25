@@ -55,6 +55,7 @@ If the sources disagree or required information is absent, stop and ask. Do not 
 | Smart Listening | Fully automatic background downloading and cleanup through `SmartListeningManager`; strictly prohibited from deleting or modifying local audiobook files |
 | Default start route | Podcasts (Subscriptions) |
 | Primary navigation | Player (Home/Now playing), Podcasts, Abooks, Settings, Add |
+| Mini-player | Floating compact pill player above bottom navigation on all screens except Player (Home); controls: -15s rewind, Play/Pause, +30s forward; background tap has no action; enabled by default via "Use mini player" switch in Settings (Figma `1264:6524`) |
 | Theme | Follow system by default; Settings exposes Light/Dark/System switch backed by DataStore; audiobooks UI strictly conforms to `mpoddy dark mode` palette |
 | Active item | Stored in Room database and restored without autoplay |
 | Mark all listened | Executes immediately on local Room DB and updates playlist/queue atomically |

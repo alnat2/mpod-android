@@ -72,4 +72,17 @@ class SettingsRefreshTimeFormatterTest {
         val onOct27Millis = ZonedDateTime.of(2026, 10, 27, 14, 0, 0, 0, zoneId).toInstant().toEpochMilli()
         assertEquals("Last updated today at 10:00", SettingsRefreshTimeFormatter.format(formattedPast, onOct27Millis, zoneId))
     }
+
+    @Test
+    fun `formatRefresh formats with Last refresh prefix`() {
+        val today10am = ZonedDateTime.of(2026, 10, 30, 10, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        val result = SettingsRefreshTimeFormatter.formatRefresh(today10am.toString(), nowMillis, zoneId)
+        assertEquals("Last refresh today at 10:00", result)
+
+        val pastDay = ZonedDateTime.of(2026, 10, 27, 10, 0, 0, 0, zoneId).toInstant().toEpochMilli()
+        val pastResult = SettingsRefreshTimeFormatter.formatRefresh(pastDay.toString(), nowMillis, zoneId)
+        assertEquals("Last refresh 27 Oct at 10:00", pastResult)
+
+        assertEquals("Last refresh: never", SettingsRefreshTimeFormatter.formatRefresh(null, nowMillis, zoneId))
+    }
 }

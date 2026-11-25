@@ -34,3 +34,16 @@ jobs:
 
       - name: Run debug unit tests
         run: ./gradlew testDebugUnitTest --console=plain
+
+      - name: Run Android debug lint
+        run: ./gradlew lintDebug --console=plain
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore

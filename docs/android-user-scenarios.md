@@ -19,7 +19,7 @@ Expected behavior is taken from these sources, in order:
 
 When a required behavior is absent or the sources disagree, the scenario is marked `Open`. It must not be implemented from an assumption.
 
-Explicit chat decisions override stale Figma states. In particular, the first bottom navigation destination is labeled `Player` in bottom navigation, has no header actions, and remains the only player screen (there is no mini-player in mpoddy; Player is a dedicated full tab destination); subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation dialog, and the start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
+Explicit chat decisions override stale Figma states. In particular, the first bottom navigation destination is labeled `Player` in bottom navigation and has no header actions; a floating mini-player is available across all other screens (Subscriptions, Audiobooks, Settings, and nested screens) above the bottom navigation bar when enabled via the "Use mini player" setting (enabled by default). Tapping the mini-player pill background performs no action; controls provide -15s rewind, Play/Pause toggle, and +30s forward. Subscription episodes have no Play action outside the playlist, Mark all listened has no confirmation dialog, and the start destination is Subscriptions. Episode actions are shown inline on the Player playlist and Subscriptions episode cards rather than through an episode action bottom sheet. Bottom sheets remain for playback-speed selection; Add podcast remains a modal overlay/card flow.
 
 Notification and alert banners are rendered at the top of the screen (with status-bar padding and 10dp top offset) so that they never obstruct bottom navigation or gesture insets. A strict "Single Active Banner" policy (Variant B — Last-in wins) is enforced: triggering a new pending action immediately commits any prior pending action to the Room DB and resets the 15-second undo countdown for the latest action. Dismissing via `[✕]` immediately commits the action. Banners use a unified dark-surface card layout (`RoundedCornerShape(16.dp)`, `FigmaShadowStyle.Sm`), high-contrast white text (`onSurface`), filled primary green action buttons (`height = 36.dp, radius = 8.dp`), and green dismiss icons. Error banners specifically apply a `1.5.dp` solid border in `MaterialTheme.colorScheme.error` (`#F83D41`), while undo banners have no border.
 
@@ -65,6 +65,7 @@ Notification and alert banners are rendered at the top of the screen (with statu
 | NAV-03 | Tap Add podcast from bottom navigation | Add modal opens above the current destination; closing it returns without an unintended mutation | U,E | Verified |
 | NAV-04 | Press Android Back from a modal or secondary state | The top modal/state closes before leaving the application | U,E | Verified |
 | NAV-05 | Background and restore the app on a primary destination | The user does not land on a wrong destination or duplicate screen | U,L | Verified |
+| NAV-06 | Floating mini-player across non-Player screens | When "Use mini player" setting is enabled, a compact floating pill player appears above the bottom navigation bar on all screens except Player (Home). Provides -15s rewind, Play/Pause toggle, and +30s forward. Tapping the pill background executes no action; displayed even when playback is idle/paused | C,U | Specified |
 
 ## P1 — adding podcasts and OPML import
 
@@ -196,6 +197,7 @@ Notification and alert banners are rendered at the top of the screen (with statu
 | SET-09 | Export file write failure | Specific recoverable error is displayed | C,U,E,L | Verified |
 | SET-10 | View application version | Settings displays `Current app build: <versionName>` derived from `BuildConfig.VERSION_NAME` | U,E,R | Verified |
 | SET-11 | Toggle 48dp MpodSwitch | Switch toggle meets 48dp accessibility touch target | C,U | Verified |
+| SET-12 | Toggle "Use mini player" setting | Grouped card with "Use mini player" switch ("Control playback from any screen with compact player.") placed between "Use dark theme" and "Export OPML" cards (Figma `1264:6524`). Enabled by default; toggling persists to DataStore and controls mini-player visibility across non-player screens | C,U | Specified |
 
 ## P1 — audiobooks and local media library
 

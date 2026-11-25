@@ -118,4 +118,8 @@ open class FakeAppSettingsStore(initial: AppSettings = AppSettings()) : AppSetti
     override suspend fun setLastRefreshTime(formatted: String) {
         stateFlow.value = stateFlow.value.copy(lastRefreshTimeFormatted = formatted)
     }
+
+    override suspend fun setMiniPlayerEnabled(enabled: Boolean) {
+        stateFlow.value = stateFlow.value.copy(isMiniPlayerEnabled = enabled)
+    }
 }

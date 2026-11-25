@@ -117,6 +117,15 @@ object SettingsRefreshTimeFormatter {
         }
     }
 
+    fun formatRefresh(
+        raw: String?,
+        nowMillis: Long = System.currentTimeMillis(),
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): String {
+        val formatted = format(raw, nowMillis, zoneId)
+        return formatted.replace("Last updated", "Last refresh")
+    }
+
     private fun formatDateTime(
         date: LocalDate,
         hour: Int,

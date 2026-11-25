@@ -1,5 +1,6 @@
 package com.example.mpod.ui.navigation
 
+import android.content.ComponentName
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -15,10 +16,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,9 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,9 +46,11 @@ import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.mpod.playback.PlaybackService
 import com.example.mpod.ui.components.AddPodcastModal
 import com.example.mpod.ui.components.AddPodcastMode
 import com.example.mpod.ui.components.AddPodcastViewModel
+import com.example.mpod.ui.components.MiniPlayer
 import com.example.mpod.ui.components.MpodBottomNav
 import com.example.mpod.ui.components.MpodStatusBanner
 import com.example.mpod.ui.components.StatusBannerType
@@ -78,9 +88,54 @@ fun AppNavigation(
     var dismissedShareBatchIds by remember { mutableStateOf(emptySet<String>()) }
     var unsupportedShareDismissed by remember { mutableStateOf(false) }
     val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomNav = currentRoute in setOf(Screen.Home.route, Screen.Subscriptions.route, Screen.Audiobooks.route, Screen.Settings.route)
+    val showMiniPlayer = settingsState.isMiniPlayerEnabled && currentRoute != Screen.Home.route && currentRoute != Screen.AddPodcast.route
+
+    val context = LocalContext.current
+    var controller by remember { mutableStateOf<MediaController?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+
+    val controllerFuture = remember(context) {
+        MediaController.Builder(
+            context,
+            SessionToken(context, ComponentName(context, PlaybackService::class.java))
+        ).buildAsync()
+    }
+
+    DisposableEffect(controllerFuture) {
+        controllerFuture.addListener(
+            {
+                runCatching { controllerFuture.get() }.onSuccess { player ->
+                    controller = player
+                    isPlaying = player.isPlaying
+                }
+            },
+            ContextCompat.getMainExecutor(context)
+        )
+        onDispose {
+            controller = null
+            if (controllerFuture.isDone) {
+                runCatching { controllerFuture.get().release() }
+            } else {
+                controllerFuture.cancel(true)
+            }
+        }
+    }
+
+    DisposableEffect(controller) {
+        val player = controller ?: return@DisposableEffect onDispose {}
+        val listener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) {
+                isPlaying = player.isPlaying
+            }
+        }
+        player.addListener(listener)
+        isPlaying = player.isPlaying
+        onDispose { player.removeListener(listener) }
+    }
 
     val latestBatchId = selectVisibleShareBatchId(recentImports)
     val latestBatch = remember(recentImports, latestBatchId) {
@@ -322,6 +377,44 @@ fun AppNavigation(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+
+    if (showMiniPlayer) {
+        val bottomNavHeight = if (showBottomNav) 65.dp else 0.dp
+        MiniPlayer(
+            isPlaying = isPlaying,
+            onPlayToggle = {
+                controller?.let { player ->
+                    val isIntentActive = player.playWhenReady && player.playerError == null
+                    if (isIntentActive) {
+                        player.pause()
+                    } else {
+                        if (player.playerError != null) {
+                            player.prepare()
+                        }
+                        player.play()
+                    }
+                }
+            },
+            onSeekBackward = {
+                controller?.let { player ->
+                    val targetMs = (player.currentPosition - 15_000L).coerceAtLeast(0L)
+                    player.seekTo(targetMs)
+                }
+            },
+            onSeekForward = {
+                controller?.let { player ->
+                    val duration = player.duration.takeIf { it > 0 }
+                    val targetMs = player.currentPosition + 30_000L
+                    val boundedMs = if (duration != null) targetMs.coerceAtMost(duration) else targetMs
+                    player.seekTo(boundedMs)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = bottomNavHeight + 12.dp)
+        )
     }
 
     val showUnsupportedShare = unsupportedShareMessage != null && !unsupportedShareDismissed

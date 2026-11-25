@@ -114,7 +114,7 @@ fun AudiobooksScreen(
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp)
                 .padding(top = 16.dp),
-            contentPadding = PaddingValues(bottom = 16.dp),
+            contentPadding = PaddingValues(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header (Figma 1304:10573)

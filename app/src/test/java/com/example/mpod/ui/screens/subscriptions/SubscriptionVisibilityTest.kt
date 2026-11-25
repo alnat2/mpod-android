@@ -40,6 +40,10 @@ class SubscriptionVisibilityTest {
             "3 podcasts · 2 unlistened",
             subscriptionsHeaderSubtitle(podcasts)
         )
+        assertEquals(
+            "3 podcasts · 2 unlistened\nLast refresh today at 03:04",
+            subscriptionsHeaderSubtitle(podcasts, "Last refresh today at 03:04")
+        )
     }
 
     @Test

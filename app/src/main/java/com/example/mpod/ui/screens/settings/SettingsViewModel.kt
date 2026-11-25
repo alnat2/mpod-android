@@ -56,6 +56,7 @@ class SettingsViewModel @Inject constructor(
                     proxyUsername = prefs.proxyUsername,
                     proxyPassword = prefs.proxyPassword,
                     themeMode = prefs.themeMode,
+                    isMiniPlayerEnabled = prefs.isMiniPlayerEnabled,
                     lastRefreshHeaderText = SettingsRefreshTimeFormatter.format(prefs.lastRefreshTimeFormatted),
                     appBuild = "mpoddy v${BuildConfig.VERSION_NAME}"
                 )
@@ -438,6 +439,12 @@ class SettingsViewModel @Inject constructor(
         _state.value = _state.value.copy(proxyMessage = null)
     }
 
+    fun setMiniPlayerEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsDataStore.setMiniPlayerEnabled(enabled)
+        }
+    }
+
     fun exportOpml(uri: Uri?) {
         if (uri == null) return
         viewModelScope.launch {
@@ -479,6 +486,7 @@ data class SettingsUiState(
     val proxyPassword: String = "",
     val proxyMessage: String? = null,
     val themeMode: String = "System",
+    val isMiniPlayerEnabled: Boolean = true,
     val lastRefreshHeaderText: String = "Last updated: never",
     val currentIpGeoText: String? = null,
     val isExportingOpml: Boolean = false,

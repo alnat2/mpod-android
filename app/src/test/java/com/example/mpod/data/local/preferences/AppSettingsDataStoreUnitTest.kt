@@ -96,4 +96,19 @@ class AppSettingsDataStoreUnitTest {
             newJob.join()
         }
     }
+
+    @Test
+    fun miniPlayerEnabled_defaultsToTrue_andPersistsWhenToggled() = runTest {
+        val store = createStore()
+        val initial = store.settingsFlow.first()
+        org.junit.Assert.assertTrue("Default must be true", initial.isMiniPlayerEnabled)
+
+        store.setMiniPlayerEnabled(false)
+        val afterDisable = store.settingsFlow.first()
+        org.junit.Assert.assertFalse("Must be false after toggle", afterDisable.isMiniPlayerEnabled)
+
+        store.setMiniPlayerEnabled(true)
+        val afterEnable = store.settingsFlow.first()
+        org.junit.Assert.assertTrue("Must be true after re-enabling", afterEnable.isMiniPlayerEnabled)
+    }
 }

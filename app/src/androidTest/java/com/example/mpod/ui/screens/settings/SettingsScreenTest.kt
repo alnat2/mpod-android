@@ -38,6 +38,8 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("Turn on if direct connection update fails.").assertIsDisplayed()
         composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
         composeRule.onNodeWithText("Use this option if it feels more comfortable for you.").assertIsDisplayed()
+        composeRule.onNodeWithText("Use mini player").assertIsDisplayed()
+        composeRule.onNodeWithText("Control playback from any screen with compact player.").assertIsDisplayed()
         composeRule.onNodeWithText("Export OPML").assertIsDisplayed()
         composeRule.onNodeWithText("Export").assertIsDisplayed()
     }
@@ -58,6 +60,23 @@ class SettingsScreenTest {
         composeRule.onNodeWithText("Use dark theme").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Use dark theme").performClick()
         composeRule.runOnIdle { assertEquals(ThemeMode.Dark, selectedMode) }
+    }
+
+    @Test
+    fun miniPlayerToggleSwitchesSetting() {
+        var toggledState: Boolean? = null
+        composeRule.setContent {
+            MpodTheme {
+                SettingsScreen(
+                    state = SettingsUiState(isMiniPlayerEnabled = true),
+                    onMiniPlayerToggle = { toggledState = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Use mini player").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Use mini player").performClick()
+        composeRule.runOnIdle { assertEquals(false, toggledState) }
     }
 
     @Test

@@ -17,4 +17,10 @@ class AppSettingsTest {
         val settings = AppSettings()
         assertEquals("System", settings.themeMode)
     }
+
+    @Test
+    fun defaultMiniPlayerIsEnabled() {
+        val settings = AppSettings()
+        org.junit.Assert.assertTrue(settings.isMiniPlayerEnabled)
+    }
 }

@@ -70,6 +70,22 @@ private fun HomeComponentsPreview() {
             currentRoute = Screen.Home.route,
             onNavigate = {}
         )
+
+        PreviewLabel("MiniPlayer / Paused")
+        MiniPlayer(
+            isPlaying = false,
+            onPlayToggle = {},
+            onSeekBackward = {},
+            onSeekForward = {}
+        )
+
+        PreviewLabel("MiniPlayer / Playing")
+        MiniPlayer(
+            isPlaying = true,
+            onPlayToggle = {},
+            onSeekBackward = {},
+            onSeekForward = {}
+        )
     }
 }
 

@@ -7,11 +7,13 @@ import com.example.mpod.data.local.dao.EpisodeDao
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.dao.PodcastDao
 import com.example.mpod.data.local.model.SubscriptionRow
+import com.example.mpod.data.local.preferences.AppSettingsStore
 import com.example.mpod.data.repository.PlaylistRepository
 import com.example.mpod.data.repository.PodcastRepository
 import com.example.mpod.playback.CleanupResult
 import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.playback.SmartListeningManager
+import com.example.mpod.ui.screens.settings.SettingsRefreshTimeFormatter
 import com.example.mpod.ui.util.cleanFeedText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -36,7 +38,8 @@ class SubscriptionsViewModel @Inject constructor(
     private val podcastRepository: PodcastRepository,
     private val playlistRepository: PlaylistRepository,
     private val queueInvalidator: PlaybackQueueInvalidator,
-    private val smartListeningManager: SmartListeningManager
+    private val smartListeningManager: SmartListeningManager,
+    private val appSettingsDataStore: AppSettingsStore? = null
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SubscriptionsUiState(isLoading = true))
@@ -51,6 +54,24 @@ class SubscriptionsViewModel @Inject constructor(
 
     init {
         observeData()
+        observeSettings()
+    }
+
+    private fun observeSettings() {
+        appSettingsDataStore?.let { store ->
+            viewModelScope.launch(Dispatchers.IO) {
+                store.settingsFlow.collect { prefs ->
+                    val formatted = if (prefs.lastRefreshTimeFormatted.isNotBlank()) {
+                        SettingsRefreshTimeFormatter.formatRefresh(prefs.lastRefreshTimeFormatted)
+                    } else {
+                        null
+                    }
+                    _state.update { current ->
+                        current.copy(lastRefreshHeaderText = formatted)
+                    }
+                }
+            }
+        }
     }
 
     private fun observeData() {
@@ -299,7 +320,8 @@ data class SubscriptionsUiState(
     val refreshingPodcastIds: Set<Long> = emptySet(),
     val unsubscribingPodcastIds: Set<Long> = emptySet(),
     val busyEpisodeIds: Set<Long> = emptySet(),
-    val podcasts: List<SubscriptionPodcastUi> = emptyList()
+    val podcasts: List<SubscriptionPodcastUi> = emptyList(),
+    val lastRefreshHeaderText: String? = null
 )
 
 data class PendingUnsubscribeUi(

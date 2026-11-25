@@ -29,7 +29,8 @@ data class AppSettings(
     val playbackSpeed: Float = 1.0f,
     val audiobookPlaybackSpeed: Float = 1.0f,
     val audiobooksFolderUri: String? = null,
-    val lastRefreshTimeFormatted: String = ""
+    val lastRefreshTimeFormatted: String = "",
+    val isMiniPlayerEnabled: Boolean = true
 ) {
     val activeProxyServer: ProxyServerConfig?
         get() {
@@ -67,6 +68,7 @@ interface AppSettingsStore {
     suspend fun setAudiobookPlaybackSpeed(speed: Float)
     suspend fun setAudiobooksFolderUri(uri: String?)
     suspend fun setLastRefreshTime(formatted: String)
+    suspend fun setMiniPlayerEnabled(enabled: Boolean)
 }
 
 class AppSettingsDataStore @Inject constructor(
@@ -90,6 +92,7 @@ class AppSettingsDataStore @Inject constructor(
         val AUDIOBOOK_PLAYBACK_SPEED = floatPreferencesKey("audiobook_playback_speed")
         val AUDIOBOOKS_FOLDER_URI = stringPreferencesKey("audiobooks_folder_uri")
         val LAST_REFRESH_TIME = stringPreferencesKey("last_refresh_time")
+        val MINI_PLAYER_ENABLED = booleanPreferencesKey("mini_player_enabled")
     }
 
     override val settingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
@@ -113,7 +116,8 @@ class AppSettingsDataStore @Inject constructor(
             playbackSpeed = prefs[Keys.PLAYBACK_SPEED] ?: 1.0f,
             audiobookPlaybackSpeed = prefs[Keys.AUDIOBOOK_PLAYBACK_SPEED] ?: 1.0f,
             audiobooksFolderUri = prefs[Keys.AUDIOBOOKS_FOLDER_URI],
-            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: ""
+            lastRefreshTimeFormatted = prefs[Keys.LAST_REFRESH_TIME] ?: "",
+            isMiniPlayerEnabled = prefs[Keys.MINI_PLAYER_ENABLED] ?: true
         )
         val active = baseSettings.activeProxyServer
         // TODO: Flat PROXY_HOST/PORT/USERNAME/PASSWORD fields are legacy; remove after full migration to PROXY_SERVERS_JSON
@@ -294,5 +298,9 @@ class AppSettingsDataStore @Inject constructor(
 
     override suspend fun setLastRefreshTime(formatted: String) {
         dataStore.edit { it[Keys.LAST_REFRESH_TIME] = formatted }
+    }
+
+    override suspend fun setMiniPlayerEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.MINI_PLAYER_ENABLED] = enabled }
     }
 }

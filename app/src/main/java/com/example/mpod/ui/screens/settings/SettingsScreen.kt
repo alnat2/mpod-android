@@ -109,6 +109,7 @@ fun SettingsRoute(
         onNavigateToEditProxy = onNavigateToEditProxy,
         onSelectProxyServer = viewModel::selectProxyServer,
         onDismissProxyNotification = viewModel::dismissTopProxyNotification,
+        onMiniPlayerToggle = viewModel::setMiniPlayerEnabled,
         onExportOpml = { opmlExportLauncher.launch("mpoddy-subscriptions.opml") }
     )
 }
@@ -127,6 +128,7 @@ fun SettingsScreen(
     onNavigateToEditProxy: (String) -> Unit = {},
     onSelectProxyServer: (String) -> Unit = {},
     onDismissProxyNotification: () -> Unit = {},
+    onMiniPlayerToggle: (Boolean) -> Unit = {},
     onExportOpml: () -> Unit = {}
 ) {
     var feedRefreshTime by rememberSaveable { mutableStateOf(state.dailyRefreshTime) }
@@ -146,7 +148,7 @@ fun SettingsScreen(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 32.dp),
+            .padding(top = 16.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         AnimatedVisibility(
@@ -166,16 +168,9 @@ fun SettingsScreen(
             }
         }
 
-        val headerSubtitle = buildString {
-            append(state.lastRefreshHeaderText)
-            if (!state.currentIpGeoText.isNullOrBlank()) {
-                append("\n")
-                append(state.currentIpGeoText)
-            }
-        }
         PageHeader(
             title = "Settings",
-            subtitle = headerSubtitle
+            subtitle = null
         )
 
         if (state.errorMessage != null) {
@@ -269,10 +264,12 @@ fun SettingsScreen(
             }
         )
 
+        val proxyDescription = proxyCardDescription(state.isProxyEnabled, state.currentIpGeoText)
+
         // Card 2: SOCKS5 Proxy toggle & multi-proxy management
         SettingItem(
             title = "Use SOCKS5 proxy",
-            description = "Turn on if direct connection update fails.",
+            description = proxyDescription,
             action = {
                 Switch(
                     checked = state.isProxyEnabled,
@@ -402,7 +399,22 @@ fun SettingsScreen(
                     onCheckedChange = { checked ->
                         onThemeModeChange(if (checked) ThemeMode.Dark else ThemeMode.Light)
                     },
-                    colors = settingsSwitchColors()
+                    colors = settingsSwitchColors(),
+                    modifier = Modifier.semantics { contentDescription = "Use dark theme" }
+                )
+            }
+        )
+
+        // Card: Use mini player
+        SettingItem(
+            title = "Use mini player",
+            description = "Control playback from any screen with compact player.",
+            action = {
+                Switch(
+                    checked = state.isMiniPlayerEnabled,
+                    onCheckedChange = onMiniPlayerToggle,
+                    colors = settingsSwitchColors(),
+                    modifier = Modifier.semantics { contentDescription = "Use mini player" }
                 )
             }
         )
@@ -661,4 +673,13 @@ private fun ProxyErrorTopBanner(
         }
     }
 }
+
+internal fun proxyCardDescription(isProxyEnabled: Boolean, currentIpGeoText: String?): String {
+    return if (isProxyEnabled && !currentIpGeoText.isNullOrBlank()) {
+        currentIpGeoText
+    } else {
+        "Turn on if direct connection update fails."
+    }
+}
+
 

@@ -64,4 +64,34 @@ class SettingsProxyAddressPortTest {
         assertNull(validateProxyCredentials("admin", "secret123"))
         assertNull(validateProxyCredentials("  admin  ", "secret123"))
     }
+
+    @Test
+    fun proxyCardDescription_reflectsEnabledAndDisabledStates() {
+        // When proxy is disabled, description is default guidance regardless of IP/Geo text
+        assertEquals(
+            "Turn on if direct connection update fails.",
+            proxyCardDescription(isProxyEnabled = false, currentIpGeoText = null)
+        )
+        assertEquals(
+            "Turn on if direct connection update fails.",
+            proxyCardDescription(isProxyEnabled = false, currentIpGeoText = "Current IP: 1.2.3.4\nGeo: US")
+        )
+
+        // When proxy is enabled but IP/Geo is not yet available
+        assertEquals(
+            "Turn on if direct connection update fails.",
+            proxyCardDescription(isProxyEnabled = true, currentIpGeoText = null)
+        )
+        assertEquals(
+            "Turn on if direct connection update fails.",
+            proxyCardDescription(isProxyEnabled = true, currentIpGeoText = "  ")
+        )
+
+        // When proxy is enabled and IP/Geo is available
+        val ipGeo = "Current IP: 43.32.112.45\nGeo: UK"
+        assertEquals(
+            ipGeo,
+            proxyCardDescription(isProxyEnabled = true, currentIpGeoText = ipGeo)
+        )
+    }
 }
