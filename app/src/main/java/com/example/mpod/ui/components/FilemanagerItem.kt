@@ -4,14 +4,11 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mpod.R
+import com.example.mpod.ui.theme.accent
 
 enum class FilemanagerItemType {
     Directory,
@@ -49,9 +47,9 @@ fun FilemanagerItem(
     onClick: () -> Unit
 ) {
     val containerColor = if (isHighlighted) {
-        MaterialTheme.colorScheme.surface
+        MaterialTheme.colorScheme.accent
     } else {
-        MaterialTheme.colorScheme.surfaceVariant
+        MaterialTheme.colorScheme.surface
     }
 
     val titleColor = if (isMuted) {
@@ -60,33 +58,42 @@ fun FilemanagerItem(
         MaterialTheme.colorScheme.onSurface
     }
 
+    val actionIconTint = if (isMuted) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
     val iconRes = when (type) {
         FilemanagerItemType.Directory -> R.drawable.ic_huge_folder_03
         FilemanagerItemType.AudiobookDirectory -> R.drawable.ic_huge_folder_audio
         FilemanagerItemType.AudioFile -> R.drawable.ic_huge_audio_book_01
     }
 
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(70.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .heightIn(min = 70.dp)
+            .testTag("filemanager_item_$title")
+            .figmaDropShadow(style = FigmaShadowStyle.Xs, radius = 16.dp)
+            .clip(shape)
             .background(containerColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Icon + Title
         Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 painter = painterResource(id = iconRes),
                 contentDescription = null,
-                tint = if (type == FilemanagerItemType.Directory || isHighlighted) MaterialTheme.colorScheme.primary else titleColor,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
             Text(
@@ -95,7 +102,7 @@ fun FilemanagerItem(
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = titleColor,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
@@ -109,27 +116,24 @@ fun FilemanagerItem(
                 lineHeight = 20.sp,
                 fontWeight = FontWeight.Normal,
                 color = if (isMuted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.End
+                textAlign = TextAlign.End,
+                maxLines = 1
             )
         }
 
         // Optional Action Button (e.g. Add to Playlist, Replay, Play, Pause)
         if (actionIconRes != null && onActionClick != null) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .clickable(onClick = onActionClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = actionIconRes),
-                    contentDescription = actionContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            SquareIconButton(
+                iconRes = actionIconRes,
+                contentDescription = actionContentDescription ?: "",
+                containerColor = MaterialTheme.colorScheme.background,
+                contentColor = actionIconTint,
+                size = 44.dp,
+                iconSize = 24.dp,
+                radius = 10.dp,
+                shadowStyle = FigmaShadowStyle.Sm,
+                onClick = onActionClick
+            )
         }
     }
 }

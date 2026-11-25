@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,11 +112,9 @@ fun AudiobooksScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(top = 16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // Header (Figma 1304:10573)
             item {
@@ -124,7 +123,10 @@ fun AudiobooksScreen(
                     subtitle = if (state.audiobooksFolderUri != null) "Local collection · ${state.totalBooksCount} items" else null,
                     showActions = state.audiobooksFolderUri != null,
                     onRefreshClick = if (state.isScanning) null else onRescanClick,
-                    isRefreshing = state.isScanning
+                    isRefreshing = state.isScanning,
+                    modifier = Modifier
+                        .testTag("audiobooks_header")
+                        .padding(bottom = 12.dp)
                 )
             }
 
@@ -135,7 +137,8 @@ fun AudiobooksScreen(
                         message = state.errorMessage,
                         type = StatusBannerType.Error,
                         actionLabel = "Dismiss",
-                        onAction = onDismissError
+                        onAction = onDismissError,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
             }
@@ -144,7 +147,8 @@ fun AudiobooksScreen(
                 item {
                     MpodStatusBanner(
                         message = state.statusMessage ?: "Scanning audiobooks...",
-                        type = StatusBannerType.Loading
+                        type = StatusBannerType.Loading,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
             } else if (state.statusMessage != null && state.errorMessage == null) {
@@ -152,7 +156,8 @@ fun AudiobooksScreen(
                     MpodStatusBanner(
                         message = state.statusMessage,
                         type = StatusBannerType.Info,
-                        onDismiss = onDismissStatus
+                        onDismiss = onDismissStatus,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
             }
@@ -162,7 +167,8 @@ fun AudiobooksScreen(
                     item {
                         MpodStatusBanner(
                             message = "Loading audiobooks",
-                            type = StatusBannerType.Loading
+                            type = StatusBannerType.Loading,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
                     }
                 }
@@ -276,6 +282,7 @@ private fun BreadcrumbsBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp)
+            .testTag("audiobooks_breadcrumbs")
             .horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
