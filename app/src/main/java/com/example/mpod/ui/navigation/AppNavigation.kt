@@ -381,6 +381,7 @@ fun AppNavigation(
 
     if (showMiniPlayer) {
         val bottomNavHeight = if (showBottomNav) 65.dp else 0.dp
+        val bottomNavOffset = if (showBottomNav) bottomNavHeight + 4.dp else 16.dp
         MiniPlayer(
             isPlaying = isPlaying,
             onPlayToggle = {
@@ -413,7 +414,7 @@ fun AppNavigation(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = bottomNavHeight + 12.dp)
+                .padding(bottom = bottomNavOffset)
         )
     }
 

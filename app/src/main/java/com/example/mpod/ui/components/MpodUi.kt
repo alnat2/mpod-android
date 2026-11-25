@@ -80,7 +80,7 @@ fun PageHeader(
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         Column(
             modifier = Modifier.weight(1f),
@@ -107,14 +107,19 @@ fun PageHeader(
         }
 
         if (showActions) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 if (onRefreshClick != null || isRefreshing) {
                     SquareIconButton(
                         iconRes = R.drawable.ic_huge_refresh_dot,
                         contentDescription = "Refresh",
                         iconRotating = isRefreshing,
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        size = 40.dp,
+                        iconSize = 20.dp,
                         elevation = 0.dp,
                         onClick = onRefreshClick
                     )
@@ -124,8 +129,11 @@ fun PageHeader(
                         iconRes = viewIconRes,
                         contentDescription = viewActionDescription,
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        elevation = 1.dp,
+                        contentColor = MaterialTheme.colorScheme.background,
+                        size = 40.dp,
+                        iconSize = 20.dp,
+                        radius = 8.dp,
+                        elevation = 0.dp,
                         onClick = onViewClick
                     )
                 }
