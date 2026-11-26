@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -759,6 +760,181 @@ class AudiobooksViewModelTest {
 
             viewModel.toggleBookPlaylist(10L)
             advanceUntilIdle()
+
+            assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun fastReopenSameBook_preservesPendingSelectionBeforeDbCommits() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val concurrentIo = executor.asCoroutineDispatcher()
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val syncStarted = java.util.concurrent.CountDownLatch(1)
+            val syncRelease = java.util.concurrent.CountDownLatch(1)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1)))
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L))).thenAnswer {
+                syncStarted.countDown()
+                syncRelease.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                true
+            }
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = concurrentIo }
+
+            viewModel.openBookModal(book)
+            val deadline1 = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal == null && System.currentTimeMillis() < deadline1) {
+                Thread.sleep(10)
+            }
+            assertEquals(book.id, viewModel.state.value.selectedBookForModal?.id)
+
+            viewModel.toggleTrackSelection(track1)
+            assertTrue(syncStarted.await(2, java.util.concurrent.TimeUnit.SECONDS))
+
+            // Close and immediately reopen while sync is still in-flight (DB still returns inQueue = false)
+            viewModel.closeBookModal()
+            viewModel.openBookModal(book)
+            val deadline2 = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal == null && System.currentTimeMillis() < deadline2) {
+                Thread.sleep(10)
+            }
+
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            syncRelease.countDown()
+        } finally {
+            executor.shutdownNow()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun rapidDeselectAllThenReselect_notWipedByIntermediatePlaylistFlow() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val concurrentIo = executor.asCoroutineDispatcher()
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val track2 = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "Ch 2", fileUri = "uri://2", trackNumber = 2)
+            val playlistItem = com.example.mpod.data.local.model.PlaylistItemWithAudiobook(1L, 0, book)
+            val playlistFlow = kotlinx.coroutines.flow.MutableStateFlow(listOf(playlistItem))
+            val syncStarted = java.util.concurrent.CountDownLatch(1)
+            val syncRelease = java.util.concurrent.CountDownLatch(1)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(playlistFlow)
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1, track2))
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(track1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1, track2)))
+            `when`(playlistRepository.syncAudiobookSelection(org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.anyList())).thenAnswer {
+                syncStarted.countDown()
+                syncRelease.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                true
+            }
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = concurrentIo }
+
+            viewModel.openBookModal(book)
+            val deadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookPlaylistTrackIds != setOf(101L) && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10)
+            }
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            // Deselect Ch 1, then immediately select Ch 2 while worker is held
+            viewModel.toggleTrackSelection(track1)
+            viewModel.toggleTrackSelection(track2)
+            assertEquals(setOf(102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+            assertTrue(syncStarted.await(2, java.util.concurrent.TimeUnit.SECONDS))
+
+            // Intermediate empty emission from playlist_items while sync is in-flight
+            playlistFlow.value = emptyList()
+            Thread.sleep(50)
+
+            // Must NOT wipe optimistic {102L}
+            assertEquals(setOf(102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            syncRelease.countDown()
+        } finally {
+            executor.shutdownNow()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun backgroundPlaylistRemoval_clearsModalSelectionWhenNoPendingSync() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val playlistItem = com.example.mpod.data.local.model.PlaylistItemWithAudiobook(1L, 0, book)
+            val playlistFlow = kotlinx.coroutines.flow.MutableStateFlow(listOf(playlistItem))
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(playlistFlow)
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1))
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(track1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1)))
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            val initDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.isLoading && System.currentTimeMillis() < initDeadline) {
+                Thread.sleep(10)
+            }
+
+            viewModel.openBookModal(book)
+            advanceUntilIdle()
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            // Playback completed and removed book from playlist in background
+            playlistFlow.value = emptyList()
+            val clearDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookPlaylistTrackIds.isNotEmpty() && System.currentTimeMillis() < clearDeadline) {
+                Thread.sleep(10)
+            }
 
             assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
         } finally {

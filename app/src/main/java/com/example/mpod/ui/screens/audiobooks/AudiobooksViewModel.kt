@@ -44,7 +44,8 @@ data class FilemanagerItemUi(
 
 private data class ChapterSyncRequest(
     val bookId: Long,
-    val trackIds: List<Long>
+    val trackIds: List<Long>,
+    val generation: Long
 )
 
 private data class AudiobookCombineSnapshot(
@@ -92,6 +93,9 @@ class AudiobooksViewModel @Inject constructor(
     private val activeBookSyncChannels = java.util.concurrent.ConcurrentHashMap<Long, Pair<Channel<ChapterSyncRequest>, Job>>()
     private val syncChannelsLock = Any()
     private val toggleBookMutexes = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
+    private val pendingBookTrackSelections = java.util.concurrent.ConcurrentHashMap<Long, Pair<Long, Set<Long>>>()
+    private val syncGenerationCounter = java.util.concurrent.atomic.AtomicLong(0L)
+    private val modalJobLock = Any()
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun getSyncChannelForBook(bookId: Long): Channel<ChapterSyncRequest> {
@@ -106,9 +110,15 @@ class AudiobooksViewModel @Inject constructor(
                     for (request in channel) {
                         try {
                             playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
+                            pendingBookTrackSelections.computeIfPresent(request.bookId) { _, pair ->
+                                if (pair.first <= request.generation) null else pair
+                            }
                             queueInvalidator.invalidate()
                         } catch (e: Exception) {
                             if (e is kotlinx.coroutines.CancellationException) throw e
+                            pendingBookTrackSelections.computeIfPresent(request.bookId) { _, pair ->
+                                if (pair.first <= request.generation) null else pair
+                            }
                             handleSyncError(request, e)
                         }
                     }
@@ -135,6 +145,7 @@ class AudiobooksViewModel @Inject constructor(
                 audiobookRepository.getSelectedTracksForAudiobook(request.bookId).map { it.id }.toSet()
             }
         } catch (dbReadError: Exception) {
+            if (dbReadError is kotlinx.coroutines.CancellationException) throw dbReadError
             Log.e("AudiobooksVM", "Failed to read DB state after sync error", dbReadError)
             emptySet()
         }
@@ -184,6 +195,7 @@ class AudiobooksViewModel @Inject constructor(
 
                 var shouldCancelModalTracks = false
                 _state.update { current ->
+                    shouldCancelModalTracks = false
                     val currentModalBook = current.selectedBookForModal
                     val updatedModalBook = currentModalBook?.let { modal ->
                         snapshot.audiobooks.firstOrNull { it.id == modal.id }
@@ -194,9 +206,12 @@ class AudiobooksViewModel @Inject constructor(
                     if (wasModalBookRemoved) {
                         shouldCancelModalTracks = true
                     }
+                    val hasPendingSync = currentModalBook != null &&
+                        pendingBookTrackSelections.containsKey(currentModalBook.id)
                     val wasRemovedFromPlaylist = currentModalBook != null &&
                         currentModalBook.id in previousPlaylistIds &&
-                        currentModalBook.id !in snapshot.playlistAudiobookIds
+                        currentModalBook.id !in snapshot.playlistAudiobookIds &&
+                        !hasPendingSync
 
                     current.copy(
                         isLoading = false,
@@ -213,8 +228,10 @@ class AudiobooksViewModel @Inject constructor(
                     )
                 }
                 if (shouldCancelModalTracks) {
-                    modalTracksJob?.cancel()
-                    modalTracksJob = null
+                    synchronized(modalJobLock) {
+                        modalTracksJob?.cancel()
+                        modalTracksJob = null
+                    }
                 }
             }
         }
@@ -306,6 +323,7 @@ class AudiobooksViewModel @Inject constructor(
                                 statusMessage = message
                             )
                         }
+                        queueInvalidator.invalidate()
                     }
                 }
             } catch (e: Exception) {
@@ -326,6 +344,7 @@ class AudiobooksViewModel @Inject constructor(
             val mutex = toggleBookMutexes.getOrPut(bookId) { Mutex() }
             mutex.withLock {
                 try {
+                    pendingBookTrackSelections.remove(bookId)
                     val inQueue = playlistDao.isAudiobookInPlaylist(bookId)
                     if (inQueue) {
                         playlistRepository.removeAudiobookFromPlaylist(bookId)
@@ -359,16 +378,20 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun openBookModal(book: AudiobookEntity) {
-        modalTracksJob?.cancel()
-        modalTracksJob = viewModelScope.launch(ioDispatcher) {
-            val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
+        val job = viewModelScope.launch(ioDispatcher) {
+            val pending = pendingBookTrackSelections[book.id]
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
-            val selectedIds = if (inQueue) {
-                audiobookRepository.getSelectedTracksForAudiobook(book.id)
-                    .map { it.id }
-                    .toSet()
+            val selectedIds = if (pending != null) {
+                pending.second.intersect(tracks.mapTo(mutableSetOf()) { it.id })
             } else {
-                emptySet()
+                val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
+                if (inQueue) {
+                    audiobookRepository.getSelectedTracksForAudiobook(book.id)
+                        .map { it.id }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
             }
 
             _state.update {
@@ -393,11 +416,17 @@ class AudiobooksViewModel @Inject constructor(
                 }
             }
         }
+        synchronized(modalJobLock) {
+            modalTracksJob?.cancel()
+            modalTracksJob = job
+        }
     }
 
     fun closeBookModal() {
-        modalTracksJob?.cancel()
-        modalTracksJob = null
+        synchronized(modalJobLock) {
+            modalTracksJob?.cancel()
+            modalTracksJob = null
+        }
         _state.update { s ->
             s.copy(
                 selectedBookForModal = null,
@@ -410,8 +439,12 @@ class AudiobooksViewModel @Inject constructor(
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
         var targetBookId: Long? = null
         var nextSelected: Set<Long> = emptySet()
+        var generation = 0L
         _state.update { s ->
+            targetBookId = null
+            nextSelected = emptySet()
             val book = s.selectedBookForModal ?: return@update s
+            if (track.audiobookId != book.id) return@update s
             targetBookId = book.id
             val updated = s.selectedBookPlaylistTrackIds.toMutableSet()
             if (track.id in updated) {
@@ -420,13 +453,16 @@ class AudiobooksViewModel @Inject constructor(
                 updated.add(track.id)
             }
             nextSelected = updated
+            generation = syncGenerationCounter.incrementAndGet()
+            pendingBookTrackSelections[book.id] = generation to updated
             s.copy(selectedBookPlaylistTrackIds = updated)
         }
         val bookId = targetBookId ?: return
         getSyncChannelForBook(bookId).trySend(
             ChapterSyncRequest(
                 bookId = bookId,
-                trackIds = nextSelected.toList()
+                trackIds = nextSelected.toList(),
+                generation = generation
             )
         )
     }

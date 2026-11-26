@@ -513,5 +513,8 @@ class AudiobookDaoTest {
 
         assertTrue(audiobookDao.getAllTracksForAudiobook(bookId).isEmpty())
         assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+
+        audiobookDao.deleteAudiobooksByIds(listOf(bookId))
+        assertNull(audiobookDao.getAudiobookById(bookId))
     }
 }

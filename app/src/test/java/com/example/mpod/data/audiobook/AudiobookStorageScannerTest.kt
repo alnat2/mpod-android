@@ -742,12 +742,14 @@ class AudiobookStorageScannerTest {
     }
 
     @Test
-    fun scanFolder_withOver1000Books_deletesStaleBooksInChunksWithoutSingleNotInOverflow(): Unit = runBlocking {
-        // Pre-populate DB with 1 stale book
-        fakeAudiobookDao.upsertedBooks.add(
-            AudiobookEntity(id = 9999L, title = "Stale Book", folderUri = "content://tree/stale")
-        )
-        // 1,100 standalone audio files (< MAX_FILES_LIMIT 2000, > SQLite 999 bind limit)
+    fun scanFolder_withOver1000BooksAndOver1000StaleBooks_deletesStaleBooksInChunks(): Unit = runBlocking {
+        // Pre-populate DB with 1,100 stale books (> SQLite 999 bind limit)
+        (1..1100).forEach { idx ->
+            fakeAudiobookDao.upsertedBooks.add(
+                AudiobookEntity(id = 10_000L + idx, title = "Stale $idx", folderUri = "content://tree/stale_$idx")
+            )
+        }
+        // 1,100 new standalone audio files (< MAX_FILES_LIMIT 2000, > SQLite 999 bind limit)
         fakeTreeHelper.childrenMap["root"] = (1..1100).map { idx ->
             DocumentItem("file_$idx", "Book $idx.mp3", "audio/mpeg", 1000L, isDirectory = false)
         }
@@ -757,7 +759,61 @@ class AudiobookStorageScannerTest {
         assertEquals(1100, summary.booksScanned)
         assertFalse(summary.isLimitExceeded)
         assertEquals(1100, fakeAudiobookDao.upsertedBooks.size)
-        assertFalse(fakeAudiobookDao.upsertedBooks.any { it.folderUri == "content://tree/stale" })
+        assertFalse(fakeAudiobookDao.upsertedBooks.any { it.folderUri.startsWith("content://tree/stale_") })
+    }
+
+    @Test
+    fun scanFolder_whenTrack1Deleted_refreshesCoverFromNewTrack1(): Unit = runBlocking {
+        val cacheDir = File(System.getProperty("java.io.tmpdir", "/tmp"), "audiobook_covers").apply { mkdirs() }
+        val staleCoverFile = File(cacheDir, "cover_old_t1.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(
+                id = 1L,
+                title = "Book",
+                folderUri = "content://tree/book_dir",
+                coverUri = staleCoverFile.absolutePath
+            )
+        )
+        fakeAudiobookDao.insertedTracks.addAll(
+            listOf(
+                AudiobookTrackEntity(
+                    id = 1L,
+                    audiobookId = 1L,
+                    title = "01",
+                    fileUri = "content://tree/t1",
+                    trackNumber = 1,
+                    durationSeconds = 100L,
+                    fileSizeBytes = 1000L,
+                    lastModifiedMs = 5000L
+                ),
+                AudiobookTrackEntity(
+                    id = 2L,
+                    audiobookId = 1L,
+                    title = "02",
+                    fileUri = "content://tree/t2",
+                    trackNumber = 2,
+                    durationSeconds = 200L,
+                    fileSizeBytes = 2000L,
+                    lastModifiedMs = 6000L
+                )
+            )
+        )
+
+        // Track 1 removed; unchanged Track 2 becomes Track 1 and has no embedded picture
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t2", "02.mp3", "audio/mpeg", 2000L, isDirectory = false, lastModified = 6000L)
+        )
+        fakeMetadataExtractor.extractCallCount = 0
+        fakeMetadataExtractor.metadataResult = ExtractedAudioMetadata(durationSeconds = 200L, embeddedPicture = null)
+
+        scanner.scanFolder(treeUri)
+
+        assertTrue(fakeMetadataExtractor.extractCallCount > 0)
+        assertEquals(null, fakeAudiobookDao.upsertedBooks.single().coverUri)
     }
 
     @Test
@@ -823,9 +879,11 @@ class AudiobookStorageScannerTest {
             upsertedBooks.clear()
         }
         override suspend fun deleteAudiobooksNotIn(retainedFolderUris: List<String>) {
+            require(retainedFolderUris.size <= 999) { "SQLite 999 variable limit exceeded" }
             upsertedBooks.removeAll { it.folderUri !in retainedFolderUris }
         }
         override suspend fun deleteAudiobooksByIds(audiobookIds: List<Long>) {
+            require(audiobookIds.size <= 999) { "SQLite 999 variable limit exceeded" }
             upsertedBooks.removeAll { it.id in audiobookIds }
         }
         override suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity? = null

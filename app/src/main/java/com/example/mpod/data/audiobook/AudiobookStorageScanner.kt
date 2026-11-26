@@ -432,6 +432,7 @@ class AudiobookStorageScanner internal constructor(
         val firstTrackUriString = firstTrackDocUri.toString()
         val firstExisting = existingByFileUri[firstTrackUriString]
         val isFirstTrackUnchanged = firstExisting != null &&
+            firstExisting.trackNumber == 1 &&
             firstExisting.durationSeconds > 0L &&
             firstExisting.fileSizeBytes > 0L &&
             firstExisting.fileSizeBytes == sortedAudioFiles[0].size &&
@@ -702,7 +703,8 @@ class AudiobookStorageScanner internal constructor(
                     file.delete()
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             // Best-effort cache cleanup
         }
     }
