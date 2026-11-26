@@ -91,11 +91,17 @@ interface AudiobookDao {
     @Query("SELECT * FROM audiobook_tracks WHERE id = :trackId")
     suspend fun getTrackById(trackId: Long): AudiobookTrackEntity?
 
-    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId ORDER BY trackNumber ASC")
+    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId AND isAvailable = 1 ORDER BY trackNumber ASC")
     suspend fun getTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity>
 
-    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId ORDER BY trackNumber ASC")
+    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId AND isAvailable = 1 ORDER BY trackNumber ASC")
     fun getTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>>
+
+    @Query("SELECT * FROM audiobook_tracks WHERE audiobookId = :audiobookId ORDER BY trackNumber ASC")
+    suspend fun getAllTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity>
+
+    @Query("DELETE FROM audiobook_tracks WHERE id IN (:trackIds)")
+    suspend fun deleteTracksByIds(trackIds: List<Long>)
 
     @Query("DELETE FROM audiobook_tracks WHERE audiobookId = :audiobookId")
     suspend fun deleteTracksForAudiobook(audiobookId: Long)
@@ -120,7 +126,7 @@ interface AudiobookDao {
     @Query("""
         SELECT t.* FROM audiobook_tracks t
         INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
-        WHERE pt.audiobookId = :audiobookId
+        WHERE pt.audiobookId = :audiobookId AND t.isAvailable = 1
         ORDER BY t.trackNumber ASC
     """)
     suspend fun getSelectedTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity>
@@ -128,7 +134,7 @@ interface AudiobookDao {
     @Query("""
         SELECT t.* FROM audiobook_tracks t
         INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
-        WHERE pt.audiobookId = :audiobookId
+        WHERE pt.audiobookId = :audiobookId AND t.isAvailable = 1
         ORDER BY t.trackNumber ASC
     """)
     fun getSelectedTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>>
@@ -137,8 +143,19 @@ interface AudiobookDao {
         SELECT t.* FROM audiobook_tracks t
         INNER JOIN audiobook_playlist_tracks pt ON t.id = pt.trackId
         INNER JOIN playlist_items p ON pt.audiobookId = p.audiobookId
+        WHERE t.isAvailable = 1
     """)
     fun getPlaylistAudiobookTracksFlow(): Flow<List<AudiobookTrackEntity>>
+
+    @Query("""
+        DELETE FROM playlist_items
+        WHERE audiobookId IS NOT NULL
+        AND NOT EXISTS (
+            SELECT 1 FROM audiobook_playlist_tracks pt
+            WHERE pt.audiobookId = playlist_items.audiobookId
+        )
+    """)
+    suspend fun deleteEmptyAudiobookPlaylistItems()
 
     // Invariant: currentTrack = первая незаслушанная выбранная глава, или первая выбранная глава, если все прослушаны
     @Query("""

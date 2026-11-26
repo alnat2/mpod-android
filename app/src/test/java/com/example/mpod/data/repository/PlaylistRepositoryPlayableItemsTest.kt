@@ -177,14 +177,21 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun addAudiobookToPlaylist_withNullTrackIdsAndExistingSelection_doesNotOverwriteTracks(): Unit = runBlocking {
+    fun addAudiobookToPlaylist_withNullTrackIdsAndExistingSelection_addsMissingTracks(): Unit = runBlocking {
         whenever(audiobookDao.getSelectedTrackIdsForAudiobook(10L)).thenReturn(listOf(101L))
+        val allTracks = listOf(
+            createTrack(101L, 10L, "Ch 1", 1),
+            createTrack(102L, 10L, "Ch 2", 2)
+        )
+        whenever(audiobookDao.getTracksForAudiobook(10L)).thenReturn(allTracks)
         whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
 
         val result = repository.addAudiobookToPlaylist(10L, null)
 
         assertTrue(result)
-        verify(audiobookDao, never()).insertPlaylistTracks(any())
+        verify(audiobookDao).insertPlaylistTracks(argThat {
+            size == 1 && map { it.trackId } == listOf(102L) && all { it.audiobookId == 10L }
+        })
         verify(playlistDao).appendAudiobookIfMissing(10L)
     }
 
@@ -241,8 +248,9 @@ class PlaylistRepositoryPlayableItemsTest {
     }
 
     @Test
-    fun removeAudiobookFromPlaylist_delegatesToPlaylistDao(): Unit = runBlocking {
+    fun removeAudiobookFromPlaylist_clearsSelectedTracksAndRemovesFromPlaylistDao(): Unit = runBlocking {
         repository.removeAudiobookFromPlaylist(15L)
+        verify(audiobookDao).clearPlaylistTracksForBook(15L)
         verify(playlistDao).removeAudiobookFromPlaylist(15L)
     }
 

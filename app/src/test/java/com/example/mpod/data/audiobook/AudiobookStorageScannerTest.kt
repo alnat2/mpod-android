@@ -722,8 +722,13 @@ class AudiobookStorageScannerTest {
         override suspend fun getTrackById(trackId: Long): AudiobookTrackEntity? =
             insertedTracks.find { it.id == trackId }
         override suspend fun getTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> =
-            insertedTracks.filter { it.audiobookId == audiobookId }
+            insertedTracks.filter { it.audiobookId == audiobookId && it.isAvailable }
         override fun getTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>> = emptyFlow()
+        override suspend fun getAllTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> =
+            insertedTracks.filter { it.audiobookId == audiobookId }
+        override suspend fun deleteTracksByIds(trackIds: List<Long>) {
+            insertedTracks.removeAll { it.id in trackIds }
+        }
         override suspend fun deleteTracksForAudiobook(audiobookId: Long) {}
 
         override suspend fun insertPlaylistTrack(playlistTrack: AudiobookPlaylistTrackEntity) {}
@@ -734,6 +739,7 @@ class AudiobookStorageScannerTest {
         override suspend fun getSelectedTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> = emptyList()
         override fun getSelectedTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>> = emptyFlow()
         override fun getPlaylistAudiobookTracksFlow(): Flow<List<AudiobookTrackEntity>> = emptyFlow()
+        override suspend fun deleteEmptyAudiobookPlaylistItems() {}
         override suspend fun getFirstUnlistenedSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
         override suspend fun getFirstSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
         override suspend fun getCurrentTrackForAudiobook(audiobookId: Long): AudiobookTrackEntity? = null

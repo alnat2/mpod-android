@@ -484,4 +484,34 @@ class AudiobookDaoTest {
         val items2 = repo.getPlayableItemsFlow().first()
         assertFalse(items2.any { it is com.example.mpod.data.local.model.PlayableItem.AudiobookItem && it.audiobook.id == bookId })
     }
+
+    @Test
+    fun unavailableTracks_areFilteredFromQueries_andDeleteEmptyPlaylistItemsRemovesOrphanedQueueEntries() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "Filter Book", folderUri = "content://audiobooks/filter")
+        )
+        val t1 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Available", fileUri = "1.mp3", trackNumber = 1, isAvailable = true)
+        )
+        val t2 = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Unavailable", fileUri = "2.mp3", trackNumber = 2, isAvailable = false)
+        )
+        audiobookDao.insertPlaylistTracks(
+            listOf(
+                AudiobookPlaylistTrackEntity(audiobookId = bookId, trackId = t1),
+                AudiobookPlaylistTrackEntity(audiobookId = bookId, trackId = t2)
+            )
+        )
+        playlistDao.appendAudiobookIfMissing(bookId)
+
+        assertEquals(listOf(t1), audiobookDao.getTracksForAudiobook(bookId).map { it.id })
+        assertEquals(listOf(t1), audiobookDao.getSelectedTracksForAudiobook(bookId).map { it.id })
+        assertEquals(listOf(t1, t2), audiobookDao.getAllTracksForAudiobook(bookId).map { it.id })
+
+        audiobookDao.deleteTracksByIds(listOf(t1, t2))
+        audiobookDao.deleteEmptyAudiobookPlaylistItems()
+
+        assertTrue(audiobookDao.getAllTracksForAudiobook(bookId).isEmpty())
+        assertFalse(playlistDao.isAudiobookInPlaylist(bookId))
+    }
 }

@@ -137,26 +137,17 @@ class PlaylistRepository(
     suspend fun addAudiobookToPlaylist(audiobookId: Long, trackIds: List<Long>? = null): Boolean = withContext(Dispatchers.IO) {
         runInTransaction {
             val now = System.currentTimeMillis()
-            if (!trackIds.isNullOrEmpty()) {
-                val existing = audiobookDao.getSelectedTrackIdsForAudiobook(audiobookId)
-                val existingSet = existing.toSet()
-                val toInsert = trackIds.filter { it !in existingSet }.map {
-                    AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
-                }
-                if (toInsert.isNotEmpty()) {
-                    audiobookDao.insertPlaylistTracks(toInsert)
-                }
+            val targetTrackIds = if (!trackIds.isNullOrEmpty()) {
+                trackIds
             } else {
-                val existing = audiobookDao.getSelectedTrackIdsForAudiobook(audiobookId)
-                if (existing.isEmpty()) {
-                    val allTracks = audiobookDao.getTracksForAudiobook(audiobookId)
-                    val entries = allTracks.map {
-                        AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it.id, addedAt = now)
-                    }
-                    if (entries.isNotEmpty()) {
-                        audiobookDao.insertPlaylistTracks(entries)
-                    }
-                }
+                audiobookDao.getTracksForAudiobook(audiobookId).map { it.id }
+            }
+            val existingSet = audiobookDao.getSelectedTrackIdsForAudiobook(audiobookId).toSet()
+            val toInsert = targetTrackIds.filter { it !in existingSet }.map {
+                AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
+            }
+            if (toInsert.isNotEmpty()) {
+                audiobookDao.insertPlaylistTracks(toInsert)
             }
             val appended = playlistDao.appendAudiobookIfMissing(audiobookId)
             appended
@@ -168,7 +159,10 @@ class PlaylistRepository(
     }
 
     suspend fun removeAudiobookFromPlaylist(audiobookId: Long) = withContext(Dispatchers.IO) {
-        playlistDao.removeAudiobookFromPlaylist(audiobookId)
+        runInTransaction {
+            audiobookDao.clearPlaylistTracksForBook(audiobookId)
+            playlistDao.removeAudiobookFromPlaylist(audiobookId)
+        }
     }
 
     suspend fun reorderPlaylist(reorderedEpisodeIds: List<Long>) = withContext(Dispatchers.IO) {
