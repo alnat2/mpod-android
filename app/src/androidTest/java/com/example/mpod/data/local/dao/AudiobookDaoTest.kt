@@ -517,4 +517,29 @@ class AudiobookDaoTest {
         audiobookDao.deleteAudiobooksByIds(listOf(bookId))
         assertNull(audiobookDao.getAudiobookById(bookId))
     }
+
+    @Test
+    fun syncAudiobookSelection_withUnavailableAndNonExistentTrackIds_filtersSafelyWithoutForeignKeyError() = runBlocking {
+        val bookId = audiobookDao.insertAudiobook(
+            AudiobookEntity(title = "FK Safe Book", folderUri = "content://audiobooks/fk_safe")
+        )
+        val availableTrackId = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Valid", fileUri = "1.mp3", trackNumber = 1, isAvailable = true)
+        )
+        val unavailableTrackId = audiobookDao.insertTrack(
+            AudiobookTrackEntity(audiobookId = bookId, title = "Gone", fileUri = "2.mp3", trackNumber = 2, isAvailable = false)
+        )
+
+        val repo = com.example.mpod.data.repository.PlaylistRepository(
+            playlistDao = playlistDao,
+            audiobookDao = audiobookDao,
+            database = database
+        )
+
+        repo.syncAudiobookSelection(bookId, listOf(availableTrackId, unavailableTrackId, 999_999L))
+
+        val persisted = audiobookDao.getSelectedTracksForAudiobook(bookId)
+        assertEquals(listOf(availableTrackId), persisted.map { it.id })
+        assertTrue(playlistDao.isAudiobookInPlaylist(bookId))
+    }
 }

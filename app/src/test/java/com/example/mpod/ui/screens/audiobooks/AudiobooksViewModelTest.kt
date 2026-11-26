@@ -866,6 +866,12 @@ class AudiobooksViewModelTest {
                 audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
             ).apply { ioDispatcher = concurrentIo }
 
+            val initDeadline = System.currentTimeMillis() + 2_000L
+            while ((viewModel.state.value.isLoading || viewModel.state.value.items.firstOrNull()?.isInPlaylist != true) && System.currentTimeMillis() < initDeadline) {
+                Thread.sleep(10)
+            }
+            assertEquals(true, viewModel.state.value.items.firstOrNull()?.isInPlaylist)
+
             viewModel.openBookModal(book)
             val deadline = System.currentTimeMillis() + 2_000L
             while (viewModel.state.value.selectedBookPlaylistTrackIds != setOf(101L) && System.currentTimeMillis() < deadline) {
@@ -881,7 +887,11 @@ class AudiobooksViewModelTest {
 
             // Intermediate empty emission from playlist_items while sync is in-flight
             playlistFlow.value = emptyList()
-            Thread.sleep(50)
+            val flowDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.items.firstOrNull()?.isInPlaylist != false && System.currentTimeMillis() < flowDeadline) {
+                Thread.sleep(10)
+            }
+            assertEquals(false, viewModel.state.value.items.firstOrNull()?.isInPlaylist)
 
             // Must NOT wipe optimistic {102L}
             assertEquals(setOf(102L), viewModel.state.value.selectedBookPlaylistTrackIds)
@@ -938,6 +948,72 @@ class AudiobooksViewModelTest {
 
             assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
         } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun olderSyncFailure_doesNotOverwriteNewerOptimisticSelection() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val concurrentIo = executor.asCoroutineDispatcher()
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val track2 = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "Ch 2", fileUri = "uri://2", trackNumber = 2)
+            val firstSyncStarted = java.util.concurrent.CountDownLatch(1)
+            val firstSyncRelease = java.util.concurrent.CountDownLatch(1)
+            val secondSyncDone = java.util.concurrent.CountDownLatch(1)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1, track2))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1, track2)))
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(emptyList())
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L))).thenAnswer {
+                firstSyncStarted.countDown()
+                firstSyncRelease.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                throw RuntimeException("Transient failure")
+            }
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L, 102L))).thenAnswer {
+                secondSyncDone.countDown()
+                true
+            }
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = concurrentIo }
+
+            viewModel.openBookModal(book)
+            val openDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal == null && System.currentTimeMillis() < openDeadline) {
+                Thread.sleep(10)
+            }
+
+            viewModel.toggleTrackSelection(track1)
+            assertTrue(firstSyncStarted.await(2, java.util.concurrent.TimeUnit.SECONDS))
+
+            // Newer selection queued while gen=1 is still running
+            viewModel.toggleTrackSelection(track2)
+            assertEquals(setOf(101L, 102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            firstSyncRelease.countDown()
+            assertTrue(secondSyncDone.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            Thread.sleep(30)
+
+            // Must preserve {101L, 102L} rather than rolling back to emptyList()
+            assertEquals(setOf(101L, 102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+        } finally {
+            executor.shutdownNow()
             Dispatchers.resetMain()
         }
     }
