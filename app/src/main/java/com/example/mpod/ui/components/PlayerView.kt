@@ -18,10 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -34,7 +32,6 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -260,155 +257,72 @@ fun PlayerView(
                         )
                     }
 
-                    if (isAudiobook) {
-                        // Figma 1336:13037: play-actions (-15, play, +30)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            PlayerLabelControl(
-                                icon = R.drawable.ic_huge_forward_02_wide,
-                                label = "-15",
-                                contentDescription = "Rewind 15 seconds",
-                                onClick = onSeekBackward
-                            )
+                    // Mobile Figma 1019:4294 / 1309:11249 order: speed, play, rewind 15, forward 30.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_gauge,
+                            label = speedLabel,
+                            contentDescription = "Playback speed ${speedLabel}x",
+                            onClick = { showSpeedSheet = true }
+                        )
 
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = ripple(bounded = true),
-                                        role = Role.Button,
-                                        onClick = onPlayClick
-                                    )
-                                    .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isPlaying) {
-                                            R.drawable.ic_huge_player_pause
-                                        } else {
-                                            R.drawable.ic_huge_player_play
-                                        }
-                                    ),
-                                    contentDescription = null,
-                                    tint = Color(0xFFF7FEE7),
-                                    modifier = Modifier.size(22.dp)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = ripple(bounded = true),
+                                    role = Role.Button,
+                                    onClick = onPlayClick
                                 )
-                            }
-
-                            PlayerLabelControl(
-                                icon = R.drawable.ic_huge_forward_02_wide,
-                                label = "+30",
-                                contentDescription = "Forward 30 seconds",
-                                iconModifier = Modifier.rotate(180f),
-                                onClick = onSeekForward
+                                .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (isPlaying) {
+                                        R.drawable.ic_huge_player_pause
+                                    } else {
+                                        R.drawable.ic_huge_player_play
+                                    }
+                                ),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                    } else {
-                        // Component version 2 order: speed, play, rewind 15, forward 30.
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            PlayerLabelControl(
-                                icon = R.drawable.ic_huge_gauge,
-                                label = speedLabel,
-                                contentDescription = "Playback speed ${speedLabel}x",
-                                onClick = { showSpeedSheet = true }
-                            )
 
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .figmaDropShadow(style = FigmaShadowStyle.Lg, shape = CircleShape)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = ripple(bounded = true),
-                                        role = Role.Button,
-                                        onClick = onPlayClick
-                                    )
-                                    .semantics { contentDescription = if (isPlaying) "Pause" else "Play" }
-                            ) {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (isPlaying) {
-                                            R.drawable.ic_huge_player_pause
-                                        } else {
-                                            R.drawable.ic_huge_player_play
-                                        }
-                                    ),
-                                    contentDescription = null,
-                                    tint = Color(0xFFF7FEE7),
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_forward_02_wide,
+                            label = "-15",
+                            contentDescription = "Rewind 15 seconds",
+                            onClick = onSeekBackward
+                        )
 
-                            PlayerLabelControl(
-                                icon = R.drawable.ic_huge_forward_02_wide,
-                                label = "-15",
-                                contentDescription = "Rewind 15 seconds",
-                                onClick = onSeekBackward
-                            )
-
-                            PlayerLabelControl(
-                                icon = R.drawable.ic_huge_forward_02_wide,
-                                label = "+30",
-                                contentDescription = "Forward 30 seconds",
-                                iconModifier = Modifier.rotate(180f),
-                                onClick = onSeekForward
-                            )
-                        }
+                        PlayerLabelControl(
+                            icon = R.drawable.ic_huge_forward_02_wide,
+                            label = "+30",
+                            contentDescription = "Forward 30 seconds",
+                            iconModifier = Modifier.rotate(180f),
+                            onClick = onSeekForward
+                        )
                     }
                 }
 
-                if (isAudiobook) {
-                    // Figma 1336:13037 btns: Speed 1.5x, Show chapters
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Speed ${speedLabel}x",
-                            fontFamily = InterFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { showSpeedSheet = true }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                        if (hasChapters && onShowChaptersClick != null) {
-                            Text(
-                                text = "Show chapters",
-                                fontFamily = InterFontFamily,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .clickable(onClick = onShowChaptersClick)
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                } else {
+                val secondaryAction = when {
+                    !isAudiobook -> "Show notes" to onNotesClick
+                    hasChapters && onShowChaptersClick != null -> "Show chapters" to onShowChaptersClick
+                    else -> null
+                }
+
+                secondaryAction?.let { (label, onSecondaryClick) ->
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
@@ -416,11 +330,11 @@ fun PlayerView(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true),
                                 role = Role.Button,
-                                onClick = onNotesClick
+                                onClick = onSecondaryClick
                             )
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                             .semantics {
-                                contentDescription = "Show notes"
+                                contentDescription = label
                                 role = Role.Button
                             },
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -433,7 +347,7 @@ fun PlayerView(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Show notes",
+                            text = label,
                             fontFamily = InterFontFamily,
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.sp,
@@ -485,6 +399,8 @@ private fun PlayerLabelControl(
             fontWeight = FontWeight.SemiBold,
             fontSize = 12.sp,
             lineHeight = 16.sp,
+            maxLines = 1,
+            softWrap = false,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

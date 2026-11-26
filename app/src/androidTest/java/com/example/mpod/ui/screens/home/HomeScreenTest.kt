@@ -6,7 +6,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipe
 import com.example.mpod.ui.theme.MpodTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -254,5 +252,101 @@ class HomeScreenTest {
 
         composeRule.onNodeWithContentDescription("Show notes").performClick()
         composeRule.onNodeWithText("No show notes for this episode.").assertIsDisplayed()
+    }
+
+    @Test
+    fun audiobookPlayerUsesMobileLayoutWithSpeedIconAndShowChapters() {
+        var speedChanged: String? = null
+        var showChaptersClicks = 0
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        hasPodcasts = true,
+                        queue = listOf(
+                            HomeEpisodeUi(
+                                id = -1L,
+                                audiobookId = 1L,
+                                title = "The Fellowship of the Ring",
+                                podcastTitle = "J.R.R. Tolkien",
+                                durationSeconds = 3600,
+                                playbackPositionSeconds = 0,
+                                isListened = false,
+                                downloaded = false,
+                                summary = null,
+                                isAudiobook = true,
+                                hasChapters = true
+                            )
+                        )
+                    ),
+                    playbackStateProvider = {
+                        HomePlaybackUiState(
+                            currentEpisodeId = -1L,
+                            positionSeconds = 120,
+                            durationSeconds = 3600,
+                            speedLabel = "1.0"
+                        )
+                    },
+                    onSpeedChange = { speedChanged = it },
+                    onShowChaptersClick = { showChaptersClicks += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("1.0").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Play").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Playback speed 1.0x").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("1.5x").performClick()
+        composeRule.onAllNodesWithText("Speed 1.0x").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Show chapters").assertIsDisplayed().performClick()
+        composeRule.onAllNodesWithContentDescription("Show notes").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Rewind 15 seconds").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Forward 30 seconds").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals("1.5", speedChanged)
+            assertEquals(1, showChaptersClicks)
+        }
+    }
+
+    @Test
+    fun singleFileAudiobookHidesSecondaryActionsWhileKeepingSpeedIcon() {
+        composeRule.setContent {
+            MpodTheme {
+                HomeScreen(
+                    state = HomeUiState(
+                        hasPodcasts = true,
+                        queue = listOf(
+                            HomeEpisodeUi(
+                                id = -2L,
+                                audiobookId = 2L,
+                                title = "Ananasnaya voda",
+                                podcastTitle = "Author",
+                                durationSeconds = 833,
+                                playbackPositionSeconds = 0,
+                                isListened = false,
+                                downloaded = false,
+                                summary = null,
+                                isAudiobook = true,
+                                hasChapters = false
+                            )
+                        )
+                    ),
+                    playbackStateProvider = {
+                        HomePlaybackUiState(
+                            currentEpisodeId = -2L,
+                            positionSeconds = 0,
+                            durationSeconds = 833,
+                            speedLabel = "1.0"
+                        )
+                    },
+                    onShowChaptersClick = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Playback speed 1.0x").assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("Show chapters").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("Show notes").assertCountEquals(0)
     }
 }

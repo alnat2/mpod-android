@@ -293,6 +293,17 @@ private fun AudiobookComponentsPreview() {
             isAudiobook = true,
             hasChapters = true,
             speedLabel = "1.0",
+            onShowChaptersClick = {},
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        PreviewLabel("PlayerView / Audiobook (Single file)")
+        PlayerView(
+            title = "Ananasnaya voda",
+            podcastTitle = "Author",
+            isAudiobook = true,
+            hasChapters = false,
+            speedLabel = "1.0",
             modifier = Modifier.fillMaxWidth()
         )
     }

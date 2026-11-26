@@ -77,7 +77,7 @@ Figma references:
 - Audiobooks section ("for abooks"): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1309-12604>
 - Audiobooks mobile screen: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1304-10573>
 - Audiobooks mobile chapters modal: <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1309-11982>
-- Player statuses (audiobook with chapters vs single audiofile): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1353-15629>
+- Mobile Player (`Version=v2` podcasts & audiobooks): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1019-4294> and <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1309-11249>
 - Go to time numeric input (PlayerMobileTimeInput): <https://www.figma.com/design/3CmMv8wYlyNz9qDDdOd2Ka/mpod?node-id=1346-15503>
 
 Icon-source decision confirmed on 2026-07-29: every Android UI icon must come from Hugeicons. Use the exact named asset from `@hugeicons/core-free-icons` or an exact Hugeicons export supplied through Figma; do not substitute Material Icons or a visually similar hand-authored icon. If the exact Hugeicons name or asset cannot be identified, implementation pauses for product-owner clarification. Branding, podcast artwork, and the approved fallback illustration are not UI icons.
