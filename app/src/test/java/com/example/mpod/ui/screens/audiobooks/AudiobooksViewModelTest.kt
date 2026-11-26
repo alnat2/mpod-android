@@ -1150,4 +1150,93 @@ class AudiobooksViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun openBookModal_whenInFlightSyncFinishesMidRead_retriesAndLoadsCommittedSelection() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(3)
+        val concurrentIo = executor.asCoroutineDispatcher()
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val track1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Ch 1", fileUri = "uri://1", trackNumber = 1)
+            val track2 = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "Ch 2", fileUri = "uri://2", trackNumber = 2)
+
+            val syncStarted = java.util.concurrent.CountDownLatch(1)
+            val syncRelease = java.util.concurrent.CountDownLatch(1)
+            val reopenReadStarted = java.util.concurrent.CountDownLatch(1)
+            val reopenReadRelease = java.util.concurrent.CountDownLatch(1)
+            val committed = java.util.concurrent.atomic.AtomicBoolean(false)
+            val getTracksCallCount = java.util.concurrent.atomic.AtomicInteger(0)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1, track2)))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenAnswer { committed.get() }
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenAnswer {
+                if (committed.get()) listOf(track1, track2) else emptyList<AudiobookTrackEntity>()
+            }
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenAnswer {
+                val call = getTracksCallCount.incrementAndGet()
+                // Call 1: initial open; Call 2: first reopen attempt (before commit); Call 3: retry after commit
+                if (call == 2) {
+                    reopenReadStarted.countDown()
+                    reopenReadRelease.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                }
+                listOf(track1, track2)
+            }
+            `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L))).thenAnswer {
+                syncStarted.countDown()
+                syncRelease.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                committed.set(true)
+                true
+            }
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = concurrentIo }
+
+            viewModel.openBookModal(book)
+            val open1Deadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal == null && System.currentTimeMillis() < open1Deadline) {
+                Thread.sleep(10)
+            }
+
+            viewModel.toggleTrackSelection(track1)
+            assertTrue(syncStarted.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            viewModel.closeBookModal()
+
+            // Start reopen while sync is still pending, then hold mid-DB-read
+            viewModel.openBookModal(book)
+            assertTrue(reopenReadStarted.await(2, java.util.concurrent.TimeUnit.SECONDS))
+
+            // Let sync finish and clear pendingBookTrackSelections while reopen DB read is paused
+            syncRelease.countDown()
+            val pendingClearedDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.pendingBookTrackSelections.containsKey(10L) && System.currentTimeMillis() < pendingClearedDeadline) {
+                Thread.sleep(10)
+            }
+
+            // Release paused DB read: openBookModal must detect pendingBeforeRead != null && pendingNow == null,
+            // retry the read, and load the newly committed [track1, track2] from DB!
+            reopenReadRelease.countDown()
+            val reopenDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal == null && System.currentTimeMillis() < reopenDeadline) {
+                Thread.sleep(10)
+            }
+
+            assertTrue(getTracksCallCount.get() >= 3)
+            assertEquals(setOf(101L, 102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+        } finally {
+            executor.shutdownNow()
+            Dispatchers.resetMain()
+        }
+    }
 }

@@ -835,6 +835,63 @@ class AudiobookStorageScannerTest {
         assertTrue(fakeAudiobookDao.deletedEmptyPlaylistItemsCalled)
     }
 
+    @Test
+    fun scanFolder_cleanupOrphanedCoverCache_deletesOrphanedCoversAndKeepsRetainedCovers(): Unit = runBlocking {
+        val tempCacheRoot = java.nio.file.Files.createTempDirectory("mpod_cover_cache_test").toFile()
+        try {
+            Mockito.`when`(context.cacheDir).thenReturn(tempCacheRoot)
+            val coversDir = File(tempCacheRoot, "audiobook_covers").apply { mkdirs() }
+            val retainedCover = File(coversDir, "cover_retained.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val orphanCover = File(coversDir, "cover_orphan.jpg").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+
+            fakeAudiobookDao.upsertedBooks.addAll(
+                listOf(
+                    AudiobookEntity(
+                        id = 1L,
+                        title = "Retained Book",
+                        folderUri = "content://tree/retained_dir",
+                        coverUri = retainedCover.absolutePath
+                    ),
+                    AudiobookEntity(
+                        id = 2L,
+                        title = "Deleted Book",
+                        folderUri = "content://tree/deleted_dir",
+                        coverUri = orphanCover.absolutePath
+                    )
+                )
+            )
+            fakeAudiobookDao.insertedTracks.add(
+                AudiobookTrackEntity(
+                    id = 10L,
+                    audiobookId = 1L,
+                    title = "01",
+                    fileUri = "content://tree/t1",
+                    trackNumber = 1,
+                    durationSeconds = 120L,
+                    fileSizeBytes = 1000L,
+                    lastModifiedMs = 5000L
+                )
+            )
+
+            // Only retained_dir remains in storage; deleted_dir was removed
+            fakeTreeHelper.childrenMap["root"] = listOf(
+                DocumentItem("retained_dir", "Retained Book", "vnd.android.document/directory", 0L, isDirectory = true)
+            )
+            fakeTreeHelper.childrenMap["retained_dir"] = listOf(
+                DocumentItem("t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false, lastModified = 5000L)
+            )
+
+            val summary = scanner.scanFolder(treeUri)
+
+            assertEquals(1, summary.booksScanned)
+            assertFalse(summary.isLimitExceeded)
+            assertTrue("Retained cover must stay on disk", retainedCover.exists())
+            assertFalse("Orphaned cover must be deleted after successful scan", orphanCover.exists())
+        } finally {
+            tempCacheRoot.deleteRecursively()
+        }
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()

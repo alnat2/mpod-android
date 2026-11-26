@@ -88,7 +88,9 @@ class AudiobooksViewModel @Inject constructor(
     internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
     private val currentPathFlow = MutableStateFlow<List<String>>(emptyList())
+    @Volatile
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
+    @Volatile
     private var playlistAudiobookIds: Set<Long> = emptySet()
     private var hasTriggeredLegacyRescan = false
     private val scanMutex = Mutex()
@@ -600,6 +602,8 @@ class AudiobooksViewModel @Inject constructor(
                     directBooks.add(book)
                 } else {
                     val subDirName = remaining.first()
+                    // Merge folders differing only in casing (consistent with matchesCurrentPath ignoreCase = true);
+                    // putIfAbsent intentionally preserves the first encountered display casing.
                     directoriesMap.putIfAbsent(
                         subDirName.lowercase(),
                         subDirName to (currentPath + subDirName).joinToString("/")
