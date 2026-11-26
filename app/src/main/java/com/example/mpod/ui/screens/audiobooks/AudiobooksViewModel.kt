@@ -415,40 +415,53 @@ class AudiobooksViewModel @Inject constructor(
     fun openBookModal(book: AudiobookEntity) {
         val token = modalTokenCounter.incrementAndGet()
         val job = viewModelScope.launch(ioDispatcher, start = CoroutineStart.LAZY) {
-            if (!isActive || activeModalToken != token) return@launch
+            while (true) {
+                if (!isActive || activeModalToken != token) return@launch
 
-            val tracks = audiobookRepository.getTracksForAudiobook(book.id)
-            val availableIds = tracks.mapTo(mutableSetOf()) { it.id }
-            val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
-            val dbSelectedIds = if (inQueue) {
-                audiobookRepository.getSelectedTracksForAudiobook(book.id)
-                    .map { it.id }
-                    .toSet()
-            } else {
-                emptySet()
-            }
-
-            var applied = false
-            _state.update { s ->
-                if (!isActive || activeModalToken != token) {
-                    applied = false
-                    return@update s
-                }
-                applied = true
-                val pending = s.pendingBookTrackSelections[book.id]
-                val resolvedSelectedIds = if (pending != null) {
-                    pending.second.intersect(availableIds)
+                val pendingBeforeRead = _state.value.pendingBookTrackSelections[book.id]
+                val tracks = audiobookRepository.getTracksForAudiobook(book.id)
+                val availableIds = tracks.mapTo(mutableSetOf()) { it.id }
+                val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
+                val dbSelectedIds = if (inQueue) {
+                    audiobookRepository.getSelectedTracksForAudiobook(book.id)
+                        .map { it.id }
+                        .toSet()
                 } else {
-                    dbSelectedIds
+                    emptySet()
                 }
-                s.copy(
-                    selectedBookForModal = book,
-                    selectedBookTracks = tracks,
-                    selectedBookPlaylistTrackIds = resolvedSelectedIds,
-                    modalSessionToken = token
-                )
+
+                var applied = false
+                var shouldRetryRead = false
+                _state.update { s ->
+                    applied = false
+                    shouldRetryRead = false
+                    if (!isActive || activeModalToken != token) {
+                        return@update s
+                    }
+                    val pendingNow = s.pendingBookTrackSelections[book.id]
+                    if (pendingBeforeRead != null && pendingNow == null) {
+                        // In-flight sync completed between DB read and CAS; re-read committed DB selection.
+                        shouldRetryRead = true
+                        return@update s
+                    }
+                    applied = true
+                    val resolvedSelectedIds = if (pendingNow != null) {
+                        pendingNow.second.intersect(availableIds)
+                    } else {
+                        dbSelectedIds
+                    }
+                    s.copy(
+                        selectedBookForModal = book,
+                        selectedBookTracks = tracks,
+                        selectedBookPlaylistTrackIds = resolvedSelectedIds,
+                        modalSessionToken = token
+                    )
+                }
+                if (!shouldRetryRead) {
+                    if (!applied) return@launch
+                    break
+                }
             }
-            if (!applied) return@launch
 
             audiobookRepository.getTracksForAudiobookFlow(book.id).collect { updatedTracks ->
                 if (!isActive || activeModalToken != token) return@collect

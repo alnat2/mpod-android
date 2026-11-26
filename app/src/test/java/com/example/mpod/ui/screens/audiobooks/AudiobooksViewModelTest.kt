@@ -1053,7 +1053,15 @@ class AudiobooksViewModelTest {
             viewModel.openBookModal(bookA)
             advanceUntilIdle()
 
-            // Switch to Book B; toggling trackA1 from Book A must be ignored
+            // Close modal; toggling trackA1 while modal is closed must be ignored
+            viewModel.closeBookModal()
+            viewModel.toggleTrackSelection(trackA1)
+            advanceUntilIdle()
+            assertTrue(viewModel.state.value.pendingBookTrackSelections.isEmpty())
+
+            // Reopen A, then switch to Book B; toggling trackA1 from Book A must be ignored
+            viewModel.openBookModal(bookA)
+            advanceUntilIdle()
             viewModel.openBookModal(bookB)
             advanceUntilIdle()
             viewModel.toggleTrackSelection(trackA1)
