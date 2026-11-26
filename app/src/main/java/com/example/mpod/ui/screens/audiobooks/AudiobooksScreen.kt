@@ -118,9 +118,10 @@ fun AudiobooksScreen(
         ) {
             // Header (Figma 1304:10573)
             item {
+                val itemLabel = if (state.totalBooksCount == 1) "item" else "items"
                 PageHeader(
                     title = "Audiobooks",
-                    subtitle = if (state.audiobooksFolderUri != null) "Local collection · ${state.totalBooksCount} items" else null,
+                    subtitle = if (state.audiobooksFolderUri != null) "Local collection · ${state.totalBooksCount} $itemLabel" else null,
                     showActions = state.audiobooksFolderUri != null,
                     onRefreshClick = if (state.isScanning) null else onRescanClick,
                     isRefreshing = state.isScanning,
@@ -185,6 +186,14 @@ fun AudiobooksScreen(
                 }
 
                 state.items.isEmpty() && !state.isScanning -> {
+                    if (state.currentPath.isNotEmpty()) {
+                        item {
+                            BreadcrumbsBar(
+                                currentPath = state.currentPath,
+                                onBreadcrumbClick = onBreadcrumbClick
+                            )
+                        }
+                    }
                     val hasError = state.errorMessage != null
                     item {
                         AudiobooksEmptyState(

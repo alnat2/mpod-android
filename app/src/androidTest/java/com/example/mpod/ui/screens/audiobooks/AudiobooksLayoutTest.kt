@@ -142,4 +142,24 @@ class AudiobooksLayoutTest {
         val secondCard = composeRule.onNodeWithTag("filemanager_item_Chapter2.mp3").getUnclippedBoundsInRoot()
         assertEquals(4f, (secondCard.top - firstCard.bottom).value, 1.5f)
     }
+
+    @Test
+    fun audiobooksScreen_whenInsideEmptySubfolder_keepsBreadcrumbsVisible() {
+        composeRule.setContent {
+            MpodTheme(themeMode = ThemeMode.Dark) {
+                AudiobooksScreen(
+                    state = AudiobooksUiState(
+                        audiobooksFolderUri = "content://abooks",
+                        currentPath = listOf("Missing Author"),
+                        items = emptyList(),
+                        totalBooksCount = 1
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("audiobooks_breadcrumbs").assertIsDisplayed()
+        composeRule.onNodeWithText("Missing Author").assertIsDisplayed()
+        composeRule.onNodeWithText("No audiobooks found").assertIsDisplayed()
+    }
 }

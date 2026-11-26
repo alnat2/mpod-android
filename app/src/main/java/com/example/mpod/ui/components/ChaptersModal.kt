@@ -163,6 +163,9 @@ fun ChaptersModal(
                     }
 
                     // Chapters list (height up to 360dp + vertical shadow padding)
+                    val availableTracks = androidx.compose.runtime.remember(tracks) {
+                        tracks.filter { it.isAvailable }
+                    }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -170,7 +173,7 @@ fun ChaptersModal(
                         contentPadding = PaddingValues(start = 4.dp, top = 2.dp, end = 4.dp, bottom = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                    items(tracks, key = { it.id }) { track ->
+                    items(availableTracks, key = { it.id }) { track ->
                         val durationFormatted = formatEpisodeDuration(track.durationSeconds.toInt())
 
                         if (mode == ChaptersModalMode.FileManager) {

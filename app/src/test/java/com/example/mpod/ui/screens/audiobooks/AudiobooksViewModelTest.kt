@@ -355,6 +355,7 @@ class AudiobooksViewModelTest {
             )
             `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(tracks)
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(tracks))
 
             val viewModel = AudiobooksViewModel(
                 audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
@@ -394,6 +395,7 @@ class AudiobooksViewModelTest {
             )
             `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(tracks)
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(tracks))
             `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(tracks[0]))
 
             val viewModel = AudiobooksViewModel(
@@ -431,6 +433,7 @@ class AudiobooksViewModelTest {
 
             `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(tracks)
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(tracks))
             `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L))).thenReturn(true)
 
             val viewModel = AudiobooksViewModel(
@@ -480,6 +483,7 @@ class AudiobooksViewModelTest {
 
             `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(tracks)
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(tracks))
             `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L)))
                 .thenThrow(RuntimeException("Database disk image is malformed"))
 
@@ -535,6 +539,8 @@ class AudiobooksViewModelTest {
             `when`(playlistDao.isAudiobookInPlaylist(20L)).thenReturn(false)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(trackA1, trackA2))
             `when`(audiobookRepository.getTracksForAudiobook(20L)).thenReturn(listOf(trackB1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(trackA1, trackA2)))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(20L)).thenReturn(flowOf(listOf(trackB1)))
 
             `when`(playlistRepository.syncAudiobookSelection(10L, listOf(101L, 102L))).thenReturn(true)
             `when`(playlistRepository.syncAudiobookSelection(20L, listOf(201L))).thenReturn(true)
@@ -597,6 +603,7 @@ class AudiobooksViewModelTest {
 
             `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
             `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(track1, track2))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(track1, track2)))
             // Actual DB state: only track 1 is saved in DB
             `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(track1))
             // Sync fails with exception
@@ -622,6 +629,101 @@ class AudiobooksViewModelTest {
             // After error: must roll back to actual DB state [101L]
             assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
             assertTrue(viewModel.state.value.errorMessage?.contains("Disk I/O error") == true)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun onRescanLibrary_whenLimitExceeded_includesLimitWarningInStatusMessage() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings(audiobooksFolderUri = "content://tree/root")))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(audiobookRepository.rescanLibrary()).thenReturn(
+                ScanSummary(booksScanned = 50, tracksScanned = 2000, isLimitExceeded = true)
+            )
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            viewModel.onRescanLibrary()
+            advanceUntilIdle()
+
+            assertNull(viewModel.state.value.errorMessage)
+            assertTrue(viewModel.state.value.statusMessage?.contains("limit", ignoreCase = true) == true)
+            assertTrue(viewModel.state.value.statusMessage?.contains("2000") == true)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun buildFilemanagerItems_caseInsensitiveSubdirs_mergesIntoSingleDirectory() {
+        val books = listOf(
+            AudiobookEntity(id = 1L, folderUri = "uri://1", title = "Book 1", relativePath = "Author/Book 1"),
+            AudiobookEntity(id = 2L, folderUri = "uri://2", title = "Book 2", relativePath = "author/Book 2")
+        )
+
+        val rootItems = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), emptyList())
+        assertEquals(1, rootItems.size)
+        assertEquals("Author", rootItems[0].title)
+        assertEquals(FilemanagerItemType.Directory, rootItems[0].type)
+
+        val nestedItems = AudiobooksViewModel.buildFilemanagerItems(books, emptySet(), listOf("Author"))
+        assertEquals(2, nestedItems.size)
+    }
+
+    @Test
+    fun openBookModal_reactivelyUpdatesWhenTracksFlowEmits() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            val oldTrack = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "Old Name", fileUri = "uri://old", trackNumber = 1)
+            val newTrack = AudiobookTrackEntity(id = 102L, audiobookId = 10L, title = "New Name", fileUri = "uri://new", trackNumber = 1)
+            val tracksFlow = kotlinx.coroutines.flow.MutableStateFlow(listOf(oldTrack))
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(true)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(oldTrack))
+            `when`(audiobookRepository.getSelectedTracksForAudiobook(10L)).thenReturn(listOf(oldTrack))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(tracksFlow)
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            viewModel.openBookModal(book)
+            advanceUntilIdle()
+
+            assertEquals(listOf(oldTrack), viewModel.state.value.selectedBookTracks)
+            assertEquals(setOf(101L), viewModel.state.value.selectedBookPlaylistTrackIds)
+
+            tracksFlow.value = listOf(newTrack)
+            advanceUntilIdle()
+
+            assertEquals(listOf(newTrack), viewModel.state.value.selectedBookTracks)
+            assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
         } finally {
             Dispatchers.resetMain()
         }

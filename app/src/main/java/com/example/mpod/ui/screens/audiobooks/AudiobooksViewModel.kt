@@ -4,6 +4,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.mpod.data.audiobook.AudiobookStorageScanner
+import com.example.mpod.data.audiobook.ScanSummary
 import com.example.mpod.data.local.dao.PlaylistDao
 import com.example.mpod.data.local.entity.AudiobookEntity
 import com.example.mpod.data.local.entity.AudiobookTrackEntity
@@ -24,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -40,8 +44,7 @@ data class FilemanagerItemUi(
 
 private data class ChapterSyncRequest(
     val bookId: Long,
-    val trackIds: List<Long>,
-    val fallbackTrackIds: Set<Long>
+    val trackIds: List<Long>
 )
 
 data class AudiobooksUiState(
@@ -76,6 +79,8 @@ class AudiobooksViewModel @Inject constructor(
     private var allAudiobooks: List<AudiobookEntity> = emptyList()
     private var playlistAudiobookIds: Set<Long> = emptySet()
     private var hasTriggeredLegacyRescan = false
+    private val scanMutex = Mutex()
+    private var modalTracksJob: Job? = null
 
     private val activeBookSyncChannels = java.util.concurrent.ConcurrentHashMap<Long, Pair<Channel<ChapterSyncRequest>, Job>>()
     private val syncChannelsLock = Any()
@@ -146,14 +151,13 @@ class AudiobooksViewModel @Inject constructor(
                 playlistDao.getPlaylistItemsWithAudiobooksFlow(),
                 currentPathFlow
             ) { settings, audiobooks, playlistItems, currentPath ->
+                val previousAudiobookIds = allAudiobooks.mapTo(mutableSetOf()) { it.id }
                 allAudiobooks = audiobooks
                 playlistAudiobookIds = playlistItems.map { it.audiobook.id }.toSet()
 
                 if (!hasTriggeredLegacyRescan && settings.audiobooksFolderUri != null && audiobooks.any { it.relativePath.isBlank() }) {
                     hasTriggeredLegacyRescan = true
-                    viewModelScope.launch(ioDispatcher) {
-                        audiobookRepository.rescanLibrary()
-                    }
+                    onRescanLibrary()
                 }
 
                 val items = buildFilemanagerItems(
@@ -162,12 +166,27 @@ class AudiobooksViewModel @Inject constructor(
                     currentPath = currentPath
                 )
 
+                val currentModalBook = _state.value.selectedBookForModal
+                val updatedModalBook = currentModalBook?.let { modal ->
+                    audiobooks.firstOrNull { it.id == modal.id }
+                }
+                val wasModalBookRemoved = currentModalBook != null &&
+                    currentModalBook.id in previousAudiobookIds &&
+                    updatedModalBook == null
+                if (wasModalBookRemoved) {
+                    modalTracksJob?.cancel()
+                    modalTracksJob = null
+                }
+
                 _state.value.copy(
                     isLoading = false,
                     audiobooksFolderUri = settings.audiobooksFolderUri,
                     currentPath = currentPath,
                     items = items,
-                    totalBooksCount = audiobooks.size
+                    totalBooksCount = audiobooks.size,
+                    selectedBookForModal = if (wasModalBookRemoved) null else (updatedModalBook ?: currentModalBook),
+                    selectedBookTracks = if (wasModalBookRemoved) emptyList() else _state.value.selectedBookTracks,
+                    selectedBookPlaylistTrackIds = if (wasModalBookRemoved) emptySet() else _state.value.selectedBookPlaylistTrackIds
                 )
             }.collect { nextState ->
                 _state.value = nextState
@@ -189,61 +208,89 @@ class AudiobooksViewModel @Inject constructor(
 
     fun onScanFolder(uri: Uri) {
         viewModelScope.launch(ioDispatcher) {
-            _state.value = _state.value.copy(isScanning = true, errorMessage = null, statusMessage = "Scanning audiobooks...")
-            try {
-                val summary = audiobookRepository.scanDirectory(uri)
-                if (summary.errorMessage != null) {
-                    _state.value = _state.value.copy(
-                        isScanning = false,
-                        errorMessage = "Scan failed: ${summary.errorMessage}",
-                        statusMessage = null
-                    )
-                } else {
-                    _state.value = _state.value.copy(
-                        isScanning = false,
-                        statusMessage = "Found ${summary.booksScanned} audiobooks (${summary.tracksScanned} tracks)"
-                    )
+            executeScan(
+                loadingMessage = "Scanning audiobooks...",
+                failPrefix = "Scan failed",
+                successFormatter = { summary ->
+                    "Found ${summary.booksScanned} audiobooks (${summary.tracksScanned} tracks)"
                 }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    isScanning = false,
-                    errorMessage = "Scan failed: ${e.localizedMessage ?: "Unknown error"}",
-                    statusMessage = null
-                )
+            ) {
+                audiobookRepository.scanDirectory(uri)
             }
         }
     }
 
     fun onRescanLibrary() {
         viewModelScope.launch(ioDispatcher) {
-            _state.value = _state.value.copy(isScanning = true, errorMessage = null, statusMessage = "Rescanning library...")
+            executeScan(
+                loadingMessage = "Rescanning library...",
+                failPrefix = "Rescan failed",
+                successFormatter = { summary ->
+                    "Rescan complete: ${summary.booksScanned} scanned, ${summary.tracksScanned} tracks"
+                },
+                nullSummaryError = "No audiobooks folder configured"
+            ) {
+                audiobookRepository.rescanLibrary()
+            }
+        }
+    }
+
+    private suspend fun executeScan(
+        loadingMessage: String,
+        failPrefix: String,
+        successFormatter: (ScanSummary) -> String,
+        nullSummaryError: String? = null,
+        scanAction: suspend () -> ScanSummary?
+    ) {
+        scanMutex.withLock {
+            _state.update {
+                it.copy(isScanning = true, errorMessage = null, statusMessage = loadingMessage)
+            }
             try {
-                val summary = audiobookRepository.rescanLibrary()
-                if (summary != null) {
-                    if (summary.errorMessage != null) {
-                        _state.value = _state.value.copy(
-                            isScanning = false,
-                            errorMessage = "Rescan failed: ${summary.errorMessage}",
-                            statusMessage = null
-                        )
-                    } else {
-                        _state.value = _state.value.copy(
-                            isScanning = false,
-                            statusMessage = "Rescan complete: ${summary.booksScanned} scanned, ${summary.tracksScanned} tracks"
-                        )
+                val summary = scanAction()
+                when {
+                    summary == null -> {
+                        _state.update {
+                            it.copy(
+                                isScanning = false,
+                                errorMessage = nullSummaryError ?: "$failPrefix: Unknown error",
+                                statusMessage = null
+                            )
+                        }
                     }
-                } else {
-                    _state.value = _state.value.copy(
-                        isScanning = false,
-                        errorMessage = "No audiobooks folder configured"
-                    )
+                    summary.errorMessage != null -> {
+                        _state.update {
+                            it.copy(
+                                isScanning = false,
+                                errorMessage = "$failPrefix: ${summary.errorMessage}",
+                                statusMessage = null
+                            )
+                        }
+                    }
+                    else -> {
+                        val baseMessage = successFormatter(summary)
+                        val message = if (summary.isLimitExceeded) {
+                            "$baseMessage. File limit (${AudiobookStorageScanner.MAX_FILES_LIMIT}) reached — some files and cleanup were skipped."
+                        } else {
+                            baseMessage
+                        }
+                        _state.update {
+                            it.copy(
+                                isScanning = false,
+                                statusMessage = message
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    isScanning = false,
-                    errorMessage = "Rescan failed: ${e.localizedMessage ?: "Unknown error"}",
-                    statusMessage = null
-                )
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _state.update {
+                    it.copy(
+                        isScanning = false,
+                        errorMessage = "$failPrefix: ${e.localizedMessage ?: "Unknown error"}",
+                        statusMessage = null
+                    )
+                }
             }
         }
     }
@@ -261,10 +308,12 @@ class AudiobooksViewModel @Inject constructor(
             } else {
                 playlistRepository.addAudiobookToPlaylist(bookId)
                 if (_state.value.selectedBookForModal?.id == bookId) {
-                    val tracks = audiobookRepository.getTracksForAudiobook(bookId)
+                    val selectedIds = audiobookRepository.getSelectedTracksForAudiobook(bookId)
+                        .map { it.id }
+                        .toSet()
                     _state.update { s ->
                         if (s.selectedBookForModal?.id == bookId) {
-                            s.copy(selectedBookPlaylistTrackIds = tracks.map { it.id }.toSet())
+                            s.copy(selectedBookPlaylistTrackIds = selectedIds)
                         } else s
                     }
                 }
@@ -274,7 +323,8 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun openBookModal(book: AudiobookEntity) {
-        viewModelScope.launch(ioDispatcher) {
+        modalTracksJob?.cancel()
+        modalTracksJob = viewModelScope.launch(ioDispatcher) {
             val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
             val selectedIds = if (inQueue) {
@@ -288,15 +338,33 @@ class AudiobooksViewModel @Inject constructor(
                 emptySet()
             }
 
-            _state.value = _state.value.copy(
-                selectedBookForModal = book,
-                selectedBookTracks = tracks,
-                selectedBookPlaylistTrackIds = selectedIds
-            )
+            _state.update {
+                it.copy(
+                    selectedBookForModal = book,
+                    selectedBookTracks = tracks,
+                    selectedBookPlaylistTrackIds = selectedIds
+                )
+            }
+
+            audiobookRepository.getTracksForAudiobookFlow(book.id).collect { updatedTracks ->
+                val availableIds = updatedTracks.mapTo(mutableSetOf()) { it.id }
+                _state.update { s ->
+                    if (s.selectedBookForModal?.id == book.id) {
+                        s.copy(
+                            selectedBookTracks = updatedTracks,
+                            selectedBookPlaylistTrackIds = s.selectedBookPlaylistTrackIds.intersect(availableIds)
+                        )
+                    } else {
+                        s
+                    }
+                }
+            }
         }
     }
 
     fun closeBookModal() {
+        modalTracksJob?.cancel()
+        modalTracksJob = null
         val currentBook = _state.value.selectedBookForModal
         currentBook?.let { book ->
             synchronized(syncChannelsLock) {
@@ -314,8 +382,7 @@ class AudiobooksViewModel @Inject constructor(
 
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
         val book = _state.value.selectedBookForModal ?: return
-        val previousSelected = _state.value.selectedBookPlaylistTrackIds
-        val currentSelected = previousSelected.toMutableSet()
+        val currentSelected = _state.value.selectedBookPlaylistTrackIds.toMutableSet()
 
         if (track.id in currentSelected) {
             currentSelected.remove(track.id)
@@ -329,8 +396,7 @@ class AudiobooksViewModel @Inject constructor(
         channel.trySend(
             ChapterSyncRequest(
                 bookId = book.id,
-                trackIds = currentSelected.toList(),
-                fallbackTrackIds = previousSelected
+                trackIds = currentSelected.toList()
             )
         )
     }
@@ -372,7 +438,7 @@ class AudiobooksViewModel @Inject constructor(
         ): List<FilemanagerItemUi> {
             if (audiobooks.isEmpty()) return emptyList()
 
-            val directoriesMap = mutableMapOf<String, String>()
+            val directoriesMap = mutableMapOf<String, Pair<String, String>>()
             val directBooks = mutableListOf<AudiobookEntity>()
 
             for (book in audiobooks) {
@@ -401,14 +467,16 @@ class AudiobooksViewModel @Inject constructor(
                     directBooks.add(book)
                 } else {
                     val subDirName = remaining.first()
-                    directoriesMap.putIfAbsent(subDirName, (currentPath + subDirName).joinToString("/"))
+                    directoriesMap.putIfAbsent(
+                        subDirName.lowercase(),
+                        subDirName to (currentPath + subDirName).joinToString("/")
+                    )
                 }
             }
 
-            val dirItems = directoriesMap.keys
-                .sortedWith(com.example.mpod.util.NaturalOrderComparator.INSTANCE)
-                .map { dirName ->
-                    val dirFullPath = directoriesMap[dirName] ?: dirName
+            val dirItems = directoriesMap.values
+                .sortedWith(com.example.mpod.util.NaturalOrderComparator.comparing { it.first })
+                .map { (dirName, dirFullPath) ->
                     FilemanagerItemUi(
                         id = "dir:$dirFullPath",
                         title = dirName,
