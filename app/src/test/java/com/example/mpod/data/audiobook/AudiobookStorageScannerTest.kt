@@ -392,11 +392,42 @@ class AudiobookStorageScannerTest {
 
     @Test
     fun scanFolder_withStandaloneAudioFileInAuthorFolder_extractsStandaloneBook(): Unit = runBlocking {
+        // Aligned with mpod: standalone audio file alongside a book subfolder in author directory
         fakeTreeHelper.childrenMap["root"] = listOf(
             DocumentItem("author_dir", "Стругацкие", "vnd.android.document/directory", 0L, isDirectory = true)
         )
         fakeTreeHelper.childrenMap["author_dir"] = listOf(
-            DocumentItem("standalone", "Хромая судьба.mp3", "audio/mpeg", 1000L, isDirectory = false)
+            DocumentItem("standalone", "Хромая судьба.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("sub_book", "Пикник на обочине", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["sub_book"] = listOf(
+            DocumentItem("sub_t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(2, summary.booksScanned)
+        assertEquals(2, summary.tracksScanned)
+
+        val standaloneBook = fakeAudiobookDao.upsertedBooks.first { it.isSingleFile }
+        assertEquals("Хромая судьба", standaloneBook.title)
+        assertEquals("Стругацкие", standaloneBook.author)
+        assertEquals("Стругацкие/Хромая судьба.mp3", standaloneBook.relativePath)
+        assertTrue(standaloneBook.isSingleFile)
+
+        val folderBook = fakeAudiobookDao.upsertedBooks.first { !it.isSingleFile }
+        assertEquals("Пикник на обочине", folderBook.title)
+        assertEquals("Стругацкие", folderBook.author)
+    }
+
+    @Test
+    fun scanFolder_singleFileInRootSubfolderWithoutAudioSubdirs_recognizesAsFolderBookWithCover(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dune", "Дюна", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dune"] = listOf(
+            DocumentItem("dune_audio", "Dune.m4b", "audio/mp4", 5000L, isDirectory = false),
+            DocumentItem("dune_cover", "cover.jpg", "image/jpeg", 2000L, isDirectory = false)
         )
 
         val summary = scanner.scanFolder(treeUri)
@@ -404,11 +435,85 @@ class AudiobookStorageScannerTest {
         assertEquals(1, summary.booksScanned)
         assertEquals(1, summary.tracksScanned)
 
-        val book = fakeAudiobookDao.upsertedBooks.first()
-        assertEquals("Хромая судьба", book.title)
-        assertEquals("Стругацкие", book.author)
-        assertEquals("Стругацкие/Хромая судьба.mp3", book.relativePath)
-        assertTrue(book.isSingleFile)
+        val book = fakeAudiobookDao.upsertedBooks.single()
+        assertEquals("Дюна", book.title)
+        assertEquals("Unknown Author", book.author)
+        assertEquals("Дюна", book.relativePath)
+        assertEquals("content://tree/dune_cover", book.coverUri)
+        assertFalse(book.isSingleFile)
+    }
+
+    @Test
+    fun scanFolder_bookFolderWithNonAudioSubdir_keepsBookIntact(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("author_dir", "Author", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["author_dir"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("t2", "02.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("extras_dir", "Extras", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["extras_dir"] = listOf(
+            DocumentItem("notes", "notes.txt", "text/plain", 100L, isDirectory = false)
+        )
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1, summary.booksScanned)
+        assertEquals(2, summary.tracksScanned)
+        val book = fakeAudiobookDao.upsertedBooks.single()
+        assertEquals("Book", book.title)
+        assertFalse(book.isSingleFile)
+    }
+
+    @Test
+    fun scanFolder_whenTrackRenamed_deletesOldTrackAndKeepsOnlyNewTrack(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t_old", "01-old.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        scanner.scanFolder(treeUri)
+        assertEquals(listOf("01-old"), fakeAudiobookDao.insertedTracks.map { it.title })
+
+        // Rename file in storage (new SAF docId & URI)
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t_new", "01-new.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        scanner.scanFolder(treeUri)
+
+        assertEquals(1, fakeAudiobookDao.insertedTracks.size)
+        assertEquals("01-new", fakeAudiobookDao.insertedTracks.single().title)
+        assertEquals("content://tree/t_new", fakeAudiobookDao.insertedTracks.single().fileUri)
+        assertTrue(fakeAudiobookDao.deletedEmptyPlaylistItemsCalled)
+    }
+
+    @Test
+    fun scanFolder_whenExternalCoverRemoved_clearsStaleContentCoverUri(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("book_dir", "Book", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false),
+            DocumentItem("cover_1", "cover.jpg", "image/jpeg", 500L, isDirectory = false)
+        )
+
+        scanner.scanFolder(treeUri)
+        assertEquals("content://tree/cover_1", fakeAudiobookDao.upsertedBooks.single().coverUri)
+
+        // Remove cover.jpg from directory
+        fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+
+        scanner.scanFolder(treeUri)
+        assertEquals(null, fakeAudiobookDao.upsertedBooks.single().coverUri)
     }
 
     @Test
@@ -538,6 +643,7 @@ class AudiobookStorageScannerTest {
             DocumentItem("book_dir", "Cached Book", "vnd.android.document/directory", 0L, isDirectory = true)
         )
         fakeTreeHelper.childrenMap["book_dir"] = listOf(
+            DocumentItem("cover_1", "cover.jpg", "image/jpeg", 500L, isDirectory = false),
             DocumentItem("t1", "01-Chapter.mp3", "audio/mpeg", 1000L, isDirectory = false, lastModified = 5000L),
             DocumentItem("t2", "02-Chapter.mp3", "audio/mpeg", 1200L, isDirectory = false, lastModified = 5000L)
         )
@@ -638,6 +744,8 @@ class AudiobookStorageScannerTest {
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()
+        var deletedEmptyPlaylistItemsCalled = false
+        private var nextTrackId = 1L
 
         override suspend fun upsertAudiobook(audiobook: AudiobookEntity): Long {
             val existing = getAudiobookByFolderUri(audiobook.folderUri)
@@ -683,7 +791,7 @@ class AudiobookStorageScannerTest {
         override fun getAudiobookByIdFlow(audiobookId: Long): Flow<AudiobookEntity?> = emptyFlow()
         override suspend fun getAudiobookByFolderUri(folderUri: String): AudiobookEntity? =
             upsertedBooks.find { it.folderUri == folderUri }
-        override suspend fun getAllAudiobooks(): List<AudiobookEntity> = emptyList()
+        override suspend fun getAllAudiobooks(): List<AudiobookEntity> = upsertedBooks.toList()
         override fun getAllAudiobooksFlow(): Flow<List<AudiobookEntity>> = emptyFlow()
         override suspend fun getAudiobookCount(): Int = upsertedBooks.size
 
@@ -698,13 +806,13 @@ class AudiobookStorageScannerTest {
         }
 
         override suspend fun insertTrack(track: AudiobookTrackEntity): Long {
-            insertedTracks.add(track)
-            return track.id
+            val assigned = if (track.id > 0L) track else track.copy(id = nextTrackId++)
+            insertedTracks.add(assigned)
+            return assigned.id
         }
 
         override suspend fun insertTracks(tracks: List<AudiobookTrackEntity>): List<Long> {
-            insertedTracks.addAll(tracks)
-            return tracks.map { it.id }
+            return tracks.map { insertTrack(it) }
         }
 
         override suspend fun updateTrack(track: AudiobookTrackEntity) {
@@ -739,7 +847,9 @@ class AudiobookStorageScannerTest {
         override suspend fun getSelectedTracksForAudiobook(audiobookId: Long): List<AudiobookTrackEntity> = emptyList()
         override fun getSelectedTracksForAudiobookFlow(audiobookId: Long): Flow<List<AudiobookTrackEntity>> = emptyFlow()
         override fun getPlaylistAudiobookTracksFlow(): Flow<List<AudiobookTrackEntity>> = emptyFlow()
-        override suspend fun deleteEmptyAudiobookPlaylistItems() {}
+        override suspend fun deleteEmptyAudiobookPlaylistItems() {
+            deletedEmptyPlaylistItemsCalled = true
+        }
         override suspend fun getFirstUnlistenedSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
         override suspend fun getFirstSelectedTrack(audiobookId: Long): AudiobookTrackEntity? = null
         override suspend fun getCurrentTrackForAudiobook(audiobookId: Long): AudiobookTrackEntity? = null

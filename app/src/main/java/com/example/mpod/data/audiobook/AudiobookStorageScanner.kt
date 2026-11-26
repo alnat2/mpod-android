@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.room.withTransaction
+import com.example.mpod.data.local.MpodDatabase
 import com.example.mpod.data.local.dao.AudiobookDao
 import com.example.mpod.data.local.entity.AudiobookEntity
 import com.example.mpod.data.local.entity.AudiobookTrackEntity
@@ -13,6 +15,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.MessageDigest
@@ -37,13 +41,30 @@ internal data class DocumentItem(
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Singleton
-class AudiobookStorageScanner @Inject constructor(
-    @ApplicationContext private val context: Context,
+class AudiobookStorageScanner internal constructor(
+    private val context: Context,
     private val audiobookDao: AudiobookDao,
     private val metadataExtractor: AudioMetadataExtractor
 ) {
+    private var database: MpodDatabase? = null
+
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        audiobookDao: AudiobookDao,
+        metadataExtractor: AudioMetadataExtractor,
+        database: MpodDatabase
+    ) : this(context, audiobookDao, metadataExtractor) {
+        this.database = database
+    }
 
     internal var treeHelper: DocumentTreeHelper = DefaultDocumentTreeHelper()
+    private val scanMutex = Mutex()
+
+    private suspend fun <T> runInTransaction(block: suspend () -> T): T {
+        val db = database
+        return if (db != null) db.withTransaction { block() } else block()
+    }
 
     companion object {
         const val MAX_FILES_LIMIT = 2000
@@ -64,44 +85,76 @@ class AudiobookStorageScanner @Inject constructor(
     )
 
     suspend fun scanFolder(treeUri: Uri): ScanSummary = withContext(Dispatchers.IO) {
-        val contentResolver = context.contentResolver
-        val counter = ScanCounter()
-        val scannedFolderUris = mutableSetOf<String>()
+        scanMutex.withLock {
+            val contentResolver = context.contentResolver
+            val counter = ScanCounter()
+            val scannedFolderUris = mutableSetOf<String>()
+            val childrenCache = mutableMapOf<String, List<DocumentItem>>()
 
-        try {
-            val rootDocId = treeHelper.getTreeDocumentId(treeUri)
-            scanDirectoryRecursively(
-                contentResolver = contentResolver,
-                treeUri = treeUri,
-                dirDocId = rootDocId,
-                currentPath = emptyList(),
-                counter = counter,
-                scannedFolderUris = scannedFolderUris
-            )
+            try {
+                val rootDocId = treeHelper.getTreeDocumentId(treeUri)
+                scanDirectoryRecursively(
+                    contentResolver = contentResolver,
+                    treeUri = treeUri,
+                    dirDocId = rootDocId,
+                    currentPath = emptyList(),
+                    counter = counter,
+                    scannedFolderUris = scannedFolderUris,
+                    childrenCache = childrenCache
+                )
 
-            if (!counter.limitExceeded) {
-                if (scannedFolderUris.isEmpty()) {
-                    audiobookDao.deleteAllAudiobooks()
-                } else {
-                    audiobookDao.deleteAudiobooksNotIn(scannedFolderUris.toList())
+                if (!counter.limitExceeded) {
+                    runInTransaction {
+                        if (scannedFolderUris.isEmpty()) {
+                            audiobookDao.deleteAllAudiobooks()
+                        } else {
+                            audiobookDao.deleteAudiobooksNotIn(scannedFolderUris.toList())
+                        }
+                        audiobookDao.deleteEmptyAudiobookPlaylistItems()
+                    }
+                    cleanupOrphanedCoverCache()
                 }
-            }
 
-            ScanSummary(
-                booksScanned = counter.booksCount,
-                tracksScanned = counter.tracksCount,
-                isLimitExceeded = counter.limitExceeded
-            )
-        } catch (e: Exception) {
-            ScanSummary(
-                booksScanned = counter.booksCount,
-                tracksScanned = counter.tracksCount,
-                isLimitExceeded = counter.limitExceeded,
-                errorMessage = e.message?.takeIf { it.isNotBlank() }
-                    ?: e.localizedMessage?.takeIf { it.isNotBlank() }
-                    ?: "Storage access error (${e.javaClass.simpleName})"
-            )
+                ScanSummary(
+                    booksScanned = counter.booksCount,
+                    tracksScanned = counter.tracksCount,
+                    isLimitExceeded = counter.limitExceeded
+                )
+            } catch (e: Exception) {
+                ScanSummary(
+                    booksScanned = counter.booksCount,
+                    tracksScanned = counter.tracksCount,
+                    isLimitExceeded = counter.limitExceeded,
+                    errorMessage = e.message?.takeIf { it.isNotBlank() }
+                        ?: e.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: "Storage access error (${e.javaClass.simpleName})"
+                )
+            }
         }
+    }
+
+    private fun queryChildrenCached(
+        contentResolver: ContentResolver,
+        treeUri: Uri,
+        dirDocId: String,
+        childrenCache: MutableMap<String, List<DocumentItem>>
+    ): List<DocumentItem> {
+        return childrenCache.getOrPut(dirDocId) {
+            treeHelper.queryChildren(contentResolver, treeUri, dirDocId)
+        }
+    }
+
+    private fun dirContainsAudio(
+        contentResolver: ContentResolver,
+        treeUri: Uri,
+        dirDocId: String,
+        childrenCache: MutableMap<String, List<DocumentItem>>,
+        visited: MutableSet<String> = mutableSetOf()
+    ): Boolean {
+        if (!visited.add(dirDocId)) return false
+        val children = queryChildrenCached(contentResolver, treeUri, dirDocId, childrenCache)
+        if (children.any { isAudioFile(it) }) return true
+        return children.any { it.isDirectory && dirContainsAudio(contentResolver, treeUri, it.docId, childrenCache, visited) }
     }
 
     private suspend fun scanDirectoryRecursively(
@@ -110,14 +163,15 @@ class AudiobookStorageScanner @Inject constructor(
         dirDocId: String,
         currentPath: List<String>,
         counter: ScanCounter,
-        scannedFolderUris: MutableSet<String>
+        scannedFolderUris: MutableSet<String>,
+        childrenCache: MutableMap<String, List<DocumentItem>>
     ) {
         if (counter.limitExceeded || counter.filesEvaluated >= MAX_FILES_LIMIT) {
             counter.limitExceeded = true
             return
         }
 
-        val children = treeHelper.queryChildren(contentResolver, treeUri, dirDocId)
+        val children = queryChildrenCached(contentResolver, treeUri, dirDocId, childrenCache)
         val directAudioFiles = children
             .filter { isAudioFile(it) }
             .sortedWith(NaturalOrderComparator.comparing { it.name })
@@ -153,7 +207,7 @@ class AudiobookStorageScanner @Inject constructor(
             }
 
             // 2. Subdirectories in root
-            for (subDir in nonDiscSubDirs) {
+            for (subDir in subDirs) {
                 if (counter.limitExceeded || counter.filesEvaluated >= MAX_FILES_LIMIT) {
                     counter.limitExceeded = true
                     return
@@ -164,15 +218,18 @@ class AudiobookStorageScanner @Inject constructor(
                     dirDocId = subDir.docId,
                     currentPath = listOf(subDir.name),
                     counter = counter,
-                    scannedFolderUris = scannedFolderUris
+                    scannedFolderUris = scannedFolderUris,
+                    childrenCache = childrenCache
                 )
             }
         } else {
-            val isBookFolder = if (currentPath.size > 1) {
-                (directAudioFiles.isNotEmpty() || discFolders.isNotEmpty()) && nonDiscSubDirs.isEmpty()
-            } else {
-                (directAudioFiles.size > 1 || discFolders.isNotEmpty()) && nonDiscSubDirs.isEmpty()
+            // Aligned with mpod: a non-root directory containing audio (or disc folders) and no non-disc
+            // subdirectories with audio is treated as a book folder, even if it holds only a single file
+            // or non-audio subdirectories (e.g. Extras/Artwork).
+            val hasSubdirWithAudio = nonDiscSubDirs.any {
+                dirContainsAudio(contentResolver, treeUri, it.docId, childrenCache)
             }
+            val isBookFolder = (directAudioFiles.isNotEmpty() || discFolders.isNotEmpty()) && !hasSubdirWithAudio
 
             if (isBookFolder) {
                 // Folder-backed book
@@ -193,7 +250,8 @@ class AudiobookStorageScanner @Inject constructor(
                     directChildren = children,
                     authorFallback = author,
                     relativePath = relativePath,
-                    currentFileCount = counter.filesEvaluated
+                    currentFileCount = counter.filesEvaluated,
+                    childrenCache = childrenCache
                 )
 
                 counter.filesEvaluated += bookResult.tracksProcessed
@@ -207,7 +265,7 @@ class AudiobookStorageScanner @Inject constructor(
                     counter.limitExceeded = true
                 }
             } else {
-                // Collection directory or folder with standalone files
+                // Collection directory or folder with standalone files alongside book subdirectories
                 for (audioFile in directAudioFiles) {
                     if (counter.filesEvaluated >= MAX_FILES_LIMIT) {
                         counter.limitExceeded = true
@@ -243,7 +301,8 @@ class AudiobookStorageScanner @Inject constructor(
                         dirDocId = subDir.docId,
                         currentPath = currentPath + subDir.name,
                         counter = counter,
-                        scannedFolderUris = scannedFolderUris
+                        scannedFolderUris = scannedFolderUris,
+                        childrenCache = childrenCache
                     )
                 }
             }
@@ -251,15 +310,17 @@ class AudiobookStorageScanner @Inject constructor(
     }
 
     suspend fun scanSingleAudioFile(fileUri: Uri): AudiobookEntity? = withContext(Dispatchers.IO) {
-        val (displayName, size, lastModified) = queryFileInfo(context.contentResolver, fileUri)
-        scanSingleTrackAsBook(
-            fileUri = fileUri,
-            displayName = displayName,
-            authorFallback = "Unknown Author",
-            relativePath = displayName,
-            fileSize = size,
-            lastModified = lastModified
-        )
+        scanMutex.withLock {
+            val (displayName, size, lastModified) = queryFileInfo(context.contentResolver, fileUri)
+            scanSingleTrackAsBook(
+                fileUri = fileUri,
+                displayName = displayName,
+                authorFallback = "Unknown Author",
+                relativePath = displayName,
+                fileSize = size,
+                lastModified = lastModified
+            )
+        }
     }
 
     internal suspend fun processBookFolder(
@@ -269,7 +330,8 @@ class AudiobookStorageScanner @Inject constructor(
         directChildren: List<DocumentItem>,
         authorFallback: String,
         relativePath: String = bookDir.name,
-        currentFileCount: Int
+        currentFileCount: Int,
+        childrenCache: MutableMap<String, List<DocumentItem>>? = null
     ): BookProcessResult {
         // 1. Collect direct root audio files and sort naturally
         val directAudioFiles = directChildren
@@ -285,7 +347,11 @@ class AudiobookStorageScanner @Inject constructor(
         val discAudioFiles = mutableListOf<DocumentItem>()
 
         for (discDir in discFolders) {
-            val discChildren = treeHelper.queryChildren(contentResolver, treeUri, discDir.docId)
+            val discChildren = if (childrenCache != null) {
+                queryChildrenCached(contentResolver, treeUri, discDir.docId, childrenCache)
+            } else {
+                treeHelper.queryChildren(contentResolver, treeUri, discDir.docId)
+            }
             discChildrenMap[discDir] = discChildren
             val sortedChildrenAudio = discChildren
                 .filter { isAudioFile(it) }
@@ -323,47 +389,29 @@ class AudiobookStorageScanner @Inject constructor(
 
         val bookFolderUri = treeHelper.buildDocumentUri(treeUri, bookDir.docId).toString()
         val existingBook = audiobookDao.getAudiobookByFolderUri(bookFolderUri)
+        val existingTracks = if (existingBook != null) {
+            audiobookDao.getAllTracksForAudiobook(existingBook.id)
+        } else {
+            emptyList()
+        }
+        val existingByFileUri = existingTracks.associateBy { it.fileUri }
 
         var coverUriString: String? = null
         if (coverFile != null) {
             coverUriString = treeHelper.buildDocumentUri(treeUri, coverFile.docId).toString()
         } else if (existingBook?.coverUri != null) {
+            // Only preserve local cached cover files when no external cover file is present;
+            // an old content:// cover URI means the external cover file was removed.
             val existingCover = existingBook.coverUri
-            val isCoverValid = when {
+            val isCachedCoverValid = when {
                 existingCover.startsWith("file://") -> File(Uri.parse(existingCover).path ?: "").exists()
                 existingCover.startsWith("/") -> File(existingCover).exists()
-                else -> true
+                else -> false
             }
-            if (isCoverValid) {
+            if (isCachedCoverValid) {
                 coverUriString = existingCover
             }
         }
-
-        val bookTitle = bookDir.name
-        val bookAuthor = authorFallback.ifBlank { "Unknown Author" }
-
-        val bookEntity = AudiobookEntity(
-            id = existingBook?.id ?: 0L,
-            title = bookTitle,
-            author = bookAuthor,
-            folderUri = bookFolderUri,
-            coverUri = coverUriString,
-            durationSeconds = existingBook?.durationSeconds ?: 0L,
-            isSingleFile = sortedAudioFiles.size == 1,
-            addedAt = existingBook?.addedAt ?: System.currentTimeMillis(),
-            relativePath = relativePath
-        )
-        val bookId = if (existingBook != null) {
-            audiobookDao.updateAudiobook(bookEntity)
-            existingBook.id
-        } else {
-            val insertedId = audiobookDao.insertAudiobook(bookEntity)
-            if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(bookFolderUri)?.id ?: -1L)
-        }
-
-        // Sync tracks
-        val existingTracks = audiobookDao.getTracksForAudiobook(bookId)
-        val existingByFileUri = existingTracks.associateBy { it.fileUri }
 
         val firstTrackDocUri = treeHelper.buildDocumentUri(treeUri, sortedAudioFiles[0].docId)
         val firstTrackUriString = firstTrackDocUri.toString()
@@ -421,68 +469,92 @@ class AudiobookStorageScanner @Inject constructor(
         }
 
         val processedFileUris = mutableSetOf<String>()
-        val tracksToInsert = mutableListOf<AudiobookTrackEntity>()
-        val tracksToUpdate = mutableListOf<AudiobookTrackEntity>()
         var totalBookDuration = 0L
 
-        trackScanResults.forEachIndexed { index, result ->
+        trackScanResults.forEach { result ->
             processedFileUris.add(result.trackUriString)
             val duration = if (result.durationSeconds > 0) result.durationSeconds else (result.existing?.durationSeconds ?: 0L)
             totalBookDuration += duration
+        }
 
-            if (result.existing != null) {
-                tracksToUpdate.add(
-                    result.existing.copy(
-                        title = result.trackTitle,
-                        trackNumber = index + 1,
-                        durationSeconds = duration,
-                        fileSizeBytes = result.audioItem.size,
-                        lastModifiedMs = result.audioItem.lastModified,
-                        isAvailable = true
-                    )
-                )
+        val bookTitle = bookDir.name
+        val bookAuthor = authorFallback.ifBlank { "Unknown Author" }
+        val finalDuration = if (totalBookDuration > 0) totalBookDuration else (existingBook?.durationSeconds ?: 0L)
+
+        val bookEntity = AudiobookEntity(
+            id = existingBook?.id ?: 0L,
+            title = bookTitle,
+            author = bookAuthor,
+            folderUri = bookFolderUri,
+            coverUri = coverUriString,
+            durationSeconds = finalDuration,
+            isSingleFile = false,
+            addedAt = existingBook?.addedAt ?: System.currentTimeMillis(),
+            relativePath = relativePath
+        )
+
+        val missingTrackIds = if (!limitExceeded) {
+            existingTracks
+                .filter { it.fileUri !in processedFileUris }
+                .map { it.id }
+        } else {
+            emptyList()
+        }
+
+        runInTransaction {
+            val bookId = if (existingBook != null) {
+                audiobookDao.updateAudiobook(bookEntity)
+                existingBook.id
             } else {
-                tracksToInsert.add(
-                    AudiobookTrackEntity(
-                        audiobookId = bookId,
-                        title = result.trackTitle,
-                        fileUri = result.trackUriString,
-                        trackNumber = index + 1,
-                        durationSeconds = duration,
-                        playbackPositionMs = 0L,
-                        isListened = false,
-                        isAvailable = true,
-                        fileSizeBytes = result.audioItem.size,
-                        lastModifiedMs = result.audioItem.lastModified
+                val insertedId = audiobookDao.insertAudiobook(bookEntity)
+                if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(bookFolderUri)?.id ?: -1L)
+            }
+
+            val tracksToInsert = mutableListOf<AudiobookTrackEntity>()
+            val tracksToUpdate = mutableListOf<AudiobookTrackEntity>()
+
+            trackScanResults.forEachIndexed { index, result ->
+                val duration = if (result.durationSeconds > 0) result.durationSeconds else (result.existing?.durationSeconds ?: 0L)
+                if (result.existing != null) {
+                    tracksToUpdate.add(
+                        result.existing.copy(
+                            title = result.trackTitle,
+                            trackNumber = index + 1,
+                            durationSeconds = duration,
+                            fileSizeBytes = result.audioItem.size,
+                            lastModifiedMs = result.audioItem.lastModified,
+                            isAvailable = true
+                        )
                     )
-                )
+                } else {
+                    tracksToInsert.add(
+                        AudiobookTrackEntity(
+                            audiobookId = bookId,
+                            title = result.trackTitle,
+                            fileUri = result.trackUriString,
+                            trackNumber = index + 1,
+                            durationSeconds = duration,
+                            playbackPositionMs = 0L,
+                            isListened = false,
+                            isAvailable = true,
+                            fileSizeBytes = result.audioItem.size,
+                            lastModifiedMs = result.audioItem.lastModified
+                        )
+                    )
+                }
             }
-        }
 
-        if (tracksToInsert.isNotEmpty()) {
-            audiobookDao.insertTracks(tracksToInsert)
-        }
-        if (tracksToUpdate.isNotEmpty()) {
-            audiobookDao.updateTracks(tracksToUpdate)
-        }
-
-        // Rescan: mark tracks previously in DB that were removed from storage as unavailable
-        for (existing in existingTracks) {
-            if (existing.fileUri !in processedFileUris && existing.isAvailable) {
-                audiobookDao.updateTrackAvailability(existing.id, isAvailable = false)
+            if (tracksToInsert.isNotEmpty()) {
+                audiobookDao.insertTracks(tracksToInsert)
             }
-        }
-
-        // Update total book duration & cover if changed
-        val updatedCover = coverUriString
-        if (totalBookDuration > 0 || updatedCover != bookEntity.coverUri) {
-            audiobookDao.updateAudiobook(
-                bookEntity.copy(
-                    id = bookId,
-                    coverUri = updatedCover,
-                    durationSeconds = if (totalBookDuration > 0) totalBookDuration else bookEntity.durationSeconds
-                )
-            )
+            if (tracksToUpdate.isNotEmpty()) {
+                audiobookDao.updateTracks(tracksToUpdate)
+            }
+            if (missingTrackIds.isNotEmpty()) {
+                missingTrackIds.chunked(500).forEach { chunk ->
+                    audiobookDao.deleteTracksByIds(chunk)
+                }
+            }
         }
 
         return BookProcessResult(
@@ -500,7 +572,7 @@ class AudiobookStorageScanner @Inject constructor(
         lastModified: Long = 0L
     ): AudiobookEntity? {
         val existingBook = audiobookDao.getAudiobookByFolderUri(fileUri.toString())
-        val existingTracks = if (existingBook != null) audiobookDao.getTracksForAudiobook(existingBook.id) else emptyList()
+        val existingTracks = if (existingBook != null) audiobookDao.getAllTracksForAudiobook(existingBook.id) else emptyList()
         val existing = existingTracks.firstOrNull { it.fileUri == fileUri.toString() }
 
         val isTrackUnchanged = existing != null &&
@@ -515,7 +587,7 @@ class AudiobookStorageScanner @Inject constructor(
             existingCover == null -> false
             existingCover.startsWith("file://") -> File(Uri.parse(existingCover).path ?: "").exists()
             existingCover.startsWith("/") -> File(existingCover).exists()
-            else -> true
+            else -> false
         }
 
         var coverUriString: String? = if (isCoverValid) existingCover else null
@@ -524,11 +596,15 @@ class AudiobookStorageScanner @Inject constructor(
         if (isTrackUnchanged && coverUriString != null) {
             duration = existing.durationSeconds
         } else {
-            val needPicture = (coverUriString == null)
+            val needPicture = !isTrackUnchanged || coverUriString == null
             val metadata = metadataExtractor.extract(fileUri, includePicture = needPicture)
             duration = metadata?.durationSeconds ?: existing?.durationSeconds ?: 0L
-            if (coverUriString == null && metadata?.embeddedPicture != null) {
-                coverUriString = saveCoverToCache(fileUri.toString(), metadata.embeddedPicture)
+            if (needPicture) {
+                if (metadata?.embeddedPicture != null) {
+                    coverUriString = saveCoverToCache(fileUri.toString(), metadata.embeddedPicture)
+                } else if (!isTrackUnchanged && metadata != null) {
+                    coverUriString = null
+                }
             }
         }
 
@@ -546,42 +622,70 @@ class AudiobookStorageScanner @Inject constructor(
             addedAt = existingBook?.addedAt ?: System.currentTimeMillis(),
             relativePath = relativePath
         )
-        val bookId = if (existingBook != null) {
-            audiobookDao.updateAudiobook(bookEntity)
-            existingBook.id
-        } else {
-            val insertedId = audiobookDao.insertAudiobook(bookEntity)
-            if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(fileUri.toString())?.id ?: -1L)
-        }
 
-        if (existing != null) {
-            audiobookDao.updateTrack(
-                existing.copy(
-                    title = title,
-                    durationSeconds = duration,
-                    fileSizeBytes = fileSize,
-                    lastModifiedMs = lastModified,
-                    isAvailable = true
-                )
-            )
-        } else {
-            audiobookDao.insertTrack(
-                AudiobookTrackEntity(
-                    audiobookId = bookId,
-                    title = title,
-                    fileUri = fileUri.toString(),
-                    trackNumber = 1,
-                    durationSeconds = duration,
-                    playbackPositionMs = 0L,
-                    isListened = false,
-                    isAvailable = true,
-                    fileSizeBytes = fileSize,
-                    lastModifiedMs = lastModified
-                )
-            )
-        }
+        return runInTransaction {
+            val bookId = if (existingBook != null) {
+                audiobookDao.updateAudiobook(bookEntity)
+                existingBook.id
+            } else {
+                val insertedId = audiobookDao.insertAudiobook(bookEntity)
+                if (insertedId > 0) insertedId else (audiobookDao.getAudiobookByFolderUri(fileUri.toString())?.id ?: -1L)
+            }
 
-        return bookEntity.copy(id = bookId)
+            if (existing != null) {
+                audiobookDao.updateTrack(
+                    existing.copy(
+                        title = title,
+                        durationSeconds = duration,
+                        fileSizeBytes = fileSize,
+                        lastModifiedMs = lastModified,
+                        isAvailable = true
+                    )
+                )
+            } else {
+                audiobookDao.insertTrack(
+                    AudiobookTrackEntity(
+                        audiobookId = bookId,
+                        title = title,
+                        fileUri = fileUri.toString(),
+                        trackNumber = 1,
+                        durationSeconds = duration,
+                        playbackPositionMs = 0L,
+                        isListened = false,
+                        isAvailable = true,
+                        fileSizeBytes = fileSize,
+                        lastModifiedMs = lastModified
+                    )
+                )
+            }
+
+            bookEntity.copy(id = bookId)
+        }
+    }
+
+    private suspend fun cleanupOrphanedCoverCache() {
+        try {
+            val cacheDir = File(context.cacheDir, "audiobook_covers")
+            if (!cacheDir.exists() || !cacheDir.isDirectory) return
+            val retainedFileNames = audiobookDao.getAllAudiobooks()
+                .mapNotNull { book ->
+                    val cover = book.coverUri ?: return@mapNotNull null
+                    when {
+                        cover.startsWith("file://") -> Uri.parse(cover).path?.let { File(it).name }
+                        cover.startsWith("/") -> File(cover).name
+                        else -> null
+                    }
+                }
+                .toSet()
+
+            cacheDir.listFiles()?.forEach { file ->
+                if (file.isFile && file.name.startsWith("cover_") && file.name !in retainedFileNames) {
+                    file.delete()
+                }
+            }
+        } catch (_: Exception) {
+            // Best-effort cache cleanup
+        }
     }
 
     private fun queryFileInfo(contentResolver: ContentResolver, uri: Uri): Triple<String, Long, Long> {
