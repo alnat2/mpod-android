@@ -728,4 +728,41 @@ class AudiobooksViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun toggleBookPlaylist_whenAddReturnsFalse_keepsModalSelectionEmpty() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val book = AudiobookEntity(id = 10L, folderUri = "uri://book10", title = "Book 10")
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(book)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(emptyList())
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(emptyList()))
+            `when`(playlistRepository.addAudiobookToPlaylist(10L)).thenReturn(false)
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            viewModel.openBookModal(book)
+            advanceUntilIdle()
+
+            viewModel.toggleBookPlaylist(10L)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }

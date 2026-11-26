@@ -104,15 +104,29 @@ class AudiobookStorageScanner internal constructor(
                 )
 
                 if (!counter.limitExceeded) {
+                    val staleBookIds = if (scannedFolderUris.isEmpty()) {
+                        emptyList()
+                    } else {
+                        audiobookDao.getAllAudiobooks()
+                            .filter { it.folderUri !in scannedFolderUris }
+                            .map { it.id }
+                    }
                     runInTransaction {
                         if (scannedFolderUris.isEmpty()) {
                             audiobookDao.deleteAllAudiobooks()
-                        } else {
-                            audiobookDao.deleteAudiobooksNotIn(scannedFolderUris.toList())
+                        } else if (staleBookIds.isNotEmpty()) {
+                            staleBookIds.chunked(500).forEach { chunk ->
+                                audiobookDao.deleteAudiobooksByIds(chunk)
+                            }
                         }
                         audiobookDao.deleteEmptyAudiobookPlaylistItems()
                     }
                     cleanupOrphanedCoverCache()
+                } else {
+                    // Books scanned prior to hitting MAX_FILES_LIMIT may have had missing tracks pruned.
+                    runInTransaction {
+                        audiobookDao.deleteEmptyAudiobookPlaylistItems()
+                    }
                 }
 
                 ScanSummary(
@@ -121,6 +135,7 @@ class AudiobookStorageScanner internal constructor(
                     isLimitExceeded = counter.limitExceeded
                 )
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 ScanSummary(
                     booksScanned = counter.booksCount,
                     tracksScanned = counter.tracksCount,
@@ -290,7 +305,7 @@ class AudiobookStorageScanner internal constructor(
                     }
                 }
 
-                for (subDir in nonDiscSubDirs) {
+                for (subDir in subDirs) {
                     if (counter.limitExceeded || counter.filesEvaluated >= MAX_FILES_LIMIT) {
                         counter.limitExceeded = true
                         return
@@ -423,13 +438,17 @@ class AudiobookStorageScanner internal constructor(
             sortedAudioFiles[0].lastModified > 0L &&
             firstExisting.lastModifiedMs == sortedAudioFiles[0].lastModified
 
-        val needPicture = (coverUriString == null)
+        val needPicture = (coverFile == null) && (coverUriString == null || !isFirstTrackUnchanged)
         val firstMetadata = if (needPicture || !isFirstTrackUnchanged) {
             metadataExtractor.extract(firstTrackDocUri, includePicture = needPicture)
         } else null
 
-        if (coverUriString == null && firstMetadata?.embeddedPicture != null) {
-            coverUriString = saveCoverToCache(bookDir.docId, firstMetadata.embeddedPicture)
+        if (needPicture) {
+            if (firstMetadata?.embeddedPicture != null) {
+                coverUriString = saveCoverToCache(bookDir.docId, firstMetadata.embeddedPicture)
+            } else if (!isFirstTrackUnchanged && firstMetadata != null) {
+                coverUriString = null
+            }
         }
 
         val scanDispatcher = Dispatchers.IO.limitedParallelism(4)

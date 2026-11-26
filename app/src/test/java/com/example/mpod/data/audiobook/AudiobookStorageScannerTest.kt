@@ -741,6 +741,44 @@ class AudiobookStorageScannerTest {
         assertTrue(fakeMetadataExtractor.extractCallCount > 0)
     }
 
+    @Test
+    fun scanFolder_withOver1000Books_deletesStaleBooksInChunksWithoutSingleNotInOverflow(): Unit = runBlocking {
+        // Pre-populate DB with 1 stale book
+        fakeAudiobookDao.upsertedBooks.add(
+            AudiobookEntity(id = 9999L, title = "Stale Book", folderUri = "content://tree/stale")
+        )
+        // 1,100 standalone audio files (< MAX_FILES_LIMIT 2000, > SQLite 999 bind limit)
+        fakeTreeHelper.childrenMap["root"] = (1..1100).map { idx ->
+            DocumentItem("file_$idx", "Book $idx.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        }
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertEquals(1100, summary.booksScanned)
+        assertFalse(summary.isLimitExceeded)
+        assertEquals(1100, fakeAudiobookDao.upsertedBooks.size)
+        assertFalse(fakeAudiobookDao.upsertedBooks.any { it.folderUri == "content://tree/stale" })
+    }
+
+    @Test
+    fun scanFolder_whenLimitExceeded_stillPrunesEmptyPlaylistItems(): Unit = runBlocking {
+        fakeTreeHelper.childrenMap["root"] = listOf(
+            DocumentItem("dir_1", "Book 1", "vnd.android.document/directory", 0L, isDirectory = true),
+            DocumentItem("dir_2", "Book 2", "vnd.android.document/directory", 0L, isDirectory = true)
+        )
+        fakeTreeHelper.childrenMap["dir_1"] = listOf(
+            DocumentItem("t1", "01.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        )
+        fakeTreeHelper.childrenMap["dir_2"] = (1..2000).map { idx ->
+            DocumentItem("b2_$idx", "$idx.mp3", "audio/mpeg", 1000L, isDirectory = false)
+        }
+
+        val summary = scanner.scanFolder(treeUri)
+
+        assertTrue(summary.isLimitExceeded)
+        assertTrue(fakeAudiobookDao.deletedEmptyPlaylistItemsCalled)
+    }
+
     internal class FakeAudiobookDao : AudiobookDao {
         val upsertedBooks = mutableListOf<AudiobookEntity>()
         val insertedTracks = mutableListOf<AudiobookTrackEntity>()
@@ -786,6 +824,9 @@ class AudiobookStorageScannerTest {
         }
         override suspend fun deleteAudiobooksNotIn(retainedFolderUris: List<String>) {
             upsertedBooks.removeAll { it.folderUri !in retainedFolderUris }
+        }
+        override suspend fun deleteAudiobooksByIds(audiobookIds: List<Long>) {
+            upsertedBooks.removeAll { it.id in audiobookIds }
         }
         override suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity? = null
         override fun getAudiobookByIdFlow(audiobookId: Long): Flow<AudiobookEntity?> = emptyFlow()

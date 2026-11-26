@@ -41,6 +41,9 @@ interface AudiobookDao {
     @Query("DELETE FROM audiobooks WHERE folderUri NOT IN (:retainedFolderUris)")
     suspend fun deleteAudiobooksNotIn(retainedFolderUris: List<String>)
 
+    @Query("DELETE FROM audiobooks WHERE id IN (:audiobookIds)")
+    suspend fun deleteAudiobooksByIds(audiobookIds: List<Long>)
+
     @Query("SELECT * FROM audiobooks WHERE id = :audiobookId")
     suspend fun getAudiobookById(audiobookId: Long): AudiobookEntity?
 

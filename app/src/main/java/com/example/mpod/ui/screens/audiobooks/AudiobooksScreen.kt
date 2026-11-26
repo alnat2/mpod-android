@@ -137,8 +137,7 @@ fun AudiobooksScreen(
                     MpodStatusBanner(
                         message = state.errorMessage,
                         type = StatusBannerType.Error,
-                        actionLabel = "Dismiss",
-                        onAction = onDismissError,
+                        onDismiss = onDismissError,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }

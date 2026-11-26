@@ -70,39 +70,41 @@ class PlaylistRepository(
         }
 
     suspend fun getPlayableItems(): List<PlayableItem> = withContext(Dispatchers.IO) {
-        val allItems = playlistDao.getAllPlaylistItems()
-        if (allItems.isEmpty()) return@withContext emptyList()
+        runInTransaction {
+            val allItems = playlistDao.getAllPlaylistItems()
+            if (allItems.isEmpty()) return@runInTransaction emptyList()
 
-        val episodes = playlistDao.getPlaylistItemsWithEpisodes().associateBy { it.playlistItemId }
-        val audiobooks = playlistDao.getPlaylistItemsWithAudiobooks().associateBy { it.playlistItemId }
+            val episodes = playlistDao.getPlaylistItemsWithEpisodes().associateBy { it.playlistItemId }
+            val audiobooks = playlistDao.getPlaylistItemsWithAudiobooks().associateBy { it.playlistItemId }
 
-        allItems.mapNotNull { item ->
-            when {
-                item.episodeId != null -> {
-                    episodes[item.id]?.let { epItem ->
-                        PlayableItem.EpisodeItem(
-                            playlistItemId = item.id,
-                            position = item.position,
-                            episode = epItem.episode,
-                            podcastTitle = epItem.podcastTitle,
-                            podcastArtworkUrl = epItem.podcastArtworkUrl
-                        )
+            allItems.mapNotNull { item ->
+                when {
+                    item.episodeId != null -> {
+                        episodes[item.id]?.let { epItem ->
+                            PlayableItem.EpisodeItem(
+                                playlistItemId = item.id,
+                                position = item.position,
+                                episode = epItem.episode,
+                                podcastTitle = epItem.podcastTitle,
+                                podcastArtworkUrl = epItem.podcastArtworkUrl
+                            )
+                        }
                     }
-                }
-                item.audiobookId != null -> {
-                    audiobooks[item.id]?.let { abkItem ->
-                        val selectedTracks = audiobookDao.getSelectedTracksForAudiobook(abkItem.audiobook.id)
-                        val currentTrack = audiobookDao.getCurrentTrackForAudiobook(abkItem.audiobook.id)
-                        PlayableItem.AudiobookItem(
-                            playlistItemId = item.id,
-                            position = item.position,
-                            audiobook = abkItem.audiobook,
-                            selectedTracks = selectedTracks,
-                            currentTrack = currentTrack
-                        )
+                    item.audiobookId != null -> {
+                        audiobooks[item.id]?.let { abkItem ->
+                            val selectedTracks = audiobookDao.getSelectedTracksForAudiobook(abkItem.audiobook.id)
+                            val currentTrack = audiobookDao.getCurrentTrackForAudiobook(abkItem.audiobook.id)
+                            PlayableItem.AudiobookItem(
+                                playlistItemId = item.id,
+                                position = item.position,
+                                audiobook = abkItem.audiobook,
+                                selectedTracks = selectedTracks,
+                                currentTrack = currentTrack
+                            )
+                        }
                     }
+                    else -> null
                 }
-                else -> null
             }
         }
     }
@@ -117,10 +119,16 @@ class PlaylistRepository(
 
     suspend fun syncAudiobookSelection(audiobookId: Long, trackIds: List<Long>): Boolean = withContext(Dispatchers.IO) {
         runInTransaction {
-            if (trackIds.isNotEmpty()) {
+            val availableTrackIds = if (trackIds.isNotEmpty()) {
+                audiobookDao.getTracksForAudiobook(audiobookId).mapTo(mutableSetOf()) { it.id }
+            } else {
+                emptySet()
+            }
+            val validTrackIds = trackIds.filter { it in availableTrackIds }
+            if (validTrackIds.isNotEmpty()) {
                 audiobookDao.clearPlaylistTracksForBook(audiobookId)
                 val now = System.currentTimeMillis()
-                val entries = trackIds.map {
+                val entries = validTrackIds.map {
                     AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
                 }
                 audiobookDao.insertPlaylistTracks(entries)
@@ -145,6 +153,9 @@ class PlaylistRepository(
             val existingSet = audiobookDao.getSelectedTrackIdsForAudiobook(audiobookId).toSet()
             val toInsert = targetTrackIds.filter { it !in existingSet }.map {
                 AudiobookPlaylistTrackEntity(audiobookId = audiobookId, trackId = it, addedAt = now)
+            }
+            if (toInsert.isEmpty() && existingSet.isEmpty()) {
+                return@runInTransaction false
             }
             if (toInsert.isNotEmpty()) {
                 audiobookDao.insertPlaylistTracks(toInsert)

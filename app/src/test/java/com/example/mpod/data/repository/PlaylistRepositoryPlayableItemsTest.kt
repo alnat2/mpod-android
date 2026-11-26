@@ -213,6 +213,9 @@ class PlaylistRepositoryPlayableItemsTest {
 
     @Test
     fun syncAudiobookSelection_withTrackIds_clearsOldTracksInsertsNewAndAppendsAudiobook(): Unit = runBlocking {
+        whenever(audiobookDao.getTracksForAudiobook(10L)).thenReturn(
+            listOf(createTrack(101L, 10L, "Ch 1", 1), createTrack(102L, 10L, "Ch 2", 2))
+        )
         whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
 
         val result = repository.syncAudiobookSelection(10L, listOf(101L, 102L))
@@ -227,6 +230,9 @@ class PlaylistRepositoryPlayableItemsTest {
 
     @Test
     fun syncAudiobookSelection_orderOfOperationsIsClearThenInsertThenAppend(): Unit = runBlocking {
+        whenever(audiobookDao.getTracksForAudiobook(10L)).thenReturn(
+            listOf(createTrack(101L, 10L, "Ch 1", 1), createTrack(102L, 10L, "Ch 2", 2))
+        )
         whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
 
         val result = repository.syncAudiobookSelection(10L, listOf(101L, 102L))
@@ -236,6 +242,33 @@ class PlaylistRepositoryPlayableItemsTest {
         order.verify(audiobookDao).clearPlaylistTracksForBook(10L)
         order.verify(audiobookDao).insertPlaylistTracks(any())
         order.verify(playlistDao).appendAudiobookIfMissing(10L)
+    }
+
+    @Test
+    fun syncAudiobookSelection_withStaleDeletedTrackIds_filtersToAvailableTracksOnly(): Unit = runBlocking {
+        whenever(audiobookDao.getTracksForAudiobook(10L)).thenReturn(
+            listOf(createTrack(101L, 10L, "Ch 1", 1))
+        )
+        whenever(playlistDao.appendAudiobookIfMissing(10L)).thenReturn(true)
+
+        val result = repository.syncAudiobookSelection(10L, listOf(101L, 999L))
+
+        assertTrue(result)
+        verify(audiobookDao).insertPlaylistTracks(argThat {
+            size == 1 && map { it.trackId } == listOf(101L)
+        })
+    }
+
+    @Test
+    fun addAudiobookToPlaylist_whenNoAvailableTracksAndNoExistingSelection_returnsFalseWithoutAppending(): Unit = runBlocking {
+        whenever(audiobookDao.getTracksForAudiobook(10L)).thenReturn(emptyList())
+        whenever(audiobookDao.getSelectedTrackIdsForAudiobook(10L)).thenReturn(emptyList())
+
+        val result = repository.addAudiobookToPlaylist(10L, null)
+
+        org.junit.Assert.assertFalse(result)
+        verify(audiobookDao, never()).insertPlaylistTracks(any())
+        verify(playlistDao, never()).appendAudiobookIfMissing(10L)
     }
 
     @Test

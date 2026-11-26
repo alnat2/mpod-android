@@ -47,6 +47,13 @@ private data class ChapterSyncRequest(
     val trackIds: List<Long>
 )
 
+private data class AudiobookCombineSnapshot(
+    val audiobooksFolderUri: String?,
+    val audiobooks: List<AudiobookEntity>,
+    val playlistAudiobookIds: Set<Long>,
+    val currentPath: List<String>
+)
+
 data class AudiobooksUiState(
     val isLoading: Boolean = false,
     val isScanning: Boolean = false,
@@ -84,6 +91,7 @@ class AudiobooksViewModel @Inject constructor(
 
     private val activeBookSyncChannels = java.util.concurrent.ConcurrentHashMap<Long, Pair<Channel<ChapterSyncRequest>, Job>>()
     private val syncChannelsLock = Any()
+    private val toggleBookMutexes = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun getSyncChannelForBook(bookId: Long): Channel<ChapterSyncRequest> {
@@ -151,45 +159,63 @@ class AudiobooksViewModel @Inject constructor(
                 playlistDao.getPlaylistItemsWithAudiobooksFlow(),
                 currentPathFlow
             ) { settings, audiobooks, playlistItems, currentPath ->
-                val previousAudiobookIds = allAudiobooks.mapTo(mutableSetOf()) { it.id }
-                allAudiobooks = audiobooks
-                playlistAudiobookIds = playlistItems.map { it.audiobook.id }.toSet()
-
                 if (!hasTriggeredLegacyRescan && settings.audiobooksFolderUri != null && audiobooks.any { it.relativePath.isBlank() }) {
                     hasTriggeredLegacyRescan = true
                     onRescanLibrary()
                 }
 
-                val items = buildFilemanagerItems(
+                AudiobookCombineSnapshot(
+                    audiobooksFolderUri = settings.audiobooksFolderUri,
                     audiobooks = audiobooks,
-                    playlistIds = playlistAudiobookIds,
+                    playlistAudiobookIds = playlistItems.map { it.audiobook.id }.toSet(),
                     currentPath = currentPath
                 )
+            }.collect { snapshot ->
+                val previousAudiobookIds = allAudiobooks.mapTo(mutableSetOf()) { it.id }
+                val previousPlaylistIds = playlistAudiobookIds
+                allAudiobooks = snapshot.audiobooks
+                playlistAudiobookIds = snapshot.playlistAudiobookIds
 
-                val currentModalBook = _state.value.selectedBookForModal
-                val updatedModalBook = currentModalBook?.let { modal ->
-                    audiobooks.firstOrNull { it.id == modal.id }
+                val items = buildFilemanagerItems(
+                    audiobooks = snapshot.audiobooks,
+                    playlistIds = snapshot.playlistAudiobookIds,
+                    currentPath = snapshot.currentPath
+                )
+
+                var shouldCancelModalTracks = false
+                _state.update { current ->
+                    val currentModalBook = current.selectedBookForModal
+                    val updatedModalBook = currentModalBook?.let { modal ->
+                        snapshot.audiobooks.firstOrNull { it.id == modal.id }
+                    }
+                    val wasModalBookRemoved = currentModalBook != null &&
+                        currentModalBook.id in previousAudiobookIds &&
+                        updatedModalBook == null
+                    if (wasModalBookRemoved) {
+                        shouldCancelModalTracks = true
+                    }
+                    val wasRemovedFromPlaylist = currentModalBook != null &&
+                        currentModalBook.id in previousPlaylistIds &&
+                        currentModalBook.id !in snapshot.playlistAudiobookIds
+
+                    current.copy(
+                        isLoading = false,
+                        audiobooksFolderUri = snapshot.audiobooksFolderUri,
+                        currentPath = snapshot.currentPath,
+                        items = items,
+                        totalBooksCount = snapshot.audiobooks.size,
+                        selectedBookForModal = if (wasModalBookRemoved) null else (updatedModalBook ?: currentModalBook),
+                        selectedBookTracks = if (wasModalBookRemoved) emptyList() else current.selectedBookTracks,
+                        selectedBookPlaylistTrackIds = when {
+                            wasModalBookRemoved || wasRemovedFromPlaylist -> emptySet()
+                            else -> current.selectedBookPlaylistTrackIds
+                        }
+                    )
                 }
-                val wasModalBookRemoved = currentModalBook != null &&
-                    currentModalBook.id in previousAudiobookIds &&
-                    updatedModalBook == null
-                if (wasModalBookRemoved) {
+                if (shouldCancelModalTracks) {
                     modalTracksJob?.cancel()
                     modalTracksJob = null
                 }
-
-                _state.value.copy(
-                    isLoading = false,
-                    audiobooksFolderUri = settings.audiobooksFolderUri,
-                    currentPath = currentPath,
-                    items = items,
-                    totalBooksCount = audiobooks.size,
-                    selectedBookForModal = if (wasModalBookRemoved) null else (updatedModalBook ?: currentModalBook),
-                    selectedBookTracks = if (wasModalBookRemoved) emptyList() else _state.value.selectedBookTracks,
-                    selectedBookPlaylistTrackIds = if (wasModalBookRemoved) emptySet() else _state.value.selectedBookPlaylistTrackIds
-                )
-            }.collect { nextState ->
-                _state.value = nextState
             }
         }
     }
@@ -297,28 +323,38 @@ class AudiobooksViewModel @Inject constructor(
 
     fun toggleBookPlaylist(bookId: Long) {
         viewModelScope.launch(ioDispatcher) {
-            val inQueue = playlistDao.isAudiobookInPlaylist(bookId)
-            if (inQueue) {
-                playlistRepository.removeAudiobookFromPlaylist(bookId)
-                _state.update { s ->
-                    if (s.selectedBookForModal?.id == bookId) {
-                        s.copy(selectedBookPlaylistTrackIds = emptySet())
-                    } else s
-                }
-            } else {
-                playlistRepository.addAudiobookToPlaylist(bookId)
-                if (_state.value.selectedBookForModal?.id == bookId) {
-                    val selectedIds = audiobookRepository.getSelectedTracksForAudiobook(bookId)
-                        .map { it.id }
-                        .toSet()
-                    _state.update { s ->
-                        if (s.selectedBookForModal?.id == bookId) {
-                            s.copy(selectedBookPlaylistTrackIds = selectedIds)
-                        } else s
+            val mutex = toggleBookMutexes.getOrPut(bookId) { Mutex() }
+            mutex.withLock {
+                try {
+                    val inQueue = playlistDao.isAudiobookInPlaylist(bookId)
+                    if (inQueue) {
+                        playlistRepository.removeAudiobookFromPlaylist(bookId)
+                        _state.update { s ->
+                            if (s.selectedBookForModal?.id == bookId) {
+                                s.copy(selectedBookPlaylistTrackIds = emptySet())
+                            } else s
+                        }
+                    } else {
+                        val added = playlistRepository.addAudiobookToPlaylist(bookId)
+                        if (added && _state.value.selectedBookForModal?.id == bookId) {
+                            val selectedIds = audiobookRepository.getSelectedTracksForAudiobook(bookId)
+                                .map { it.id }
+                                .toSet()
+                            _state.update { s ->
+                                if (s.selectedBookForModal?.id == bookId) {
+                                    s.copy(selectedBookPlaylistTrackIds = selectedIds)
+                                } else s
+                            }
+                        }
+                    }
+                    queueInvalidator.invalidate()
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _state.update {
+                        it.copy(errorMessage = "Failed to update playlist: ${e.localizedMessage ?: "Unknown error"}")
                     }
                 }
             }
-            queueInvalidator.invalidate()
         }
     }
 
@@ -328,12 +364,9 @@ class AudiobooksViewModel @Inject constructor(
             val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
             val selectedIds = if (inQueue) {
-                val selectedTracks = audiobookRepository.getSelectedTracksForAudiobook(book.id)
-                if (selectedTracks.isNotEmpty()) {
-                    selectedTracks.map { it.id }.toSet()
-                } else {
-                    tracks.map { it.id }.toSet()
-                }
+                audiobookRepository.getSelectedTracksForAudiobook(book.id)
+                    .map { it.id }
+                    .toSet()
             } else {
                 emptySet()
             }
@@ -365,12 +398,6 @@ class AudiobooksViewModel @Inject constructor(
     fun closeBookModal() {
         modalTracksJob?.cancel()
         modalTracksJob = null
-        val currentBook = _state.value.selectedBookForModal
-        currentBook?.let { book ->
-            synchronized(syncChannelsLock) {
-                activeBookSyncChannels[book.id]?.first?.close()
-            }
-        }
         _state.update { s ->
             s.copy(
                 selectedBookForModal = null,
@@ -381,32 +408,35 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
-        val book = _state.value.selectedBookForModal ?: return
-        val currentSelected = _state.value.selectedBookPlaylistTrackIds.toMutableSet()
-
-        if (track.id in currentSelected) {
-            currentSelected.remove(track.id)
-        } else {
-            currentSelected.add(track.id)
+        var targetBookId: Long? = null
+        var nextSelected: Set<Long> = emptySet()
+        _state.update { s ->
+            val book = s.selectedBookForModal ?: return@update s
+            targetBookId = book.id
+            val updated = s.selectedBookPlaylistTrackIds.toMutableSet()
+            if (track.id in updated) {
+                updated.remove(track.id)
+            } else {
+                updated.add(track.id)
+            }
+            nextSelected = updated
+            s.copy(selectedBookPlaylistTrackIds = updated)
         }
-
-        _state.update { it.copy(selectedBookPlaylistTrackIds = currentSelected) }
-
-        val channel = getSyncChannelForBook(book.id)
-        channel.trySend(
+        val bookId = targetBookId ?: return
+        getSyncChannelForBook(bookId).trySend(
             ChapterSyncRequest(
-                bookId = book.id,
-                trackIds = currentSelected.toList()
+                bookId = bookId,
+                trackIds = nextSelected.toList()
             )
         )
     }
 
     fun dismissError() {
-        _state.value = _state.value.copy(errorMessage = null)
+        _state.update { it.copy(errorMessage = null) }
     }
 
     fun dismissStatus() {
-        _state.value = _state.value.copy(statusMessage = null)
+        _state.update { it.copy(statusMessage = null) }
     }
 
     override fun onCleared() {
