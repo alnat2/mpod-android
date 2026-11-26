@@ -16,6 +16,7 @@ import com.example.mpod.playback.PlaybackQueueInvalidator
 import com.example.mpod.ui.components.FilemanagerItemType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -66,7 +68,9 @@ data class AudiobooksUiState(
     val totalBooksCount: Int = 0,
     val selectedBookForModal: AudiobookEntity? = null,
     val selectedBookTracks: List<AudiobookTrackEntity> = emptyList(),
-    val selectedBookPlaylistTrackIds: Set<Long> = emptySet()
+    val selectedBookPlaylistTrackIds: Set<Long> = emptySet(),
+    internal val pendingBookTrackSelections: Map<Long, Pair<Long, Set<Long>>> = emptyMap(),
+    internal val modalSessionToken: Long = 0L
 )
 
 @HiltViewModel
@@ -93,10 +97,11 @@ class AudiobooksViewModel @Inject constructor(
     private val activeBookSyncChannels = java.util.concurrent.ConcurrentHashMap<Long, Pair<Channel<ChapterSyncRequest>, Job>>()
     private val syncChannelsLock = Any()
     private val toggleBookMutexes = java.util.concurrent.ConcurrentHashMap<Long, Mutex>()
-    private val pendingBookTrackSelections = java.util.concurrent.ConcurrentHashMap<Long, Pair<Long, Set<Long>>>()
     private val syncGenerationCounter = java.util.concurrent.atomic.AtomicLong(0L)
+    private val modalTokenCounter = java.util.concurrent.atomic.AtomicLong(0L)
     private val modalJobLock = Any()
-    private var modalJobBookId: Long? = null
+    @Volatile
+    private var activeModalToken: Long = 0L
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun getSyncChannelForBook(bookId: Long): Channel<ChapterSyncRequest> {
@@ -111,15 +116,17 @@ class AudiobooksViewModel @Inject constructor(
                     for (request in channel) {
                         try {
                             playlistRepository.syncAudiobookSelection(request.bookId, request.trackIds)
-                            pendingBookTrackSelections.computeIfPresent(request.bookId) { _, pair ->
-                                if (pair.first <= request.generation) null else pair
+                            _state.update { s ->
+                                val pending = s.pendingBookTrackSelections[request.bookId]
+                                if (pending != null && pending.first <= request.generation) {
+                                    s.copy(pendingBookTrackSelections = s.pendingBookTrackSelections - request.bookId)
+                                } else {
+                                    s
+                                }
                             }
                             queueInvalidator.invalidate()
                         } catch (e: Exception) {
                             if (e is kotlinx.coroutines.CancellationException) throw e
-                            pendingBookTrackSelections.computeIfPresent(request.bookId) { _, pair ->
-                                if (pair.first <= request.generation) null else pair
-                            }
                             handleSyncError(request, e)
                         }
                     }
@@ -138,9 +145,13 @@ class AudiobooksViewModel @Inject constructor(
 
     private suspend fun handleSyncError(request: ChapterSyncRequest, error: Exception) {
         Log.e("AudiobooksVM", "Failed to sync book ${request.bookId}", error)
-        if (_state.value.selectedBookForModal?.id != request.bookId) {
+        val alreadySuperseded = _state.value.pendingBookTrackSelections[request.bookId]?.first?.let {
+            it > request.generation
+        } == true
+        if (alreadySuperseded) {
             return
         }
+
         val actualDbState = try {
             withContext(ioDispatcher) {
                 audiobookRepository.getSelectedTracksForAudiobook(request.bookId).map { it.id }.toSet()
@@ -152,15 +163,21 @@ class AudiobooksViewModel @Inject constructor(
         }
 
         _state.update { s ->
-            val pending = pendingBookTrackSelections[request.bookId]
+            val pending = s.pendingBookTrackSelections[request.bookId]
             val hasNewerPending = pending != null && pending.first > request.generation
-            if (s.selectedBookForModal?.id == request.bookId && !hasNewerPending) {
-                s.copy(
-                    selectedBookPlaylistTrackIds = actualDbState,
-                    errorMessage = "Failed to update chapters: ${error.localizedMessage ?: "Unknown error"}"
-                )
-            } else {
+            if (hasNewerPending) {
                 s
+            } else {
+                val nextPending = s.pendingBookTrackSelections - request.bookId
+                if (s.selectedBookForModal?.id == request.bookId) {
+                    s.copy(
+                        pendingBookTrackSelections = nextPending,
+                        selectedBookPlaylistTrackIds = actualDbState,
+                        errorMessage = "Failed to update chapters: ${error.localizedMessage ?: "Unknown error"}"
+                    )
+                } else {
+                    s.copy(pendingBookTrackSelections = nextPending)
+                }
             }
         }
     }
@@ -196,9 +213,9 @@ class AudiobooksViewModel @Inject constructor(
                     currentPath = snapshot.currentPath
                 )
 
-                var removedModalBookId: Long? = null
+                var removedModalToken: Long? = null
                 _state.update { current ->
-                    removedModalBookId = null
+                    removedModalToken = null
                     val currentModalBook = current.selectedBookForModal
                     val updatedModalBook = currentModalBook?.let { modal ->
                         snapshot.audiobooks.firstOrNull { it.id == modal.id }
@@ -207,10 +224,10 @@ class AudiobooksViewModel @Inject constructor(
                         currentModalBook.id in previousAudiobookIds &&
                         updatedModalBook == null
                     if (wasModalBookRemoved) {
-                        removedModalBookId = currentModalBook?.id
+                        removedModalToken = current.modalSessionToken
                     }
                     val hasPendingSync = currentModalBook != null &&
-                        pendingBookTrackSelections.containsKey(currentModalBook.id)
+                        current.pendingBookTrackSelections.containsKey(currentModalBook.id)
                     val wasRemovedFromPlaylist = currentModalBook != null &&
                         currentModalBook.id in previousPlaylistIds &&
                         currentModalBook.id !in snapshot.playlistAudiobookIds &&
@@ -227,15 +244,16 @@ class AudiobooksViewModel @Inject constructor(
                         selectedBookPlaylistTrackIds = when {
                             wasModalBookRemoved || wasRemovedFromPlaylist -> emptySet()
                             else -> current.selectedBookPlaylistTrackIds
-                        }
+                        },
+                        modalSessionToken = if (wasModalBookRemoved) 0L else current.modalSessionToken
                     )
                 }
-                removedModalBookId?.let { removedId ->
+                removedModalToken?.takeIf { it != 0L }?.let { token ->
                     synchronized(modalJobLock) {
-                        if (modalJobBookId == removedId) {
+                        if (activeModalToken == token) {
+                            activeModalToken = 0L
                             modalTracksJob?.cancel()
                             modalTracksJob = null
-                            modalJobBookId = null
                         }
                     }
                 }
@@ -350,25 +368,36 @@ class AudiobooksViewModel @Inject constructor(
             val mutex = toggleBookMutexes.getOrPut(bookId) { Mutex() }
             mutex.withLock {
                 try {
-                    pendingBookTrackSelections.remove(bookId)
                     val inQueue = playlistDao.isAudiobookInPlaylist(bookId)
                     if (inQueue) {
                         playlistRepository.removeAudiobookFromPlaylist(bookId)
                         _state.update { s ->
+                            val nextPending = s.pendingBookTrackSelections - bookId
                             if (s.selectedBookForModal?.id == bookId) {
-                                s.copy(selectedBookPlaylistTrackIds = emptySet())
-                            } else s
+                                s.copy(
+                                    pendingBookTrackSelections = nextPending,
+                                    selectedBookPlaylistTrackIds = emptySet()
+                                )
+                            } else {
+                                s.copy(pendingBookTrackSelections = nextPending)
+                            }
                         }
                     } else {
                         val added = playlistRepository.addAudiobookToPlaylist(bookId)
-                        if (added && _state.value.selectedBookForModal?.id == bookId) {
-                            val selectedIds = audiobookRepository.getSelectedTracksForAudiobook(bookId)
+                        val selectedIds = if (added) {
+                            audiobookRepository.getSelectedTracksForAudiobook(bookId)
                                 .map { it.id }
                                 .toSet()
-                            _state.update { s ->
-                                if (s.selectedBookForModal?.id == bookId) {
-                                    s.copy(selectedBookPlaylistTrackIds = selectedIds)
-                                } else s
+                        } else emptySet()
+                        _state.update { s ->
+                            val nextPending = s.pendingBookTrackSelections - bookId
+                            if (added && s.selectedBookForModal?.id == bookId) {
+                                s.copy(
+                                    pendingBookTrackSelections = nextPending,
+                                    selectedBookPlaylistTrackIds = selectedIds
+                                )
+                            } else {
+                                s.copy(pendingBookTrackSelections = nextPending)
                             }
                         }
                     }
@@ -384,37 +413,51 @@ class AudiobooksViewModel @Inject constructor(
     }
 
     fun openBookModal(book: AudiobookEntity) {
-        val job = viewModelScope.launch(ioDispatcher) {
-            val pending = pendingBookTrackSelections[book.id]
+        val token = modalTokenCounter.incrementAndGet()
+        val job = viewModelScope.launch(ioDispatcher, start = CoroutineStart.LAZY) {
+            if (!isActive || activeModalToken != token) return@launch
+
             val tracks = audiobookRepository.getTracksForAudiobook(book.id)
-            val selectedIds = if (pending != null) {
-                pending.second.intersect(tracks.mapTo(mutableSetOf()) { it.id })
+            val availableIds = tracks.mapTo(mutableSetOf()) { it.id }
+            val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
+            val dbSelectedIds = if (inQueue) {
+                audiobookRepository.getSelectedTracksForAudiobook(book.id)
+                    .map { it.id }
+                    .toSet()
             } else {
-                val inQueue = playlistDao.isAudiobookInPlaylist(book.id)
-                if (inQueue) {
-                    audiobookRepository.getSelectedTracksForAudiobook(book.id)
-                        .map { it.id }
-                        .toSet()
-                } else {
-                    emptySet()
-                }
+                emptySet()
             }
 
-            _state.update {
-                it.copy(
+            var applied = false
+            _state.update { s ->
+                if (!isActive || activeModalToken != token) {
+                    applied = false
+                    return@update s
+                }
+                applied = true
+                val pending = s.pendingBookTrackSelections[book.id]
+                val resolvedSelectedIds = if (pending != null) {
+                    pending.second.intersect(availableIds)
+                } else {
+                    dbSelectedIds
+                }
+                s.copy(
                     selectedBookForModal = book,
                     selectedBookTracks = tracks,
-                    selectedBookPlaylistTrackIds = selectedIds
+                    selectedBookPlaylistTrackIds = resolvedSelectedIds,
+                    modalSessionToken = token
                 )
             }
+            if (!applied) return@launch
 
             audiobookRepository.getTracksForAudiobookFlow(book.id).collect { updatedTracks ->
-                val availableIds = updatedTracks.mapTo(mutableSetOf()) { it.id }
+                if (!isActive || activeModalToken != token) return@collect
+                val nextAvailableIds = updatedTracks.mapTo(mutableSetOf()) { it.id }
                 _state.update { s ->
-                    if (s.selectedBookForModal?.id == book.id) {
+                    if (s.selectedBookForModal?.id == book.id && s.modalSessionToken == token) {
                         s.copy(
                             selectedBookTracks = updatedTracks,
-                            selectedBookPlaylistTrackIds = s.selectedBookPlaylistTrackIds.intersect(availableIds)
+                            selectedBookPlaylistTrackIds = s.selectedBookPlaylistTrackIds.intersect(nextAvailableIds)
                         )
                     } else {
                         s
@@ -423,39 +466,36 @@ class AudiobooksViewModel @Inject constructor(
             }
         }
         synchronized(modalJobLock) {
+            activeModalToken = token
             modalTracksJob?.cancel()
             modalTracksJob = job
-            modalJobBookId = book.id
         }
+        job.start()
     }
 
     fun closeBookModal() {
         synchronized(modalJobLock) {
+            activeModalToken = 0L
             modalTracksJob?.cancel()
             modalTracksJob = null
-            modalJobBookId = null
         }
         _state.update { s ->
             s.copy(
                 selectedBookForModal = null,
                 selectedBookTracks = emptyList(),
-                selectedBookPlaylistTrackIds = emptySet()
+                selectedBookPlaylistTrackIds = emptySet(),
+                modalSessionToken = 0L
             )
         }
     }
 
     fun toggleTrackSelection(track: AudiobookTrackEntity) {
+        val generation = syncGenerationCounter.incrementAndGet()
         var targetBookId: Long? = null
         var nextSelected: Set<Long> = emptySet()
-        var generation = 0L
-        var lastTentativeWrite: Pair<Long, Pair<Long, Set<Long>>>? = null
         _state.update { s ->
             targetBookId = null
             nextSelected = emptySet()
-            lastTentativeWrite?.let { (prevBookId, prevPair) ->
-                pendingBookTrackSelections.remove(prevBookId, prevPair)
-            }
-            lastTentativeWrite = null
             val book = s.selectedBookForModal ?: return@update s
             if (track.audiobookId != book.id) return@update s
             targetBookId = book.id
@@ -466,11 +506,10 @@ class AudiobooksViewModel @Inject constructor(
                 updated.add(track.id)
             }
             nextSelected = updated
-            generation = syncGenerationCounter.incrementAndGet()
-            val entry = generation to updated
-            pendingBookTrackSelections[book.id] = entry
-            lastTentativeWrite = book.id to entry
-            s.copy(selectedBookPlaylistTrackIds = updated)
+            s.copy(
+                selectedBookPlaylistTrackIds = updated,
+                pendingBookTrackSelections = s.pendingBookTrackSelections + (book.id to (generation to updated))
+            )
         }
         val bookId = targetBookId ?: return
         getSyncChannelForBook(bookId).trySend(

@@ -1012,6 +1012,127 @@ class AudiobooksViewModelTest {
 
             // Must preserve {101L, 102L} rather than rolling back to emptyList()
             assertEquals(setOf(101L, 102L), viewModel.state.value.selectedBookPlaylistTrackIds)
+            assertNull(viewModel.state.value.errorMessage)
+        } finally {
+            executor.shutdownNow()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun toggleTrackSelection_afterModalClosedOrSwitched_doesNotLeaveGhostPendingSelection() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val bookA = AudiobookEntity(id = 10L, folderUri = "uri://bookA", title = "Book A")
+            val bookB = AudiobookEntity(id = 20L, folderUri = "uri://bookB", title = "Book B")
+            val trackA1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "A1", fileUri = "uri://a1", trackNumber = 1)
+            val trackB1 = AudiobookTrackEntity(id = 201L, audiobookId = 20L, title = "B1", fileUri = "uri://b1", trackNumber = 1)
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(flowOf(listOf(bookA, bookB)))
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(playlistDao.isAudiobookInPlaylist(20L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(trackA1))
+            `when`(audiobookRepository.getTracksForAudiobook(20L)).thenReturn(listOf(trackB1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(trackA1)))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(20L)).thenReturn(flowOf(listOf(trackB1)))
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = testDispatcher }
+            advanceUntilIdle()
+
+            viewModel.openBookModal(bookA)
+            advanceUntilIdle()
+
+            // Switch to Book B; toggling trackA1 from Book A must be ignored
+            viewModel.openBookModal(bookB)
+            advanceUntilIdle()
+            viewModel.toggleTrackSelection(trackA1)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.state.value.pendingBookTrackSelections.isEmpty())
+
+            // Reopen Book A: must show empty selection (no ghost pending selection)
+            viewModel.openBookModal(bookA)
+            advanceUntilIdle()
+            assertTrue(viewModel.state.value.selectedBookPlaylistTrackIds.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun wasModalBookRemoved_doesNotCancelNewlyOpenedBookTracksFlow() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val concurrentIo = executor.asCoroutineDispatcher()
+        try {
+            val audiobookRepository = mock(AudiobookRepository::class.java)
+            val playlistRepository = mock(PlaylistRepository::class.java)
+            val playlistDao = mock(PlaylistDao::class.java)
+            val appSettingsStore = mock(AppSettingsStore::class.java)
+            val queueInvalidator = mock(PlaybackQueueInvalidator::class.java)
+
+            val bookA = AudiobookEntity(id = 10L, folderUri = "uri://bookA", title = "Book A")
+            val bookB = AudiobookEntity(id = 20L, folderUri = "uri://bookB", title = "Book B")
+            val trackA1 = AudiobookTrackEntity(id = 101L, audiobookId = 10L, title = "A1", fileUri = "uri://a1", trackNumber = 1)
+            val trackB1 = AudiobookTrackEntity(id = 201L, audiobookId = 20L, title = "B1", fileUri = "uri://b1", trackNumber = 1)
+            val trackB2 = AudiobookTrackEntity(id = 202L, audiobookId = 20L, title = "B2", fileUri = "uri://b2", trackNumber = 2)
+
+            val booksFlow = kotlinx.coroutines.flow.MutableStateFlow(listOf(bookA, bookB))
+            val tracksBFlow = kotlinx.coroutines.flow.MutableStateFlow(listOf(trackB1))
+
+            `when`(appSettingsStore.settingsFlow).thenReturn(flowOf(AppSettings()))
+            `when`(audiobookRepository.audiobooksFlow).thenReturn(booksFlow)
+            `when`(playlistDao.getPlaylistItemsWithAudiobooksFlow()).thenReturn(flowOf(emptyList()))
+            `when`(playlistDao.isAudiobookInPlaylist(10L)).thenReturn(false)
+            `when`(playlistDao.isAudiobookInPlaylist(20L)).thenReturn(false)
+            `when`(audiobookRepository.getTracksForAudiobook(10L)).thenReturn(listOf(trackA1))
+            `when`(audiobookRepository.getTracksForAudiobook(20L)).thenReturn(listOf(trackB1))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(10L)).thenReturn(flowOf(listOf(trackA1)))
+            `when`(audiobookRepository.getTracksForAudiobookFlow(20L)).thenReturn(tracksBFlow)
+
+            val viewModel = AudiobooksViewModel(
+                audiobookRepository, playlistRepository, playlistDao, appSettingsStore, queueInvalidator
+            ).apply { ioDispatcher = concurrentIo }
+
+            val initDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.isLoading && System.currentTimeMillis() < initDeadline) {
+                Thread.sleep(10)
+            }
+
+            viewModel.openBookModal(bookA)
+            val modalADeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal?.id != bookA.id && System.currentTimeMillis() < modalADeadline) {
+                Thread.sleep(10)
+            }
+
+            // Switch to Book B while removing Book A from library
+            viewModel.openBookModal(bookB)
+            booksFlow.value = listOf(bookB)
+
+            val modalBDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookForModal?.id != bookB.id && System.currentTimeMillis() < modalBDeadline) {
+                Thread.sleep(10)
+            }
+
+            // Book B's tracks flow must remain active and deliver updates
+            tracksBFlow.value = listOf(trackB1, trackB2)
+            val tracksDeadline = System.currentTimeMillis() + 2_000L
+            while (viewModel.state.value.selectedBookTracks.size != 2 && System.currentTimeMillis() < tracksDeadline) {
+                Thread.sleep(10)
+            }
+            assertEquals(listOf(trackB1, trackB2), viewModel.state.value.selectedBookTracks)
         } finally {
             executor.shutdownNow()
             Dispatchers.resetMain()
